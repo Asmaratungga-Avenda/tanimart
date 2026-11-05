@@ -28,6 +28,22 @@ class ProductController extends Controller
         return response()->json($response, (int) $code);
     }
 
+    public function categories()
+    {
+        if (Schema::hasTable('categories')) {
+            $categories = \Illuminate\Support\Facades\DB::table('categories')->get();
+        } else {
+            $categories = Product::select('kategori')->distinct()->get()->pluck('kategori');
+        }
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Daftar kategori berhasil diambil',
+            $categories
+        );
+    }
+
     public function index(Request $request)
     {
         $query = Product::query();
@@ -93,7 +109,12 @@ class ProductController extends Controller
             );
         }
 
-        $product = Product::create($request->all());
+        $validated = $validator->validated();
+        if (isset($validated['stok']) && $validated['stok'] <= 0 && !isset($validated['tersedia'])) {
+            $validated['tersedia'] = false;
+        }
+
+        $product = Product::create($validated);
 
         return $this->jsonResponse(
             'sukses',
@@ -136,7 +157,12 @@ class ProductController extends Controller
             );
         }
 
-        $product->update($request->all());
+        $validated = $validator->validated();
+        if (isset($validated['stok']) && $validated['stok'] <= 0 && !isset($validated['tersedia'])) {
+            $validated['tersedia'] = false;
+        }
+
+        $product->update($validated);
 
         return $this->jsonResponse(
             'sukses',
@@ -158,13 +184,33 @@ class ProductController extends Controller
             );
         }
 
-        // Pengecekan aman: hanya jalankan aturan 409 jika tabel order_details benar-benar sudah ada
-        if (Schema::hasTable('order_details')) {
-            $isUsed = $product->orderDetails()->whereHas('order', function ($query) {
+        // Pengecekan aman jika relasi pesanan ada
+        if (Schema::hasTable('order_items')) {
+            $isUsedInActiveOrder = $product->orderItems()->whereHas('order', function ($query) {
                 $query->whereNotIn('status', ['selesai', 'dibatalkan']);
             })->exists();
 
-            if ($isUsed) {
+            if ($isUsedInActiveOrder) {
+                return $this->jsonResponse(
+                    'gagal',
+                    409,
+                    'Produk tidak dapat dihapus karena masih terpakai pada pesanan aktif'
+                );
+            }
+
+            if ($product->orderItems()->exists()) {
+                return $this->jsonResponse(
+                    'gagal',
+                    409,
+                    'Produk tidak dapat dihapus karena memiliki riwayat pesanan'
+                );
+            }
+        } elseif (Schema::hasTable('order_details')) {
+            $isUsedInActiveOrder = $product->orderDetails()->whereHas('order', function ($query) {
+                $query->whereNotIn('status', ['selesai', 'dibatalkan']);
+            })->exists();
+
+            if ($isUsedInActiveOrder) {
                 return $this->jsonResponse(
                     'gagal',
                     409,
@@ -173,7 +219,15 @@ class ProductController extends Controller
             }
         }
 
-        $product->delete();
+        try {
+            $product->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            return $this->jsonResponse(
+                'gagal',
+                409,
+                'Produk tidak dapat dihapus karena masih memiliki keterkaitan dengan data lain'
+            );
+        }
 
         return $this->jsonResponse(
             'sukses',
