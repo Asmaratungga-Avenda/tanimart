@@ -28,7 +28,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Bayam hijau segar dipetik langsung dari kebun lokal.',
                 'satuan_jual' => 'ikat',
                 'mudah_rusak' => true,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 2,
@@ -40,7 +40,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Kangkung segar pilihan untuk ditumis.',
                 'satuan_jual' => 'ikat',
                 'mudah_rusak' => true,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 3,
@@ -52,7 +52,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Tomat merah segar tanpa pestisida buatan.',
                 'satuan_jual' => 'kg',
                 'mudah_rusak' => true,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 4,
@@ -64,7 +64,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Cabai rawit super pedas pilihan petani.',
                 'satuan_jual' => 'kg',
                 'mudah_rusak' => true,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 5,
@@ -76,7 +76,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Kentang kualitas dataran tinggi Dieng.',
                 'satuan_jual' => 'kg',
                 'mudah_rusak' => false,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 6,
@@ -88,7 +88,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Wortel segar kaya vitamin A.',
                 'satuan_jual' => 'kg',
                 'mudah_rusak' => false,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 7,
@@ -100,7 +100,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Bawang merah berkualitas tinggi khas Brebes.',
                 'satuan_jual' => 'kg',
                 'mudah_rusak' => true,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
 
             // Kategori 2: Sembako & Kebutuhan Harian
@@ -114,7 +114,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Beras putih pulen kualitas super kemasan 5 kg.',
                 'satuan_jual' => 'pak',
                 'mudah_rusak' => false,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 9,
@@ -126,7 +126,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Minyak goreng jernih kemasan 1 liter.',
                 'satuan_jual' => 'liter',
                 'mudah_rusak' => false,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 10,
@@ -138,7 +138,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Telur ayam negeri segar setiap hari.',
                 'satuan_jual' => 'kg',
                 'mudah_rusak' => true,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 11,
@@ -150,7 +150,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Gula pasir manis higienis.',
                 'satuan_jual' => 'kg',
                 'mudah_rusak' => false,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
             [
                 'id' => 12,
@@ -162,7 +162,7 @@ class DatabaseSeeder extends Seeder
                 'deskripsi' => 'Tepung terigu kualitas bagus untuk aneka masakan.',
                 'satuan_jual' => 'pak',
                 'mudah_rusak' => false,
-                'created_at' => now(), 'updated_at' => now()
+                'created_at' => now(), 'updated_at' => now(),
             ],
         ], ['id'], [
             'nama',
@@ -173,6 +173,65 @@ class DatabaseSeeder extends Seeder
             'deskripsi',
             'satuan_jual',
             'mudah_rusak',
+            'updated_at',
+        ]);
+
+        DB::table('couriers')->upsert([
+            ['id' => 1, 'nama' => 'Kurir Toko Area Dekat', 'tarif' => 10000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'nama' => 'Kurir Toko Area Jauh', 'tarif' => 20000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
+        ], ['id'], ['nama', 'tarif', 'aktif', 'updated_at']);
+
+        DB::table('payment_methods')->upsert([
+            ['id' => 1, 'nama' => 'Transfer Bank', 'deskripsi' => 'Simulasi pembayaran melalui transfer bank.', 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'nama' => 'Bayar di Tempat', 'deskripsi' => 'Simulasi pembayaran saat pesanan diterima.', 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
+        ], ['id'], ['nama', 'deskripsi', 'aktif', 'updated_at']);
+
+        DB::table('orders')->upsert([
+            [
+                'nama_penerima' => 'Contoh Penerima',
+                'alamat_penerima' => 'Jl. Tani No. 1',
+                'kurir_id' => 1,
+                'payment_method_id' => 1,
+                'subtotal' => 75000,
+                'ongkir' => 10000,
+                'total_harga' => 85000,
+                'status' => 'menunggu_pembayaran',
+                'tanggal_antar' => now()->toDateString(),
+                'idempotency_key' => 'contoh-pesanan-seeder',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ], ['idempotency_key'], [
+            'nama_penerima',
+            'alamat_penerima',
+            'kurir_id',
+            'payment_method_id',
+            'subtotal',
+            'ongkir',
+            'total_harga',
+            'status',
+            'tanggal_antar',
+            'updated_at',
+        ]);
+
+        $sampleOrderId = DB::table('orders')
+            ->where('idempotency_key', 'contoh-pesanan-seeder')
+            ->value('id');
+
+        DB::table('order_items')->upsert([
+            [
+                'order_id' => $sampleOrderId,
+                'product_id' => 8,
+                'quantity' => 1,
+                'harga_satuan' => 75000,
+                'subtotal' => 75000,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ], ['order_id', 'product_id'], [
+            'quantity',
+            'harga_satuan',
+            'subtotal',
             'updated_at',
         ]);
     }
