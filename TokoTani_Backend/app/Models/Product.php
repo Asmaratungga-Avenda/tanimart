@@ -11,4 +11,12 @@ class Product extends Model
 
     // Melindungi kolom id agar tidak bisa diisi sembarang, sisanya mass-assignable
     protected $guarded = ['id'];
+
+    // Menambahkan field virtual nama_produk agar serasi dengan kebutuhan Frontend
+    protected $appends = ['nama_produk'];
+
+    public function getNamaProdukAttribute()
+    {
+        return $this->attributes['nama'] ?? null;
+    }
 }

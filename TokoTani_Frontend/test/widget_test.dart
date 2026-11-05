@@ -1,30 +1,59 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:tokotani/main.dart';
+import 'package:tokotani/views/halamanDetail.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Memuat aplikasi TokoTaniApp dan menampilkan Halaman Katalog', (WidgetTester tester) async {
+    // Memuat aplikasi utama
+    await tester.pumpWidget(const TokoTaniApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Memverifikasi judul AppBar 'Produk Pertanian' dan ikon pencarian muncul di halaman katalog
+    expect(find.text('Produk Pertanian'), findsOneWidget);
+    expect(find.byIcon(Icons.search), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('Memuat HalamanDetail produk dan menguji perubahan jumlah pembelian', (WidgetTester tester) async {
+    final mockProduk = {
+      'id': 1,
+      'nama': 'Bayam Hijau Segar',
+      'nama_produk': 'Bayam Hijau Segar',
+      'harga': 5000,
+      'satuan_jual': 'ikat',
+      'stok': 10,
+      'mudah_rusak': true,
+      'deskripsi': 'Bayam segar langsung dari petani lokal.',
+    };
+
+    // Render HalamanDetail secara langsung dengan data simulasi produk
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HalamanDetail(produk: mockProduk),
+      ),
+    );
+
+    // Verifikasi komponen utama di HalamanDetail muncul
+    expect(find.text('Rincian Produk'), findsOneWidget);
+    expect(find.text('Bayam Hijau Segar'), findsOneWidget);
+    expect(find.text('Rp 5000'), findsOneWidget);
+    expect(find.text('Tambah ke Keranjang'), findsOneWidget);
+
+    // Verifikasi jumlah beli awal adalah 1
+    expect(find.text('1'), findsOneWidget);
+
+    // Tekan tombol tambah jumlah pesanan (+)
+    await tester.tap(find.byIcon(Icons.add_circle_outline));
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
+    // Verifikasi jumlah pembelian bertambah menjadi 2
+    expect(find.text('2'), findsOneWidget);
+
+    // Tekan tombol kurangi jumlah pesanan (-)
+    await tester.tap(find.byIcon(Icons.remove_circle_outline));
+    await tester.pump();
+
+    // Verifikasi kembali menjadi 1
     expect(find.text('1'), findsOneWidget);
   });
 }
