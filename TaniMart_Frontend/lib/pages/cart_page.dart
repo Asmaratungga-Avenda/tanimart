@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/widgets/product_image.dart';
 import '../models/cart_item.dart';
 import '../services/api_service.dart';
 import '../widgets/responsive_wrapper.dart';
@@ -434,19 +435,17 @@ class _CartPageState extends State<CartPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gambar / Thumbnail Produk
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          // Gambar / Thumbnail Produk Nyata
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: ProductImage(
+                productName: item.nama,
+                fit: BoxFit.cover,
               ),
-              borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.eco, size: 38, color: Color(0xFF2E7D32)),
           ),
           const SizedBox(width: 14),
 

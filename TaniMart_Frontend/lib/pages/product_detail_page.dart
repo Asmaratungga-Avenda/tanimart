@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../core/theme/app_theme.dart';
+import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
 
@@ -132,31 +134,30 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   Widget _buildImageSection() {
     return SizedBox(
-      height: 300,
+      height: 320,
       width: double.infinity,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          _product.foto != null && _product.foto!.startsWith('http')
-              ? Image.network(
-                  _product.foto!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => _placeholderBig(),
-                )
-              : _placeholderBig(),
+          ProductImage(
+            imageUrl: _product.foto,
+            productName: _product.nama,
+            category: _product.kategori,
+            fit: BoxFit.cover,
+          ),
           // Gradient overlay
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: Container(
-              height: 80,
+              height: 90,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.5),
+                    Colors.black.withValues(alpha: 0.6),
                     Colors.transparent,
                   ],
                 ),
@@ -510,14 +511,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _placeholderBig() {
-    return Container(
-      color: const Color(0xFFE8F5E9),
-      child: Center(
-        child: Text(
-          _emojiForCategory(_product.kategori),
-          style: const TextStyle(fontSize: 100),
-        ),
-      ),
+    return ProductImage(
+      imageUrl: _product.foto,
+      productName: _product.nama,
+      category: _product.kategori,
+      fit: BoxFit.cover,
     );
   }
 }

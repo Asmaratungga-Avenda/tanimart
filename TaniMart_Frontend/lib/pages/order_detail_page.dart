@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../core/widgets/product_image.dart';
 import '../models/order.dart';
 import '../services/api_service.dart';
 
@@ -422,16 +423,16 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: ProductImage(
+                          productName: item.namaProduk,
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                      child: const Center(
-                          child:
-                              Text('🌿', style: TextStyle(fontSize: 22))),
                     ),
                     const SizedBox(width: 10),
                     Expanded(

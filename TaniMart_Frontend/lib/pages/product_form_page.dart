@@ -21,6 +21,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
   late final TextEditingController stokCtrl;
   late final TextEditingController deskripsiCtrl;
   late final TextEditingController satuanCtrl;
+  late final TextEditingController fotoCtrl;
 
   bool tersedia = true;
   bool mudahRusak = false;
@@ -59,6 +60,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
     stokCtrl = TextEditingController(text: p != null ? p.stok.toString() : '10');
     deskripsiCtrl = TextEditingController(text: p?.deskripsi ?? '');
     satuanCtrl = TextEditingController(text: p?.satuanJual ?? 'kg');
+    fotoCtrl = TextEditingController(text: p?.foto ?? '');
     tersedia = p?.tersedia ?? true;
     mudahRusak = p?.mudahRusak ?? false;
   }
@@ -71,6 +73,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
     stokCtrl.dispose();
     deskripsiCtrl.dispose();
     satuanCtrl.dispose();
+    fotoCtrl.dispose();
     super.dispose();
   }
 
@@ -100,6 +103,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
       'deskripsi': deskripsiCtrl.text.trim().isEmpty ? null : deskripsiCtrl.text.trim(),
       'satuan_jual': satuanCtrl.text.trim(),
       'mudah_rusak': mudahRusak,
+      if (fotoCtrl.text.trim().isNotEmpty) 'foto': fotoCtrl.text.trim(),
     };
 
     try {
@@ -365,6 +369,19 @@ class _ProductFormPageState extends State<ProductFormPage> {
                 errorText: fieldErrors['deskripsi'],
               ),
               onChanged: (_) => _clearFieldError('deskripsi'),
+            ),
+            const SizedBox(height: 14),
+
+            // Foto Produk (Opsional / fallback ke aset lokal)
+            TextFormField(
+              controller: fotoCtrl,
+              decoration: const InputDecoration(
+                labelText: 'URL Foto Produk (Opsional)',
+                hintText: 'https://domain.com/foto_produk.jpg',
+                prefixIcon: Icon(Icons.image_outlined, color: Color(0xFF64748B)),
+                helperText: 'Kosongkan untuk otomatis menggunakan aset foto lokal AgriMart',
+                helperStyle: TextStyle(fontSize: 11),
+              ),
             ),
             const SizedBox(height: 16),
 

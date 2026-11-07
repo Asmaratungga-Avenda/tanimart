@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../core/theme/app_theme.dart';
+import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
 import 'product_detail_page.dart';
 
 class ProductCatalogPage extends StatefulWidget {
   final String? initialCategory;
+  final String? initialQuery;
 
-  const ProductCatalogPage({super.key, this.initialCategory});
+  const ProductCatalogPage({super.key, this.initialCategory, this.initialQuery});
 
   @override
   State<ProductCatalogPage> createState() => _ProductCatalogPageState();
@@ -20,31 +23,34 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
 
   String _selectedCategory = 'Semua';
   String _sortBy = 'default';
-  final TextEditingController _searchController = TextEditingController();
+  late final TextEditingController _searchController;
   String _searchQuery = '';
 
-  static const _primaryGreen = Color(0xFF2E7D32);
-  static const _lightGreen = Color(0xFFE8F5E9);
-  static const _textPrimary = Color(0xFF1F2937);
-  static const _textSecondary = Color(0xFF6B7280);
+  static const _primaryGreen = AppTheme.primaryGreen;
+  static const _lightGreen = AppTheme.lightGreen;
+  static const _textPrimary = AppTheme.textPrimary;
+  static const _textSecondary = AppTheme.textSecondary;
 
   final List<String> _categories = [
     'Semua',
-    'Beras & Biji-bijian',
+    'Sayuran dan Buah Segar',
+    'Sembako dan Kebutuhan Harian',
     'Sayuran',
+    'Beras & Biji-bijian',
     'Bumbu & Rempah',
     'Bibit & Benih',
     'Pupuk',
     'Peralatan',
-    'Kebutuhan Harian',
     'Lainnya',
   ];
 
   @override
   void initState() {
     super.initState();
+    _searchQuery = widget.initialQuery ?? '';
+    _searchController = TextEditingController(text: _searchQuery);
+
     if (widget.initialCategory != null) {
-      // try to match the initial category
       final match = _categories.firstWhere(
         (c) => c.toLowerCase().contains(
             widget.initialCategory!.toLowerCase().replaceAll(' & ', ' ')),
@@ -314,9 +320,9 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 0.68,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.62,
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 14,
                 ),
                 itemCount: sorted.length,
                 itemBuilder: (ctx, i) => _CatalogProductCard(
@@ -377,9 +383,9 @@ class _CatalogProductCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onAddToCart;
 
-  static const _primaryGreen = Color(0xFF2E7D32);
-  static const _textPrimary = Color(0xFF1F2937);
-  static const _textSecondary = Color(0xFF6B7280);
+  static const _primaryGreen = AppTheme.primaryGreen;
+  static const _textPrimary = AppTheme.textPrimary;
+  static const _textSecondary = AppTheme.textSecondary;
 
   const _CatalogProductCard({
     required this.product,
@@ -391,18 +397,6 @@ class _CatalogProductCard extends StatelessWidget {
     return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
   }
 
-  String _emoji() {
-    final k = product.kategori.toLowerCase();
-    if (k.contains('beras') || k.contains('biji')) return '🌾';
-    if (k.contains('sayur')) return '🥬';
-    if (k.contains('bumbu') || k.contains('rempah')) return '🌶️';
-    if (k.contains('bibit') || k.contains('benih')) return '🌱';
-    if (k.contains('pupuk')) return '🧪';
-    if (k.contains('alat')) return '🛠️';
-    if (k.contains('harian')) return '🧴';
-    return '🌿';
-  }
-
   @override
   Widget build(BuildContext context) {
     final isAvailable = product.tersedia && product.stok > 0;
@@ -411,41 +405,45 @@ class _CatalogProductCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.055),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              flex: 5,
+            AspectRatio(
+              aspectRatio: 1.0,
               child: ClipRRect(
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                    const BorderRadius.vertical(top: Radius.circular(18)),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    product.foto != null && product.foto!.startsWith('http')
-                        ? Image.network(
-                            product.foto!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => _placeholder(),
-                          )
-                        : _placeholder(),
+                    ProductImage(
+                      imageUrl: product.foto,
+                      productName: product.nama,
+                      category: product.kategori,
+                      fit: BoxFit.cover,
+                    ),
                     if (!isAvailable)
                       Container(
-                        color: Colors.black.withValues(alpha: 0.4),
+                        color: Colors.black.withValues(alpha: 0.5),
                         child: const Center(
-                          child: Text('Stok Habis',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold)),
+                          child: Text(
+                            'Stok Habis',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       ),
                     if (product.mudahRusak)
@@ -456,13 +454,17 @@ class _CatalogProductCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                              color: Colors.orange.shade700,
-                              borderRadius: BorderRadius.circular(6)),
-                          child: const Text('Segar',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold)),
+                            color: const Color(0xFFF59E0B),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Segar',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                   ],
@@ -470,7 +472,6 @@ class _CatalogProductCard extends StatelessWidget {
               ),
             ),
             Expanded(
-              flex: 4,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                 child: Column(
@@ -479,9 +480,10 @@ class _CatalogProductCard extends StatelessWidget {
                     Text(
                       product.kategori,
                       style: GoogleFonts.poppins(
-                          fontSize: 9.5,
-                          color: _primaryGreen,
-                          fontWeight: FontWeight.w500),
+                        fontSize: 9.5,
+                        color: _primaryGreen,
+                        fontWeight: FontWeight.w600,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -489,30 +491,48 @@ class _CatalogProductCard extends StatelessWidget {
                     Text(
                       product.nama,
                       style: GoogleFonts.poppins(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: _textPrimary,
-                          height: 1.2),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: _textPrimary,
+                        height: 1.2,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const Spacer(),
-                    Text(
-                      _formatRupiah(product.harga),
-                      style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: _primaryGreen),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          _formatRupiah(product.harga),
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryGreen,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '/${product.satuanJual}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 9.5,
+                            color: _textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
-                      '/ ${product.satuanJual} · Stok: ${product.stok}',
+                      'Stok: ${product.stok}',
                       style: GoogleFonts.poppins(
-                          fontSize: 9.5, color: _textSecondary),
+                        fontSize: 9.5,
+                        color: _textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     SizedBox(
                       width: double.infinity,
-                      height: 30,
+                      height: 32,
                       child: FilledButton(
                         onPressed: isAvailable ? onAddToCart : null,
                         style: FilledButton.styleFrom(
@@ -520,12 +540,13 @@ class _CatalogProductCard extends StatelessWidget {
                           disabledBackgroundColor: Colors.grey.shade200,
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                         child: Text(
                           isAvailable ? '+ Keranjang' : 'Habis',
                           style: GoogleFonts.poppins(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w600,
                             color: isAvailable
                                 ? Colors.white
@@ -541,14 +562,6 @@ class _CatalogProductCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _placeholder() {
-    return Container(
-      color: const Color(0xFFE8F5E9),
-      child: Center(
-          child: Text(_emoji(), style: const TextStyle(fontSize: 44))),
     );
   }
 }

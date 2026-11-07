@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'core/theme/app_theme.dart';
+import 'core/constants/product_images.dart';
 import 'pages/cart_page.dart';
 import 'pages/home_page.dart';
 import 'pages/manage_product_page.dart';
@@ -34,79 +36,8 @@ class TaniMartApp extends StatelessWidget {
     return MaterialApp(
       title: 'Tani Mart',
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(),
+      theme: AppTheme.lightTheme,
       home: home ?? const MainNavPage(),
-    );
-  }
-
-  ThemeData _buildTheme() {
-    final base = ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF2E7D32),
-        primary: const Color(0xFF2E7D32),
-        secondary: const Color(0xFF4CAF50),
-        surface: Colors.white,
-      ),
-      useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFF7F9F6),
-    );
-
-    return base.copyWith(
-      textTheme: GoogleFonts.poppinsTextTheme(base.textTheme),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF2E7D32),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-        ),
-      ),
-      cardTheme: const CardThemeData(
-        elevation: 0,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: const Color(0xFFF8FAFC),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.red.shade400),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.red.shade700, width: 1.5),
-        ),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF2E7D32),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        ),
-      ),
     );
   }
 }
@@ -136,6 +67,7 @@ class MainNavPage extends StatefulWidget {
 
 class _MainNavPageState extends State<MainNavPage> {
   late int _currentIndex;
+  int _cartCount = 0;
 
   static const _primaryGreen = Color(0xFF2E7D32);
   static const _lightGreen = Color(0xFFE8F5E9);
@@ -144,9 +76,23 @@ class _MainNavPageState extends State<MainNavPage> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _refreshCartCount();
   }
 
-  void _goToTab(int index) => setState(() => _currentIndex = index);
+  void _refreshCartCount() async {
+    try {
+      final cart = await ApiService.getCart();
+      if (!mounted) return;
+      setState(() {
+        _cartCount = cart.items.fold(0, (sum, i) => sum + i.jumlah);
+      });
+    } catch (_) {}
+  }
+
+  void _goToTab(int index) {
+    setState(() => _currentIndex = index);
+    _refreshCartCount();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -156,9 +102,12 @@ class _MainNavPageState extends State<MainNavPage> {
         onGoToProducts: () => _goToTab(1),
       ),
       const ProductCatalogPage(),
-      CartPage(showBackButton: false, onCheckout: () {}),
+      CartPage(
+        showBackButton: false,
+        onCheckout: () => _goToTab(3),
+      ),
       const OrdersPage(),
-      const ProfilePage(),
+      const ManageProductsPage(),
     ];
 
     return Scaffold(
@@ -170,13 +119,21 @@ class _MainNavPageState extends State<MainNavPage> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                ProductImages.logo,
+                height: 28,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.eco, color: Colors.white, size: 20),
+                ),
               ),
-              child: const Icon(Icons.eco, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 8),
             const Text(
@@ -184,13 +141,23 @@ class _MainNavPageState extends State<MainNavPage> {
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 19,
+                fontSize: 18,
                 letterSpacing: -0.3,
               ),
             ),
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline, color: Colors.white),
+            tooltip: 'Profil Saya',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.assignment_outlined, color: Colors.white),
             tooltip: 'Ringkasan Tugas & Rubrik',
@@ -217,7 +184,7 @@ class _MainNavPageState extends State<MainNavPage> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, -3),
           ),
@@ -231,28 +198,38 @@ class _MainNavPageState extends State<MainNavPage> {
           elevation: 0,
           indicatorColor: _lightGreen,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home, color: _primaryGreen),
               label: 'Beranda',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.storefront_outlined),
               selectedIcon: Icon(Icons.storefront, color: _primaryGreen),
               label: 'Produk',
             ),
             NavigationDestination(
-              icon: Icon(Icons.shopping_cart_outlined),
-              selectedIcon: Icon(Icons.shopping_cart, color: _primaryGreen),
+              icon: Badge(
+                isLabelVisible: _cartCount > 0,
+                label: Text('$_cartCount'),
+                backgroundColor: const Color(0xFFF59E0B),
+                child: const Icon(Icons.shopping_cart_outlined),
+              ),
+              selectedIcon: Badge(
+                isLabelVisible: _cartCount > 0,
+                label: Text('$_cartCount'),
+                backgroundColor: const Color(0xFFF59E0B),
+                child: const Icon(Icons.shopping_cart, color: _primaryGreen),
+              ),
               label: 'Keranjang Belanja',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.receipt_long_outlined),
               selectedIcon: Icon(Icons.receipt_long, color: _primaryGreen),
               label: 'Pesanan',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.inventory_2_outlined),
               selectedIcon: Icon(Icons.inventory_2, color: _primaryGreen),
               label: 'Kelola Produk',
