@@ -416,33 +416,37 @@ class _CartPageState extends State<CartPage> {
     final itemTotal = item.harga * item.jumlah;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Gambar / Thumbnail Produk
           Container(
-            width: 64,
-            height: 64,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.eco, size: 36, color: Color(0xFF2E7D32)),
+            child: const Icon(Icons.eco, size: 38, color: Color(0xFF2E7D32)),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
 
           // Detail Produk
           Expanded(
@@ -450,74 +454,98 @@ class _CartPageState extends State<CartPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        item.nama,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Color(0xFF1E293B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.nama,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: Color(0xFF1E293B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${formatRupiah(item.harga)} / ${item.satuanJual}',
+                            style: const TextStyle(
+                              color: Color(0xFF2E7D32),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    InkWell(
-                      onTap: isProcessing ? null : () => removeItem(item),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.close, size: 16, color: Color(0xFF94A3B8)),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: isProcessing ? null : () => removeItem(item),
+                        child: const Padding(
+                          padding: EdgeInsets.all(6),
+                          child: Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${formatRupiah(item.harga)}/${item.satuanJual}',
-                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
                 // Stepper Jumlah dan Subtotal Item Sesuai Desain
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Stepper (- / qty / +)
+                    // Stepper (- / qty / +) dengan target sentuh ergonomis
                     Container(
                       decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
                         border: Border.all(color: const Color(0xFFCBD5E1)),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          InkWell(
-                            onTap: (isProcessing || item.jumlah <= 1)
-                                ? null
-                                : () => changeQuantity(item, item.jumlah - 1),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              child: Icon(
-                                Icons.remove,
-                                size: 14,
-                                color: item.jumlah > 1 ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: const BorderRadius.horizontal(left: Radius.circular(9)),
+                              onTap: (isProcessing || item.jumlah <= 1)
+                                  ? null
+                                  : () => changeQuantity(item, item.jumlah - 1),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                child: Icon(
+                                  Icons.remove,
+                                  size: 16,
+                                  color: item.jumlah > 1 ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
+                                ),
                               ),
                             ),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 28),
+                            alignment: Alignment.center,
                             child: Text(
                               '${item.jumlah}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                           ),
-                          InkWell(
-                            onTap: isProcessing ? null : () => changeQuantity(item, item.jumlah + 1),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              child: Icon(Icons.add, size: 14, color: Color(0xFF1E293B)),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: const BorderRadius.horizontal(right: Radius.circular(9)),
+                              onTap: isProcessing ? null : () => changeQuantity(item, item.jumlah + 1),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                child: Icon(Icons.add, size: 16, color: Color(0xFF1E293B)),
+                              ),
                             ),
                           ),
                         ],
@@ -528,7 +556,7 @@ class _CartPageState extends State<CartPage> {
                     Text(
                       formatRupiah(itemTotal),
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E293B),
                       ),
@@ -547,35 +575,64 @@ class _CartPageState extends State<CartPage> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            offset: const Offset(0, -3),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.07),
+            offset: const Offset(0, -4),
+            blurRadius: 14,
           ),
         ],
       ),
       child: SafeArea(
+        top: false,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
                     children: [
-                      const Column(
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Total Belanja',
-                            style: TextStyle(fontSize: 14, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                          Row(
+                            children: [
+                              const Text(
+                                'Total Belanja',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE8F5E9),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '${items.length} item',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF2E7D32),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            'Subtotal dari server',
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Subtotal dari API server',
                             style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                           ),
                         ],
@@ -583,21 +640,23 @@ class _CartPageState extends State<CartPage> {
                       Text(
                         formatRupiah(subtotal),
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1E293B),
+                          letterSpacing: -0.5,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
+                    height: 50,
                     child: FilledButton(
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF2E7D32),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       onPressed: isProcessing
                           ? null
@@ -606,6 +665,7 @@ class _CartPageState extends State<CartPage> {
                                 SnackBar(
                                   backgroundColor: const Color(0xFF2E7D32),
                                   behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                   content: Row(
                                     children: [
                                       const Icon(Icons.check_circle, color: Colors.white),
@@ -620,17 +680,23 @@ class _CartPageState extends State<CartPage> {
                                 ),
                               );
                             },
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Checkout',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(width: 8),
-                          Icon(Icons.arrow_forward, size: 18),
-                        ],
-                      ),
+                      child: isProcessing
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Checkout',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_forward_rounded, size: 20, color: Colors.white),
+                              ],
+                            ),
                     ),
                   ),
                 ],

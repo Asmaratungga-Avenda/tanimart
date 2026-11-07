@@ -415,66 +415,117 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
     final isStokHabis = p.stok <= 0;
     final isTidakTersedia = !p.tersedia;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isStokHabis ? Colors.red.shade100 : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar Ikon Produk
+                // Avatar Ikon Produk dengan Gradien Segar
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: 58,
+                  height: 58,
                   decoration: BoxDecoration(
-                    color: isStokHabis ? Colors.grey.shade100 : Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(10),
+                    gradient: LinearGradient(
+                      colors: isStokHabis
+                          ? [Colors.grey.shade100, Colors.grey.shade200]
+                          : [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
                     Icons.eco,
-                    color: isStokHabis ? Colors.grey : Colors.green,
-                    size: 30,
+                    color: isStokHabis ? Colors.grey : const Color(0xFF2E7D32),
+                    size: 32,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
 
-                // Nama & Harga
+                // Nama, Kategori, & Harga
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        p.nama,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: isStokHabis ? Colors.grey.shade700 : Colors.black87,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.nama,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: isStokHabis ? Colors.grey.shade700 : const Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${formatRupiah(p.harga)} / ${p.satuanJual}',
-                        style: TextStyle(
-                          color: isStokHabis ? Colors.grey : Colors.green.shade800,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Text(
+                            formatRupiah(p.harga),
+                            style: TextStyle(
+                              color: isStokHabis ? Colors.grey : const Color(0xFF2E7D32),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          Text(
+                            ' / ${p.satuanJual}',
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Kategori: ${p.kategori}',
-                        style: const TextStyle(fontSize: 12, color: Colors.black54),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          p.kategori,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF475569),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
 
-                // Menu Ubah & Hapus
+                // Menu Cepat Ubah & Hapus dengan Icon Ergonomis
                 PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Color(0xFF64748B)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 3,
                   onSelected: (action) {
                     if (action == 'edit') openForm(p);
                     if (action == 'delete') deleteProduct(p);
@@ -484,9 +535,9 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit_outlined, size: 20, color: Colors.blue),
-                          SizedBox(width: 8),
-                          Text('Ubah'),
+                          Icon(Icons.edit_outlined, size: 20, color: Color(0xFF2563EB)),
+                          SizedBox(width: 10),
+                          Text('Ubah Produk', style: TextStyle(fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
@@ -495,8 +546,8 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                       child: Row(
                         children: [
                           Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Hapus', style: TextStyle(color: Colors.red)),
+                          SizedBox(width: 10),
+                          Text('Hapus Produk', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
@@ -505,7 +556,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
               ],
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             // Penanda Status dan Atribut Khas Domain Pertanian (Kriteria 1 & 2)
             Wrap(
               spacing: 6,
@@ -513,31 +564,43 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
               children: [
                 // Badge Stok
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isStokHabis ? Colors.red.shade50 : Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(6),
+                    color: isStokHabis ? Colors.red.shade50 : const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isStokHabis ? Colors.red.shade300 : Colors.blue.shade300,
+                      color: isStokHabis ? Colors.red.shade200 : const Color(0xFFA5D6A7),
                     ),
                   ),
-                  child: Text(
-                    isStokHabis ? 'STOK HABIS (0)' : 'Stok: ${p.stok} ${p.satuanJual}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: isStokHabis ? Colors.red.shade800 : Colors.blue.shade900,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isStokHabis ? Icons.warning_amber_rounded : Icons.inventory_2_outlined,
+                        size: 13,
+                        color: isStokHabis ? Colors.red.shade800 : const Color(0xFF1B5E20),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isStokHabis ? 'STOK HABIS (0)' : 'Stok: ${p.stok} ${p.satuanJual}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isStokHabis ? Colors.red.shade800 : const Color(0xFF1B5E20),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
                 // Penanda Ketersediaan
                 if (isTidakTersedia)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(6),
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
                     ),
                     child: const Text(
                       'TIDAK AKTIF',
@@ -548,16 +611,16 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                 // Atribut Khas Pertanian TokoTani: Mudah Rusak
                 if (p.mudahRusak)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.orange.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.alarm, size: 12, color: Colors.orange.shade900),
+                        Icon(Icons.access_time_rounded, size: 13, color: Colors.orange.shade900),
                         const SizedBox(width: 4),
                         Text(
                           'MUDAH RUSAK',
@@ -574,10 +637,10 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
             ),
 
             if (p.deskripsi != null && p.deskripsi!.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 p.deskripsi!,
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.3),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),

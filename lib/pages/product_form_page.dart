@@ -191,8 +191,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
               decoration: InputDecoration(
                 labelText: 'Nama Produk Pertanian *',
                 hintText: 'Contoh: Cabai Merah Keriting',
-                prefixIcon: const Icon(Icons.eco),
-                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.eco, color: Color(0xFF2E7D32)),
                 errorText: fieldErrors['nama'],
               ),
               onChanged: (_) => _clearFieldError('nama'),
@@ -205,25 +204,15 @@ class _ProductFormPageState extends State<ProductFormPage> {
             const SizedBox(height: 14),
 
             // Kategori
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: kategoriCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Kategori Produk *',
-                      hintText: 'Sayuran / Buah / Beras',
-                      prefixIcon: const Icon(Icons.category),
-                      border: const OutlineInputBorder(),
-                      errorText: fieldErrors['kategori'],
-                    ),
-                    onChanged: (_) => _clearFieldError('kategori'),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Kategori wajib diisi.' : null,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.arrow_drop_down_circle_outlined),
+            TextFormField(
+              controller: kategoriCtrl,
+              decoration: InputDecoration(
+                labelText: 'Kategori Produk *',
+                hintText: 'Sayuran / Buah / Beras',
+                prefixIcon: const Icon(Icons.category, color: Color(0xFF2E7D32)),
+                errorText: fieldErrors['kategori'],
+                suffixIcon: PopupMenuButton<String>(
+                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
                   tooltip: 'Pilih saran kategori',
                   onSelected: (val) {
                     setState(() {
@@ -235,7 +224,33 @@ class _ProductFormPageState extends State<ProductFormPage> {
                       .map((k) => PopupMenuItem(value: k, child: Text(k)))
                       .toList(),
                 ),
-              ],
+              ),
+              onChanged: (_) => _clearFieldError('kategori'),
+              validator: (v) => v == null || v.trim().isEmpty ? 'Kategori wajib diisi.' : null,
+            ),
+            const SizedBox(height: 8),
+            // Quick suggestion chips untuk Kategori
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: kategoriSuggestions.map((cat) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ActionChip(
+                      label: Text(cat, style: const TextStyle(fontSize: 12)),
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      onPressed: () {
+                        setState(() {
+                          kategoriCtrl.text = cat;
+                          _clearFieldError('kategori');
+                        });
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
             const SizedBox(height: 14),
 
@@ -252,7 +267,6 @@ class _ProductFormPageState extends State<ProductFormPage> {
                       labelText: 'Harga (Rp) *',
                       hintText: 'Contoh: 25000',
                       prefixText: 'Rp ',
-                      border: const OutlineInputBorder(),
                       errorText: fieldErrors['harga'],
                     ),
                     onChanged: (_) => _clearFieldError('harga'),
@@ -267,24 +281,14 @@ class _ProductFormPageState extends State<ProductFormPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   flex: 2,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: satuanCtrl,
-                          decoration: InputDecoration(
-                            labelText: 'Satuan Jual *',
-                            hintText: 'kg / ikat / pak',
-                            border: const OutlineInputBorder(),
-                            errorText: fieldErrors['satuan_jual'],
-                          ),
-                          onChanged: (_) => _clearFieldError('satuan_jual'),
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty ? 'Satuan wajib diisi.' : null,
-                        ),
-                      ),
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.arrow_drop_down),
+                  child: TextFormField(
+                    controller: satuanCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Satuan Jual *',
+                      hintText: 'kg / ikat / pak',
+                      errorText: fieldErrors['satuan_jual'],
+                      suffixIcon: PopupMenuButton<String>(
+                        icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
                         tooltip: 'Pilih saran satuan',
                         onSelected: (val) {
                           setState(() {
@@ -296,10 +300,37 @@ class _ProductFormPageState extends State<ProductFormPage> {
                             .map((s) => PopupMenuItem(value: s, child: Text(s)))
                             .toList(),
                       ),
-                    ],
+                    ),
+                    onChanged: (_) => _clearFieldError('satuan_jual'),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Satuan wajib diisi.' : null,
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            // Quick suggestion chips untuk Satuan
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: satuanSuggestions.map((sat) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ActionChip(
+                      label: Text(sat, style: const TextStyle(fontSize: 12)),
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      onPressed: () {
+                        setState(() {
+                          satuanCtrl.text = sat;
+                          _clearFieldError('satuan_jual');
+                        });
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
             const SizedBox(height: 14),
 
@@ -310,8 +341,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
               decoration: InputDecoration(
                 labelText: 'Jumlah Stok Tersedia *',
                 hintText: '0 untuk stok habis',
-                prefixIcon: const Icon(Icons.inventory_outlined),
-                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2E7D32)),
                 errorText: fieldErrors['stok'],
               ),
               onChanged: (_) => _clearFieldError('stok'),
@@ -331,8 +361,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
               decoration: InputDecoration(
                 labelText: 'Deskripsi Produk (Opsional)',
                 hintText: 'Keterangan mutu panen, cara simpan, dll.',
-                prefixIcon: const Icon(Icons.description_outlined),
-                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.description_outlined, color: Color(0xFF64748B)),
                 errorText: fieldErrors['deskripsi'],
               ),
               onChanged: (_) => _clearFieldError('deskripsi'),
@@ -340,47 +369,68 @@ class _ProductFormPageState extends State<ProductFormPage> {
             const SizedBox(height: 16),
 
             // Atribut Khas Domain Pertanian: Mudah Rusak
-            Card(
-              elevation: 0,
+            Material(
+              color: Colors.orange.shade50.withValues(alpha: 0.5),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(14),
                 side: BorderSide(color: Colors.orange.shade200),
               ),
-              color: Colors.orange.shade50.withValues(alpha: 0.4),
               child: SwitchListTile(
-                secondary: Icon(Icons.alarm, color: Colors.orange.shade900),
+                secondary: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.access_time_rounded, color: Colors.orange.shade900, size: 20),
+                ),
                 title: const Text(
                   'Produk Mudah Rusak (Perishable)',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 subtitle: const Text(
-                  'Centang jika produk seperti sayur segar atau buah yang wajib dikirim di hari yang sama.',
+                  'Wajib dikirim di hari yang sama karena masa simpan singkat.',
+                  style: TextStyle(fontSize: 12),
                 ),
                 value: mudahRusak,
+                activeThumbColor: const Color(0xFF2E7D32),
                 onChanged: (v) => setState(() => mudahRusak = v),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
             // Status Ketersediaan
-            Card(
-              elevation: 0,
+            Material(
+              color: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               child: SwitchListTile(
-                secondary: Icon(
-                  tersedia ? Icons.check_circle_outline : Icons.cancel_outlined,
-                  color: tersedia ? Colors.green : Colors.grey,
+                secondary: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: tersedia ? const Color(0xFFE8F5E9) : Colors.grey.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    tersedia ? Icons.check_circle_rounded : Icons.cancel_outlined,
+                    color: tersedia ? const Color(0xFF2E7D32) : Colors.grey,
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Produk Aktif / Tersedia'),
+                title: const Text(
+                  'Produk Aktif / Tersedia',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
                 subtitle: Text(
                   tersedia
-                      ? 'Produk tampil dan dapat dipesan oleh pembeli.'
-                      : 'Produk disembunyikan / tidak dapat dipesan.',
+                      ? 'Produk tampil di katalog dan dapat dipesan.'
+                      : 'Produk disembunyikan sementara dari pembeli.',
+                  style: const TextStyle(fontSize: 12),
                 ),
                 value: tersedia,
+                activeThumbColor: const Color(0xFF2E7D32),
                 onChanged: (v) => setState(() => tersedia = v),
               ),
             ),
