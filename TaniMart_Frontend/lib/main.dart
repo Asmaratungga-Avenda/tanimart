@@ -285,7 +285,7 @@ class _MenuPageState extends State<MenuPage> {
             Icon(Icons.eco, color: Colors.white),
             SizedBox(width: 8),
             Text(
-              'TokoTani - Tani Mart',
+              'Tani Mart',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ],

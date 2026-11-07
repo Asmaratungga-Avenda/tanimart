@@ -248,7 +248,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
             onSubmitted: (_) => loadProducts(),
           ),
           const SizedBox(height: 10),
-          // Pilihan Kategori (Filter Chip) Sesuai Desain UI AgriMart
+          // Pilihan Kategori (Filter Chip) Sesuai Desain UI Tani Mart
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -608,7 +608,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                     ),
                   ),
 
-                // Atribut Khas Pertanian TokoTani: Mudah Rusak
+                // Atribut Khas Pertanian Tani Mart: Mudah Rusak
                 if (p.mudahRusak)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),

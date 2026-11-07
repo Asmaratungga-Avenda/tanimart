@@ -1,4 +1,4 @@
-# AgriMart (TokoTani) Troubleshooting Guide
+# Tani Mart (Tani Mart) Troubleshooting Guide
 
 Panduan pemecahan masalah dan solusi kendala teknis yang umum ditemui selama integrasi antara Laravel REST API dan Flutter Mobile Application.
 
@@ -76,14 +76,14 @@ Panduan pemecahan masalah dan solusi kendala teknis yang umum ditemui selama int
 - **Solusi:**
   1. Buka XAMPP Control Panel / Laragon.
   2. Klik tombol **Start** pada modul MySQL.
-  3. Pastikan port 3306 aktif dan database `tokotani` sudah dibuat.
+  3. Pastikan port 3306 aktif dan database `Tani Mart` sudah dibuat.
 
-### Gejala 2: `Table 'tokotani.carts' doesn't exist`
+### Gejala 2: `Table 'Tani Mart.carts' doesn't exist`
 - **Penyebab:** Migrasi tabel keranjang belum dijalankan di database MySQL.
 - **Solusi:**
   Jalankan perintah migrasi pada terminal:
   ```bash
-  cd TokoTani_Backend
+  cd TaniMart_Backend
   php artisan migrate
   ```
 

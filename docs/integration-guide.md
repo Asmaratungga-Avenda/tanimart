@@ -1,6 +1,6 @@
-# AgriMart (TokoTani) Fullstack Integration Guide
+# Tani Mart (Tani Mart) Fullstack Integration Guide
 
-Panduan lengkap untuk menjalankan, mengintegrasikan, dan memverifikasi sistem backend Laravel dan aplikasi mobile Flutter **AgriMart** (TokoTani) secara *end-to-end*.
+Panduan lengkap untuk menjalankan, mengintegrasikan, dan memverifikasi sistem backend Laravel dan aplikasi mobile Flutter **Tani Mart** (Tani Mart) secara *end-to-end*.
 
 ---
 
@@ -20,11 +20,11 @@ Panduan lengkap untuk menjalankan, mengintegrasikan, dan memverifikasi sistem ba
 ### A. Konfigurasi Lingkungan
 1. Buka terminal pada folder backend:
    ```bash
-   cd TokoTani_Backend
+   cd TaniMart_Backend
    ```
 2. Pastikan file `.env` sudah ada dan terisi konfigurasi database:
    ```env
-   APP_NAME=TokoTani
+   APP_NAME=Tani Mart
    APP_ENV=local
    APP_KEY=base64:d7VKD3aIkJ7EaW8OaBXhkO6nI7Hzy0zd4pcWZfY03nw=
    APP_DEBUG=true
@@ -33,13 +33,13 @@ Panduan lengkap untuk menjalankan, mengintegrasikan, dan memverifikasi sistem ba
    DB_CONNECTION=mysql
    DB_HOST=127.0.0.1
    DB_PORT=3306
-   DB_DATABASE=tokotani
+   DB_DATABASE=Tani Mart
    DB_USERNAME=root
    DB_PASSWORD=
    ```
-3. Jika database `tokotani` belum dibuat di MySQL, buat database tersebut terlebih dahulu:
+3. Jika database `Tani Mart` belum dibuat di MySQL, buat database tersebut terlebih dahulu:
    ```sql
-   CREATE DATABASE tokotani CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE DATABASE Tani Mart CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
 
 ### B. Migrasi Skema Basis Data
@@ -73,7 +73,7 @@ Untuk mengelola produk, kategori, kurir, dan memantau status pesanan dari web:
 ### A. Pengaturan Dependensi
 Buka terminal pada folder Flutter:
 ```bash
-cd TokoTani_Frontend
+cd TaniMart_Frontend
 flutter pub get
 ```
 

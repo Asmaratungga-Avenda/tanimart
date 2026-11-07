@@ -1,6 +1,6 @@
-# AgriMart (TokoTani) API Contract — Single Source of Truth
+# Tani Mart API Contract — Single Source of Truth
 
-Dokumen ini mendefinisikan kontrak REST API resmi antara Laravel Backend dan Flutter Mobile Client untuk aplikasi **AgriMart** (TokoTani). Kontrak ini berfungsi sebagai **Sumber Kebenaran Tunggal (Single Source of Truth)**.
+Dokumen ini mendefinisikan kontrak REST API resmi antara Laravel Backend dan Flutter Mobile Client untuk aplikasi **Tani Mart** (Tani Mart). Kontrak ini berfungsi sebagai **Sumber Kebenaran Tunggal (Single Source of Truth)**.
 
 ---
 
