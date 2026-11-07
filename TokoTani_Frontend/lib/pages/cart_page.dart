@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import '../models/cart_item.dart';
 import '../services/api_service.dart';
 import '../widgets/responsive_wrapper.dart';
+import 'checkout_page.dart';
 
 class CartPage extends StatefulWidget {
   final bool showBackButton;
+  final VoidCallback? onCheckout;
 
-  const CartPage({super.key, this.showBackButton = false});
+  const CartPage({super.key, this.showBackButton = false, this.onCheckout});
 
   @override
   State<CartPage> createState() => _CartPageState();
@@ -661,22 +663,10 @@ class _CartPageState extends State<CartPage> {
                       onPressed: isProcessing
                           ? null
                           : () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: const Color(0xFF2E7D32),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  content: Row(
-                                    children: [
-                                      const Icon(Icons.check_circle, color: Colors.white),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          'Subtotal ${formatRupiah(subtotal)} berhasil divalidasi oleh server. (Alur Checkout ditangani oleh Anggota 6)',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CheckoutPage(),
                                 ),
                               );
                             },

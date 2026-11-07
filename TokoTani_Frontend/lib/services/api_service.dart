@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/cart_item.dart';
+import '../models/courier.dart';
+import '../models/order.dart';
+import '../models/payment_method.dart';
 import '../models/product.dart';
 
 /// Empat keadaan layar wajib sesuai ketentuan Rubrik Kriteria 7.
@@ -291,6 +294,92 @@ class ApiService {
   static Future<void> deleteProduct(int id) async {
     if (useMock) return _mockDeleteProduct(id);
     await _send('DELETE', '/produk/$id');
+  }
+
+  // -------------------------------------------------------------
+  // ENDPOINT KURIR
+  // -------------------------------------------------------------
+
+  /// GET /api/kurir
+  static Future<List<Courier>> getCouriers() async {
+    if (useMock) return _mockGetCouriers();
+    try {
+      final response = await http.get(_uri('/kurir'), headers: headers).timeout(timeoutDuration);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final list = data is List ? data : <dynamic>[];
+      return list.map((e) => Courier.fromJson(Map<String, dynamic>.from(e))).toList();
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // ENDPOINT METODE PEMBAYARAN
+  // -------------------------------------------------------------
+
+  /// GET /api/metode-pembayaran
+  static Future<List<PaymentMethod>> getPaymentMethods() async {
+    if (useMock) return _mockGetPaymentMethods();
+    try {
+      final response = await http.get(_uri('/metode-pembayaran'), headers: headers).timeout(timeoutDuration);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final list = data is List ? data : <dynamic>[];
+      return list.map((e) => PaymentMethod.fromJson(Map<String, dynamic>.from(e))).toList();
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // ENDPOINT PESANAN
+  // -------------------------------------------------------------
+
+  /// GET /api/pesanan
+  static Future<List<Order>> getOrders() async {
+    if (useMock) return _mockGetOrders();
+    try {
+      final response = await http.get(_uri('/pesanan'), headers: headers).timeout(timeoutDuration);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final list = data is List ? data : <dynamic>[];
+      return list.map((e) => Order.fromJson(Map<String, dynamic>.from(e))).toList();
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// GET /api/pesanan/{id}
+  static Future<Order> getOrderDetail(int id) async {
+    if (useMock) return _mockGetOrderDetail(id);
+    try {
+      final response = await http.get(_uri('/pesanan/$id'), headers: headers).timeout(timeoutDuration);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      return Order.fromJson(Map<String, dynamic>.from(data));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // ENDPOINT CHECKOUT
+  // -------------------------------------------------------------
+
+  /// POST /api/checkout
+  static Future<Order> checkout(Map<String, dynamic> payload) async {
+    if (useMock) return _mockCheckout(payload);
+    try {
+      final response = await http
+          .post(_uri('/checkout'), headers: headers, body: jsonEncode(payload))
+          .timeout(const Duration(seconds: 30));
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      return Order.fromJson(Map<String, dynamic>.from(data));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
   }
 
   // -------------------------------------------------------------
@@ -643,5 +732,235 @@ class ApiService {
       );
     }
     _mockProducts.removeWhere((p) => p.id == id);
+  }
+
+  // ---- Mock Kurir ----
+  static final List<Courier> _mockCouriers = [
+    const Courier(id: 1, nama: 'JNE Regular', tarif: 15000, aktif: true),
+    const Courier(id: 2, nama: 'SiCepat HALU', tarif: 12000, aktif: true),
+    const Courier(id: 3, nama: 'Gojek Instant', tarif: 25000, aktif: true),
+  ];
+
+  static Future<List<Courier>> _mockGetCouriers() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return List.from(_mockCouriers);
+  }
+
+  // ---- Mock Metode Pembayaran ----
+  static final List<PaymentMethod> _mockPaymentMethods = [
+    const PaymentMethod(id: 1, nama: 'COD (Bayar di Tempat)', aktif: true),
+    const PaymentMethod(id: 2, nama: 'Transfer Bank BCA', aktif: true),
+    const PaymentMethod(id: 3, nama: 'Transfer Bank BRI', aktif: true),
+  ];
+
+  static Future<List<PaymentMethod>> _mockGetPaymentMethods() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return List.from(_mockPaymentMethods);
+  }
+
+  // ---- Mock Pesanan ----
+  static final List<Order> _mockOrders = [
+    Order(
+      id: 1001,
+      namaPenerima: 'Budi Santoso',
+      alamatPenerima: 'Jl. Merdeka No. 10, Jakarta Pusat',
+      kurirId: 1,
+      namaCourier: 'JNE Regular',
+      paymentMethodId: 1,
+      namaPaymentMethod: 'COD (Bayar di Tempat)',
+      subtotal: 110000,
+      ongkir: 15000,
+      totalHarga: 125000,
+      status: 'selesai',
+      tanggalAntar: '2026-11-01',
+      createdAt: '2026-10-31T10:00:00',
+      items: [
+        const OrderItem(
+          id: 1,
+          orderId: 1001,
+          productId: 1,
+          namaProduk: 'Beras Pandan Wangi Organik',
+          quantity: 1,
+          hargaSatuan: 75000,
+          subtotal: 75000,
+        ),
+        const OrderItem(
+          id: 2,
+          orderId: 1001,
+          productId: 3,
+          namaProduk: 'Tomat Buah Segar',
+          quantity: 2,
+          hargaSatuan: 14000,
+          subtotal: 28000,
+        ),
+        const OrderItem(
+          id: 3,
+          orderId: 1001,
+          productId: 5,
+          namaProduk: 'Bayam Hijau Hidroponik',
+          quantity: 1,
+          hargaSatuan: 6000,
+          subtotal: 6000,
+        ),
+      ],
+    ),
+    Order(
+      id: 1002,
+      namaPenerima: 'Siti Rahayu',
+      alamatPenerima: 'Jl. Pahlawan No. 25, Bandung',
+      kurirId: 2,
+      namaCourier: 'SiCepat HALU',
+      paymentMethodId: 2,
+      namaPaymentMethod: 'Transfer Bank BCA',
+      subtotal: 70000,
+      ongkir: 12000,
+      totalHarga: 82000,
+      status: 'dikirim',
+      tanggalAntar: '2026-11-07',
+      createdAt: '2026-11-06T14:30:00',
+      items: [
+        const OrderItem(
+          id: 4,
+          orderId: 1002,
+          productId: 2,
+          namaProduk: 'Cabai Merah Keriting Segar',
+          quantity: 2,
+          hargaSatuan: 32000,
+          subtotal: 64000,
+        ),
+        const OrderItem(
+          id: 5,
+          orderId: 1002,
+          productId: 4,
+          namaProduk: 'Bawang Merah Brebes Pilihan',
+          quantity: 0,
+          hargaSatuan: 38000,
+          subtotal: 0,
+        ),
+      ],
+    ),
+    Order(
+      id: 1003,
+      namaPenerima: 'Ahmad Fauzi',
+      alamatPenerima: 'Jl. Sudirman No. 88, Surabaya',
+      kurirId: 3,
+      namaCourier: 'Gojek Instant',
+      paymentMethodId: 1,
+      namaPaymentMethod: 'COD (Bayar di Tempat)',
+      subtotal: 38000,
+      ongkir: 25000,
+      totalHarga: 63000,
+      status: 'menunggu_pembayaran',
+      tanggalAntar: '2026-11-07',
+      createdAt: '2026-11-07T09:00:00',
+      items: [
+        const OrderItem(
+          id: 6,
+          orderId: 1003,
+          productId: 4,
+          namaProduk: 'Bawang Merah Brebes Pilihan',
+          quantity: 1,
+          hargaSatuan: 38000,
+          subtotal: 38000,
+        ),
+      ],
+    ),
+  ];
+
+  static Future<List<Order>> _mockGetOrders() async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    return List.from(_mockOrders);
+  }
+
+  static Future<Order> _mockGetOrderDetail(int id) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    try {
+      return _mockOrders.firstWhere((o) => o.id == id);
+    } catch (_) {
+      throw const ApiException(
+        statusCode: 404,
+        message: 'Pesanan tidak ditemukan.',
+        errorType: ApiErrorType.notFound,
+      );
+    }
+  }
+
+  static int _mockOrderIdCounter = 1004;
+
+  static Future<Order> _mockCheckout(Map<String, dynamic> payload) async {
+    await Future.delayed(const Duration(milliseconds: 600));
+
+    final errors = <String, dynamic>{};
+    if ((payload['nama_penerima'] ?? '').toString().trim().isEmpty) {
+      errors['nama_penerima'] = ['Nama penerima wajib diisi.'];
+    }
+    if ((payload['alamat_penerima'] ?? '').toString().trim().isEmpty) {
+      errors['alamat_penerima'] = ['Alamat pengiriman wajib diisi.'];
+    }
+    if (payload['kurir_id'] == null) {
+      errors['kurir_id'] = ['Kurir wajib dipilih.'];
+    }
+    if (payload['payment_method_id'] == null) {
+      errors['payment_method_id'] = ['Metode pembayaran wajib dipilih.'];
+    }
+    final rawItems = payload['items'];
+    if (rawItems == null || rawItems is! List || rawItems.isEmpty) {
+      errors['items'] = ['Keranjang tidak boleh kosong.'];
+    }
+    if (errors.isNotEmpty) {
+      throw ApiException(
+        statusCode: 422,
+        message: 'Periksa kembali data checkout.',
+        errorType: ApiErrorType.validation,
+        errors: errors,
+      );
+    }
+
+    final kurir = _mockCouriers.firstWhere((c) => c.id == payload['kurir_id'],
+        orElse: () => _mockCouriers.first);
+    final payment = _mockPaymentMethods.firstWhere(
+        (p) => p.id == payload['payment_method_id'],
+        orElse: () => _mockPaymentMethods.first);
+
+    final items = (rawItems as List).map((item) {
+      final productId = item['product_id'] as int;
+      final quantity = item['quantity'] as int;
+      final product = _mockProducts.firstWhere((p) => p.id == productId,
+          orElse: () => throw ApiException(
+                statusCode: 404,
+                message: 'Produk tidak ditemukan.',
+                errorType: ApiErrorType.notFound,
+              ));
+      return OrderItem(
+        id: 0,
+        orderId: 0,
+        productId: productId,
+        namaProduk: product.nama,
+        quantity: quantity,
+        hargaSatuan: product.harga,
+        subtotal: product.harga * quantity,
+      );
+    }).toList();
+
+    final subtotal = items.fold<int>(0, (s, i) => s + i.subtotal);
+    final ongkir = kurir.tarif;
+    final newOrder = Order(
+      id: _mockOrderIdCounter++,
+      namaPenerima: payload['nama_penerima'],
+      alamatPenerima: payload['alamat_penerima'],
+      kurirId: kurir.id,
+      namaCourier: kurir.nama,
+      paymentMethodId: payment.id,
+      namaPaymentMethod: payment.nama,
+      subtotal: subtotal,
+      ongkir: ongkir,
+      totalHarga: subtotal + ongkir,
+      status: 'menunggu_pembayaran',
+      tanggalAntar: payload['tanggal_antar'] ?? '',
+      createdAt: DateTime.now().toIso8601String(),
+      items: items,
+    );
+    _mockOrders.insert(0, newOrder);
+    return newOrder;
   }
 }
