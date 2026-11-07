@@ -20,7 +20,7 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
-      await tester.pumpWidget(const TokoTaniApp());
+      await tester.pumpWidget(const TaniMartApp());
       await tester.pumpAndSettle();
 
       expect(find.text('Tani Mart'), findsWidgets);
@@ -36,7 +36,7 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
-      await tester.pumpWidget(const TokoTaniApp());
+      await tester.pumpWidget(const TaniMartApp());
       await tester.pumpAndSettle();
 
       expect(find.text('Tani Mart'), findsWidgets);

@@ -4,7 +4,7 @@ import 'package:tanimart/main.dart';
 void main() {
   testWidgets('Memverifikasi judul dan navigasi utama Tani Mart', (WidgetTester tester) async {
     // Membangun aplikasi Tani Mart
-    await tester.pumpWidget(const TokoTaniApp());
+    await tester.pumpWidget(const TaniMartApp());
 
     // Memverifikasi teks judul 'Tani Mart' muncul di AppBar
     expect(find.text('Tani Mart'), findsWidgets);
@@ -16,7 +16,7 @@ void main() {
 
   testWidgets('Memverifikasi menu navigasi evaluasi Tani Mart', (WidgetTester tester) async {
     // Membangun menu ringkasan tugas
-    await tester.pumpWidget(const TokoTaniApp(home: MenuPage()));
+    await tester.pumpWidget(const TaniMartApp(home: MenuPage()));
 
     // Memverifikasi teks judul 'Tani Mart' muncul
     expect(find.textContaining('Tani Mart'), findsWidgets);
