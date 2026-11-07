@@ -145,3 +145,4 @@ class NotificationService {
     } catch (_) {}
   }
 }
+

@@ -23,25 +23,25 @@ class ProfilePage extends StatelessWidget {
             const SizedBox(height: 20),
             _buildApiModeToggle(context),
             const SizedBox(height: 14),
-            _buildMenuSection(
-              context,
-              'Akun',
-              [
-                _MenuItem(
-                  icon: Icons.person_outline,
-                  title: 'Edit Profil',
-                  subtitle: 'Budi Santoso',
-                  onTap: () => _showComingSoon(context),
-                ),
-                _MenuItem(
-                  icon: Icons.location_on_outlined,
-                  title: 'Alamat Tersimpan',
-                  subtitle: 'Kelola alamat pengiriman',
-                  onTap: () => _showComingSoon(context),
-                ),
-                ValueListenableBuilder<int>(
-                  valueListenable: NotificationService.unreadCountNotifier,
-                  builder: (context, unread, _) => _MenuItem(
+            ValueListenableBuilder<int>(
+              valueListenable: NotificationService.unreadCountNotifier,
+              builder: (context, unread, _) => _buildMenuSection(
+                context,
+                'Akun',
+                [
+                  _MenuItem(
+                    icon: Icons.person_outline,
+                    title: 'Edit Profil',
+                    subtitle: 'Budi Santoso',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                  _MenuItem(
+                    icon: Icons.location_on_outlined,
+                    title: 'Alamat Tersimpan',
+                    subtitle: 'Kelola alamat pengiriman',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                  _MenuItem(
                     icon: Icons.notifications_outlined,
                     title: 'Notifikasi',
                     subtitle: unread > 0
@@ -73,8 +73,8 @@ class ProfilePage extends StatelessWidget {
                           )
                         : null,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 14),
             _buildMenuSection(

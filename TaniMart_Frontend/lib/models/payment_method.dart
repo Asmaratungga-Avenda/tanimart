@@ -1,11 +1,13 @@
 class PaymentMethod {
   final int id;
   final String nama;
+  final String? deskripsi;
   final bool aktif;
 
   const PaymentMethod({
     required this.id,
     required this.nama,
+    this.deskripsi,
     required this.aktif,
   });
 
@@ -19,6 +21,7 @@ class PaymentMethod {
     return PaymentMethod(
       id: int.tryParse('${json['id']}') ?? 0,
       nama: '${json['nama'] ?? ''}',
+      deskripsi: json['deskripsi']?.toString(),
       aktif: isAktif,
     );
   }
