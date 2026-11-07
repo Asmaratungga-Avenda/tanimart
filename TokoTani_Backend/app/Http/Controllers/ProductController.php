@@ -91,7 +91,8 @@ class ProductController extends Controller
         $validator = Validator::make($request->all(), [
             'nama'        => 'required|string|max:255',
             'harga'       => 'required|integer|min:0',
-            'kategori'    => 'required|string',
+            'kategori'    => 'nullable|string',
+            'category_id' => 'nullable|integer|exists:categories,id',
             'stok'        => 'required|integer|min:0',
             'tersedia'    => 'required|boolean',
             'deskripsi'   => 'nullable|string',
@@ -112,6 +113,13 @@ class ProductController extends Controller
         $validated = $validator->validated();
         if (isset($validated['stok']) && $validated['stok'] <= 0 && !isset($validated['tersedia'])) {
             $validated['tersedia'] = false;
+        }
+
+        if (empty($validated['kategori']) && !empty($validated['category_id'])) {
+            $category = \App\Models\Category::find($validated['category_id']);
+            if ($category) {
+                $validated['kategori'] = $category->nama_kategori;
+            }
         }
 
         $product = Product::create($validated);
@@ -139,7 +147,8 @@ class ProductController extends Controller
         $validator = Validator::make($request->all(), [
             'nama'        => 'sometimes|required|string|max:255',
             'harga'       => 'sometimes|required|integer|min:0',
-            'kategori'    => 'sometimes|required|string',
+            'kategori'    => 'sometimes|nullable|string',
+            'category_id' => 'sometimes|nullable|integer|exists:categories,id',
             'stok'        => 'sometimes|required|integer|min:0',
             'tersedia'    => 'sometimes|required|boolean',
             'deskripsi'   => 'nullable|string',
@@ -160,6 +169,13 @@ class ProductController extends Controller
         $validated = $validator->validated();
         if (isset($validated['stok']) && $validated['stok'] <= 0 && !isset($validated['tersedia'])) {
             $validated['tersedia'] = false;
+        }
+
+        if (array_key_exists('category_id', $validated) && empty($validated['kategori']) && !empty($validated['category_id'])) {
+            $category = \App\Models\Category::find($validated['category_id']);
+            if ($category) {
+                $validated['kategori'] = $category->nama_kategori;
+            }
         }
 
         $product->update($validated);

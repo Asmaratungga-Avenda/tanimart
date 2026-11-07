@@ -21,7 +21,8 @@ return new class extends Migration
             $table->id();
             $table->string('nama');
             $table->unsignedBigInteger('harga');
-            $table->string('kategori');
+            $table->string('kategori')->nullable();
+            $table->foreignId('category_id')->nullable()->constrained('categories')->nullOnDelete();
             $table->unsignedInteger('stok')->default(0);
             $table->boolean('tersedia')->default(true);
             $table->text('deskripsi')->nullable();
