@@ -79,3 +79,4 @@ class ProductImages {
     return catKebutuhanHarian;
   }
 }
+

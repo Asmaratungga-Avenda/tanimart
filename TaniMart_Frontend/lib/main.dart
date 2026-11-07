@@ -11,12 +11,15 @@ import 'pages/orders_page.dart';
 import 'pages/product_catalog_page.dart';
 import 'pages/product_form_page.dart';
 import 'pages/profile_page.dart';
+import 'pages/notifications_page.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 import 'widgets/responsive_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id', null);
+  await NotificationService.init();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -67,7 +70,6 @@ class MainNavPage extends StatefulWidget {
 
 class _MainNavPageState extends State<MainNavPage> {
   late int _currentIndex;
-  int _cartCount = 0;
 
   static const _primaryGreen = Color(0xFF2E7D32);
   static const _lightGreen = Color(0xFFE8F5E9);
@@ -83,9 +85,8 @@ class _MainNavPageState extends State<MainNavPage> {
     try {
       final cart = await ApiService.getCart();
       if (!mounted) return;
-      setState(() {
-        _cartCount = cart.items.fold(0, (sum, i) => sum + i.jumlah);
-      });
+      final count = cart.items.fold(0, (sum, i) => sum + i.jumlah);
+      NotificationService.cartCountNotifier.value = count;
     } catch (_) {}
   }
 
@@ -148,6 +149,29 @@ class _MainNavPageState extends State<MainNavPage> {
           ],
         ),
         actions: [
+          // Lonceng Notifikasi Reaktif (Langsung bertambah saat checkout)
+          ValueListenableBuilder<int>(
+            valueListenable: NotificationService.unreadCountNotifier,
+            builder: (context, unreadCount, _) {
+              return IconButton(
+                icon: Badge(
+                  isLabelVisible: unreadCount > 0,
+                  label: Text('$unreadCount'),
+                  backgroundColor: const Color(0xFFDC2626),
+                  child: const Icon(Icons.notifications_outlined,
+                      color: Colors.white),
+                ),
+                tooltip: 'Notifikasi',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const NotificationsPage()),
+                  );
+                },
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.person_outline, color: Colors.white),
             tooltip: 'Profil Saya',
@@ -209,24 +233,48 @@ class _MainNavPageState extends State<MainNavPage> {
               selectedIcon: Icon(Icons.storefront, color: _primaryGreen),
               label: 'Produk',
             ),
+            // Badge Keranjang Reaktif (ValueListenable)
             NavigationDestination(
-              icon: Badge(
-                isLabelVisible: _cartCount > 0,
-                label: Text('$_cartCount'),
-                backgroundColor: const Color(0xFFF59E0B),
-                child: const Icon(Icons.shopping_cart_outlined),
+              icon: ValueListenableBuilder<int>(
+                valueListenable: NotificationService.cartCountNotifier,
+                builder: (context, count, _) => Badge(
+                  isLabelVisible: count > 0,
+                  label: Text('$count'),
+                  backgroundColor: const Color(0xFFF59E0B),
+                  child: const Icon(Icons.shopping_cart_outlined),
+                ),
               ),
-              selectedIcon: Badge(
-                isLabelVisible: _cartCount > 0,
-                label: Text('$_cartCount'),
-                backgroundColor: const Color(0xFFF59E0B),
-                child: const Icon(Icons.shopping_cart, color: _primaryGreen),
+              selectedIcon: ValueListenableBuilder<int>(
+                valueListenable: NotificationService.cartCountNotifier,
+                builder: (context, count, _) => Badge(
+                  isLabelVisible: count > 0,
+                  label: Text('$count'),
+                  backgroundColor: const Color(0xFFF59E0B),
+                  child: const Icon(Icons.shopping_cart, color: _primaryGreen),
+                ),
               ),
               label: 'Keranjang Belanja',
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long, color: _primaryGreen),
+            // Badge Pesanan Reaktif (ValueListenable)
+            NavigationDestination(
+              icon: ValueListenableBuilder<int>(
+                valueListenable: NotificationService.newOrdersCountNotifier,
+                builder: (context, count, _) => Badge(
+                  isLabelVisible: count > 0,
+                  label: Text('$count'),
+                  backgroundColor: _primaryGreen,
+                  child: const Icon(Icons.receipt_long_outlined),
+                ),
+              ),
+              selectedIcon: ValueListenableBuilder<int>(
+                valueListenable: NotificationService.newOrdersCountNotifier,
+                builder: (context, count, _) => Badge(
+                  isLabelVisible: count > 0,
+                  label: Text('$count'),
+                  backgroundColor: _primaryGreen,
+                  child: const Icon(Icons.receipt_long, color: _primaryGreen),
+                ),
+              ),
               label: 'Pesanan',
             ),
             const NavigationDestination(

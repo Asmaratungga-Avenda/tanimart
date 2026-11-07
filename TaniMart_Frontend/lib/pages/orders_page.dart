@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/order.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import 'order_detail_page.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -38,6 +39,7 @@ class _OrdersPageState extends State<OrdersPage> {
         _orders = result;
         _isLoading = false;
       });
+      NotificationService.newOrdersCountNotifier.value = 0;
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {

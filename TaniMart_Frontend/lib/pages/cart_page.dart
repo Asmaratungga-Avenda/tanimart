@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/widgets/product_image.dart';
 import '../models/cart_item.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/responsive_wrapper.dart';
 import 'checkout_page.dart';
 
@@ -50,6 +51,8 @@ class _CartPageState extends State<CartPage> {
         subtotal = result.subtotal;
         state = items.isEmpty ? KeadaanMuat.kosong : KeadaanMuat.berhasil;
       });
+      NotificationService.cartCountNotifier.value =
+          result.items.fold(0, (sum, i) => sum + i.jumlah);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {

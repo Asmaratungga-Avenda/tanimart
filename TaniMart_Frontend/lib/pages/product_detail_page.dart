@@ -4,6 +4,7 @@ import '../core/theme/app_theme.dart';
 import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Product product;
@@ -66,6 +67,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     setState(() => _isAddingToCart = true);
     try {
       await ApiService.addCart(_product.id, _quantity);
+      NotificationService.cartCountNotifier.value += _quantity;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

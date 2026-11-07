@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
+import 'notifications_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -37,11 +39,40 @@ class ProfilePage extends StatelessWidget {
                   subtitle: 'Kelola alamat pengiriman',
                   onTap: () => _showComingSoon(context),
                 ),
-                _MenuItem(
-                  icon: Icons.notifications_outlined,
-                  title: 'Notifikasi',
-                  subtitle: 'Aktif',
-                  onTap: () => _showComingSoon(context),
+                ValueListenableBuilder<int>(
+                  valueListenable: NotificationService.unreadCountNotifier,
+                  builder: (context, unread, _) => _MenuItem(
+                    icon: Icons.notifications_outlined,
+                    title: 'Notifikasi',
+                    subtitle: unread > 0
+                        ? '$unread notifikasi baru'
+                        : 'Tidak ada notifikasi baru',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const NotificationsPage()),
+                      );
+                    },
+                    trailing: unread > 0
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$unread',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
                 ),
               ],
             ),

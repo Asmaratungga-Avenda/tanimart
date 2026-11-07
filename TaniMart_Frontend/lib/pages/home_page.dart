@@ -6,6 +6,7 @@ import '../core/theme/app_theme.dart';
 import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import 'product_detail_page.dart';
 import 'product_catalog_page.dart';
 
@@ -757,6 +758,7 @@ class _HomePageState extends State<HomePage> {
     }
     try {
       await ApiService.addCart(product.id, 1);
+      NotificationService.cartCountNotifier.value++;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
