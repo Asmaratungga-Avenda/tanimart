@@ -1,30 +1,28 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:tokotani/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Memverifikasi judul dan navigasi utama terfokus Anggota 5', (WidgetTester tester) async {
+    // Membangun aplikasi TokoTani / AgriMart
+    await tester.pumpWidget(const TokoTaniApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Memverifikasi teks judul 'AgriMart' muncul di AppBar
+    expect(find.text('AgriMart'), findsWidgets);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Memverifikasi dua tab navigasi utama tugas Anggota 5
+    expect(find.text('Keranjang Belanja'), findsWidgets);
+    expect(find.text('Kelola Produk'), findsWidgets);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('Memverifikasi menu navigasi evaluasi Anggota 5', (WidgetTester tester) async {
+    // Membangun menu ringkasan tugas
+    await tester.pumpWidget(const TokoTaniApp(home: MenuPage()));
+
+    // Memverifikasi teks judul 'TokoTani' muncul
+    expect(find.textContaining('TokoTani'), findsWidgets);
+
+    // Memverifikasi kartu navigasi bagian Anggota 5 muncul
+    expect(find.text('Keranjang Belanja'), findsOneWidget);
+    expect(find.text('Kelola Produk (CRUD)'), findsOneWidget);
   });
 }
