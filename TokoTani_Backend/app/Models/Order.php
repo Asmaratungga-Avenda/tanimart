@@ -31,6 +31,29 @@ class Order extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::updating(function (Order $order) {
+            if ($order->isDirty('status')) {
+                $oldStatus = $order->getOriginal('status');
+                $newStatus = $order->status;
+
+                if ($newStatus === 'dibatalkan' && $oldStatus !== 'dibatalkan') {
+                    foreach ($order->items as $item) {
+                        $product = $item->product;
+                        if ($product) {
+                            $product->increment('stok', $item->quantity);
+                            if ($product->stok > 0 && ! $product->tersedia) {
+                                $product->tersedia = true;
+                                $product->save();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     public function courier(): BelongsTo
     {
         return $this->belongsTo(Courier::class, 'kurir_id');

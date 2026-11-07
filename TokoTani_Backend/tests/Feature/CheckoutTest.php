@@ -273,6 +273,7 @@ class CheckoutTest extends TestCase
         $this->seed();
         $this->seed();
 
+        $this->assertDatabaseCount('users', 1);
         $this->assertDatabaseCount('categories', 2);
         $this->assertDatabaseCount('products', 12);
         $this->assertDatabaseCount('couriers', 2);

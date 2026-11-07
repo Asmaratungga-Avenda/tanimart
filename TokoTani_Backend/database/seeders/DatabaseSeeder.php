@@ -9,6 +9,18 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // 0. Akun Administrator Filament
+        DB::table('users')->upsert([
+            [
+                'id' => 1,
+                'name' => 'Admin TokoTani',
+                'email' => 'admin@tokotani.com',
+                'password' => bcrypt('password'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ], ['id'], ['name', 'email', 'password', 'updated_at']);
+
         // 1. Data Kategori (2 Kategori)
         DB::table('categories')->upsert([
             ['id' => 1, 'nama_kategori' => 'Sayuran dan Buah Segar', 'created_at' => now(), 'updated_at' => now()],
