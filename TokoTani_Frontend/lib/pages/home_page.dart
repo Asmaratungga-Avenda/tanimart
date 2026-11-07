@@ -205,7 +205,7 @@ class _HomePageState extends State<HomePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'AgriMart',
+                  'Tani Mart',
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontSize: 18,

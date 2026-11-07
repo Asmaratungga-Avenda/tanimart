@@ -332,7 +332,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           Text(
             _product.deskripsi?.isNotEmpty == true
                 ? _product.deskripsi!
-                : 'Produk pertanian berkualitas dari petani pilihan AgriMart.',
+                : 'Produk pertanian berkualitas dari petani pilihan Tani Mart.',
             style: GoogleFonts.poppins(
               fontSize: 13.5,
               color: _textSecondary,

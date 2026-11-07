@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import '../core/config/api_config.dart';
 import '../models/cart_item.dart';
 import '../models/courier.dart';
 import '../models/order.dart';
@@ -67,22 +68,15 @@ class CartResponse {
 }
 
 class ApiService {
-  // Emulator Android memakai http://10.0.2.2:8000/api
-  // HP fisik: ganti dengan IP lokal laptop (misal http://192.168.1.10:8000/api)
-  // Web/Desktop: http://127.0.0.1:8000/api
-  static const String baseUrl = 'http://10.0.2.2:8000/api';
-  static const Duration timeoutDuration = Duration(seconds: 10);
+  // Menggunakan konfigurasi dinamis sesuai platform (Emulator, Device Fisik, atau Localhost)
+  static String get baseUrl => ApiConfig.baseUrl;
+  static const Duration timeoutDuration = ApiConfig.timeoutDuration;
 
   // Token statis atau ID pelanggan yang disepakati kelompok (sesuai batasan tugas)
-  static const Map<String, String> headers = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-    'X-Pelanggan-Id': '1',
-  };
+  static const Map<String, String> headers = ApiConfig.defaultHeaders;
 
   /// Flag simulasi data tiruan (Jalur B pada dokumen tugas).
-  /// Berguna saat server backend Laravel belum dijalankan oleh anggota backend,
-  /// sehingga pengujian frontend tetap berjalan 100%.
+  /// Bernilai false secara default agar seluruh data diambil langsung dari Laravel API (Single Source of Truth).
   static bool useMock = false;
 
   // -------------------------------------------------------------
@@ -108,7 +102,8 @@ class ApiService {
     }
 
     final body = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
-    final isSuccessStatus = body['status'] == 'sukses';
+    // Kompatibel dengan respons dual 'status: sukses' dan 'success: true'
+    final isSuccessStatus = body['status'] == 'sukses' || body['success'] == true;
     final isHttpSuccess = response.statusCode >= 200 && response.statusCode < 300;
 
     if (!isHttpSuccess || !isSuccessStatus) {

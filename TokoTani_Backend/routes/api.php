@@ -1,8 +1,21 @@
 <?php
 
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
+
+// Keranjang Belanja (Cart)
+Route::get('/keranjang', [CartController::class, 'index']);
+Route::post('/keranjang', [CartController::class, 'store']);
+Route::put('/keranjang/{id}', [CartController::class, 'update']);
+Route::delete('/keranjang/{id}', [CartController::class, 'destroy']);
+Route::delete('/keranjang', [CartController::class, 'clear']);
+
+Route::get('/cart', [CartController::class, 'index']);
+Route::post('/cart', [CartController::class, 'store']);
+Route::put('/cart/{id}', [CartController::class, 'update']);
+Route::delete('/cart/{id}', [CartController::class, 'destroy']);
 
 // Checkout & Orders
 Route::post('/checkout', [CheckoutController::class, 'store']);

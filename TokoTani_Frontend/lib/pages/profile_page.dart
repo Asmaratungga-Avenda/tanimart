@@ -72,7 +72,7 @@ class ProfilePage extends StatelessWidget {
                 _MenuItem(
                   icon: Icons.info_outline,
                   title: 'Versi Aplikasi',
-                  subtitle: 'AgriMart v1.0.0',
+                  subtitle: 'Tani Mart v1.0.0',
                   onTap: () {},
                   trailing: Container(
                     padding:
@@ -145,7 +145,7 @@ class ProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Pelanggan AgriMart',
+            'Pelanggan Tani Mart',
             style: GoogleFonts.poppins(
               color: Colors.white.withValues(alpha: 0.85),
               fontSize: 13,

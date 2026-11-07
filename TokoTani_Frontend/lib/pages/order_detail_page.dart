@@ -220,7 +220,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Terima kasih telah berbelanja di AgriMart.',
+            'Terima kasih telah berbelanja di Tani Mart.',
             style: GoogleFonts.poppins(
                 color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
           ),

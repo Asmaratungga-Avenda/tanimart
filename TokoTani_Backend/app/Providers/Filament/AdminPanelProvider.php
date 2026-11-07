@@ -27,6 +27,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->brandName('Tani Mart Admin')
             ->login()
             ->colors([
                 'primary' => Color::Amber,
@@ -38,7 +39,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
-                \App\Filament\Widgets\TokoTaniStatsOverview::class,
+                \App\Filament\Widgets\TaniMartStatsOverview::class,
                 \App\Filament\Widgets\LatestOrders::class,
             ])
             ->middleware([

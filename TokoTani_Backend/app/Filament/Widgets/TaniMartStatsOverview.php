@@ -7,7 +7,7 @@ use App\Models\Product;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
-class TokoTaniStatsOverview extends StatsOverviewWidget
+class TaniMartStatsOverview extends StatsOverviewWidget
 {
     protected static ?int $sort = 1;
 

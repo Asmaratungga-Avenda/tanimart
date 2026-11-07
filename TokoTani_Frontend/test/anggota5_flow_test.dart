@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tokotani/pages/cart_page.dart';
-import 'package:tokotani/pages/manage_product_page.dart';
-import 'package:tokotani/pages/product_form_page.dart';
-import 'package:tokotani/services/api_service.dart';
+import 'package:tanimart/pages/cart_page.dart';
+import 'package:tanimart/pages/manage_product_page.dart';
+import 'package:tanimart/pages/product_form_page.dart';
+import 'package:tanimart/services/api_service.dart';
 
 void main() {
   setUp(() {

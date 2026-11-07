@@ -15,7 +15,7 @@ class LatestOrders extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected static ?string $heading = 'Pesanan Terbaru (Backend TokoTani)';
+    protected static ?string $heading = 'Pesanan Terbaru (Tani Mart)';
 
     public function table(Table $table): Table
     {

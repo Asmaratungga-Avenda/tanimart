@@ -21,18 +21,18 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const AgriMartApp());
+  runApp(const TaniMartApp());
 }
 
-class AgriMartApp extends StatelessWidget {
+class TaniMartApp extends StatelessWidget {
   final Widget? home;
 
-  const AgriMartApp({super.key, this.home});
+  const TaniMartApp({super.key, this.home});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AgriMart - TokoTani',
+      title: 'Tani Mart',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
       home: home ?? const MainNavPage(),
@@ -111,7 +111,7 @@ class AgriMartApp extends StatelessWidget {
   }
 }
 
-/// Alias kompatibilitas untuk unit testing TokoTaniApp
+/// Alias kompatibilitas untuk unit testing TaniMartApp
 class TokoTaniApp extends StatelessWidget {
   final Widget? home;
 
@@ -119,7 +119,7 @@ class TokoTaniApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AgriMartApp(home: home);
+    return TaniMartApp(home: home);
   }
 }
 
@@ -180,7 +180,7 @@ class _MainNavPageState extends State<MainNavPage> {
             ),
             const SizedBox(width: 8),
             const Text(
-              'AgriMart',
+              'Tani Mart',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -264,7 +264,7 @@ class _MainNavPageState extends State<MainNavPage> {
   }
 }
 
-/// Halaman evaluasi dan navigasi cepat pengujian tugas (TokoTani & AgriMart)
+/// Halaman evaluasi dan navigasi cepat pengujian tugas (Tani Mart)
 class MenuPage extends StatefulWidget {
   const MenuPage({super.key});
 
@@ -285,7 +285,7 @@ class _MenuPageState extends State<MenuPage> {
             Icon(Icons.eco, color: Colors.white),
             SizedBox(width: 8),
             Text(
-              'TokoTani - AgriMart',
+              'TokoTani - Tani Mart',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ],
@@ -311,7 +311,7 @@ class _MenuPageState extends State<MenuPage> {
                         Icon(Icons.assignment_ind, color: Colors.green.shade800),
                         const SizedBox(width: 8),
                         Text(
-                          'Sistem E-Commerce AgriMart',
+                          'Sistem E-Commerce Tani Mart',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.green.shade900,

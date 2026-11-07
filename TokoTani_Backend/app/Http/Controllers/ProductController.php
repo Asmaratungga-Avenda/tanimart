@@ -9,17 +9,16 @@ use Illuminate\Support\Facades\Schema;
 
 class ProductController extends Controller
 {
-    private function jsonResponse($status, $code, $message, $data = null, $errors = null)
+    private function jsonResponse($status, $code, $message, $data = null, $errors = null, $meta = null)
     {
         $response = [
+            'success' => $status === 'sukses',
             'status'  => $status,
             'code'    => (string) $code,
             'message' => $message,
+            'data'    => $data,
+            'meta'    => $meta,
         ];
-
-        if ($data !== null) {
-            $response['data'] = $data;
-        }
 
         if ($errors !== null) {
             $response['errors'] = $errors;

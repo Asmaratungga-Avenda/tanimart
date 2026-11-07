@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cart;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\PaymentMethod;
@@ -11,28 +12,37 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class CheckoutController extends Controller
 {
-    private function jsonResponse($status, $code, $message, $data = null, $errors = null)
+    private function jsonResponse($status, $code, $message, $data = null, $errors = null, $meta = null)
     {
         $response = [
-            'status' => $status,
-            'code' => (string) $code,
+            'success' => $status === 'sukses',
+            'status'  => $status,
+            'code'    => (string) $code,
             'message' => $message,
+            'data'    => $data,
+            'meta'    => $meta,
         ];
-
-        if ($data !== null) {
-            $response['data'] = $data;
-        }
 
         if ($errors !== null) {
             $response['errors'] = $errors;
         }
 
         return response()->json($response, (int) $code);
+    }
+
+    private function getCustomerId(Request $request): int
+    {
+        $id = $request->header('X-Pelanggan-Id')
+            ?: $request->header('X-Customer-Id')
+            ?: $request->input('customer_id');
+
+        return (int) ($id ?: 1);
     }
 
     public function couriers()
@@ -145,12 +155,13 @@ class CheckoutController extends Controller
             );
         }
 
+        $customerId = $this->getCustomerId($request);
         $validated = $validator->validated();
         $tanggalAntar = Carbon::createFromFormat('Y-m-d', $validated['tanggal_antar'])->startOfDay();
         $isSameDay = $tanggalAntar->isSameDay(Carbon::today());
 
         try {
-            $order = DB::transaction(function () use ($validated, $isSameDay, $idempotencyKey) {
+            $order = DB::transaction(function () use ($validated, $isSameDay, $idempotencyKey, $customerId) {
                 $subtotal = 0;
                 $orderItems = [];
 
@@ -229,6 +240,14 @@ class CheckoutController extends Controller
                 ]);
 
                 $order->items()->createMany($orderItems);
+
+                // Sinkronisasi keranjang: Hapus item yang berhasil di-checkout dari tabel carts
+                if (Schema::hasTable('carts')) {
+                    $orderedProductIds = collect($orderItems)->pluck('product_id')->all();
+                    Cart::where('customer_id', $customerId)
+                        ->whereIn('product_id', $orderedProductIds)
+                        ->delete();
+                }
 
                 return $order->load('items');
             });
