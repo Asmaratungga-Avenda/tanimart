@@ -397,11 +397,54 @@ class ApiService {
     }
   }
 
+  /// GET /api/produk/{id}
+  static Future<Product> getProduct(int id) async {
+    if (useMock) return _mockGetProduct(id);
+    try {
+      final response = await http.get(_uri('/produk/$id'), headers: headers).timeout(timeoutDuration);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      return Product.fromJson(Map<String, dynamic>.from(data));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// GET /api/kategori
+  static Future<List<String>> getCategories() async {
+    if (useMock) return _mockGetCategories();
+    try {
+      final response = await http.get(_uri('/kategori'), headers: headers).timeout(timeoutDuration);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final list = data is List ? data : <dynamic>[];
+      return list.map((e) => e.toString()).toList();
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// POST /api/checkout
+  /// Menyertakan header X-Kunci-Idempoten (idempotency key) untuk mencegah duplikasi pesanan.
+  static Future<Map<String, dynamic>> checkout(
+    Map<String, dynamic> payload, {
+    String? idempotencyKey,
+  }) async {
+    if (useMock) return _mockCheckout(payload, idempotencyKey: idempotencyKey);
+    final extra = idempotencyKey != null ? {'X-Kunci-Idempoten': idempotencyKey} : null;
+    try {
+      final res = await _send('POST', '/checkout', payload, extra);
+      return res;
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
   // -------------------------------------------------------------
   // ENDPOINT PESANAN
   // -------------------------------------------------------------
 
-  /// GET /api/pesanan
+  /// GET /api/pesanan (Riwayat Pesanan)
   static Future<List<Order>> getOrders() async {
     if (useMock) return _mockGetOrders();
     try {

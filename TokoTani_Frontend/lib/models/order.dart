@@ -1,3 +1,7 @@
+import 'courier.dart';
+import 'payment_method.dart';
+import 'product.dart';
+
 class Order {
   final int id;
   final String namaPenerima;
@@ -12,7 +16,10 @@ class Order {
   final String status;
   final String tanggalAntar;
   final String? createdAt;
+  final String? idempotencyKey;
   final List<OrderItem> items;
+  final Courier? courier;
+  final PaymentMethod? paymentMethod;
 
   const Order({
     required this.id,
@@ -28,7 +35,10 @@ class Order {
     required this.status,
     required this.tanggalAntar,
     this.createdAt,
+    this.idempotencyKey,
     this.items = const [],
+    this.courier,
+    this.paymentMethod,
   });
 
   Order copyWith({String? status}) => Order(
@@ -45,7 +55,10 @@ class Order {
     status: status ?? this.status,
     tanggalAntar: tanggalAntar,
     createdAt: createdAt,
+    idempotencyKey: idempotencyKey,
     items: items,
+    courier: courier,
+    paymentMethod: paymentMethod,
   );
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -75,7 +88,10 @@ class Order {
       status: '${json['status'] ?? 'menunggu_pembayaran'}',
       tanggalAntar: '${json['tanggal_antar'] ?? ''}',
       createdAt: json['created_at']?.toString(),
+      idempotencyKey: json['idempotency_key']?.toString(),
       items: itemsList,
+      courier: courierData is Map ? Courier.fromJson(Map<String, dynamic>.from(courierData)) : null,
+      paymentMethod: paymentData is Map ? PaymentMethod.fromJson(Map<String, dynamic>.from(paymentData)) : null,
     );
   }
 }
@@ -89,20 +105,23 @@ class OrderItem {
   final int hargaSatuan;
   final int subtotal;
   final String? fotoProduk;
+  final Product? product;
 
   const OrderItem({
     required this.id,
     required this.orderId,
     required this.productId,
-    required this.namaProduk,
+    String? namaProduk,
     required this.quantity,
     required this.hargaSatuan,
     required this.subtotal,
     this.fotoProduk,
-  });
+    this.product,
+  }) : namaProduk = namaProduk ?? product?.nama ?? 'Produk';
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
     final produk = json['product'] ?? json['produk'];
+    final parsedProduct = produk is Map ? Product.fromJson(Map<String, dynamic>.from(produk)) : null;
     final namaProduk = produk is Map
         ? '${produk['nama'] ?? json['nama'] ?? 'Produk'}'
         : '${json['nama'] ?? 'Produk'}';
@@ -117,6 +136,11 @@ class OrderItem {
       hargaSatuan: int.tryParse('${json['harga_satuan'] ?? 0}') ?? 0,
       subtotal: int.tryParse('${json['subtotal'] ?? 0}') ?? 0,
       fotoProduk: foto,
+      product: parsedProduct,
     );
   }
 }
+
+typedef OrderModel = Order;
+typedef OrderItemModel = OrderItem;
+

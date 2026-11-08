@@ -6,8 +6,13 @@ import 'order_detail_page.dart';
 
 class OrderHistoryPage extends StatefulWidget {
   final bool showBackButton;
+  final VoidCallback? onGoToCatalog;
 
-  const OrderHistoryPage({super.key, this.showBackButton = false});
+  const OrderHistoryPage({
+    super.key,
+    this.showBackButton = false,
+    this.onGoToCatalog,
+  });
 
   @override
   State<OrderHistoryPage> createState() => _OrderHistoryPageState();
@@ -181,7 +186,9 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                   icon: const Icon(Icons.shopping_bag_outlined),
                   label: const Text('Mulai Belanja Sekarang'),
                   onPressed: () {
-                    if (Navigator.canPop(context)) {
+                    if (widget.onGoToCatalog != null) {
+                      widget.onGoToCatalog!();
+                    } else if (Navigator.canPop(context)) {
                       Navigator.pop(context);
                     }
                   },

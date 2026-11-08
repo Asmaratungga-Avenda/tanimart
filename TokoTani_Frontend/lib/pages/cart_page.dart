@@ -4,13 +4,20 @@ import '../models/cart_item.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/responsive_wrapper.dart';
+import 'catalog_page.dart';
 import 'checkout_page.dart';
 
 class CartPage extends StatefulWidget {
   final bool showBackButton;
   final VoidCallback? onCheckout;
+  final VoidCallback? onGoToCatalog;
 
-  const CartPage({super.key, this.showBackButton = false, this.onCheckout});
+  const CartPage({
+    super.key,
+    this.showBackButton = false,
+    this.onCheckout,
+    this.onGoToCatalog,
+  });
 
   @override
   State<CartPage> createState() => _CartPageState();
@@ -340,8 +347,15 @@ class _CartPageState extends State<CartPage> {
                   icon: const Icon(Icons.storefront_outlined),
                   label: const Text('Mulai Belanja Produk Segar'),
                   onPressed: () {
-                    if (Navigator.canPop(context)) {
+                    if (widget.onGoToCatalog != null) {
+                      widget.onGoToCatalog!();
+                    } else if (Navigator.canPop(context)) {
                       Navigator.pop(context);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CatalogPage(showBackButton: true)),
+                      );
                     }
                   },
                 ),
@@ -418,6 +432,43 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
+  IconData _getItemIcon(CartItem item) {
+    final lower = item.nama.toLowerCase();
+    if (lower.contains('beras') || lower.contains('padi')) return Icons.grain_rounded;
+    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) {
+      return Icons.local_fire_department_rounded;
+    }
+    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) return Icons.eco_rounded;
+    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) return Icons.apple_rounded;
+    if (lower.contains('umbi') || lower.contains('kentang')) return Icons.spa_rounded;
+    return item.mudahRusak ? Icons.local_florist_rounded : Icons.eco_rounded;
+  }
+
+  List<Color> _getItemGradient(CartItem item) {
+    final lower = item.nama.toLowerCase();
+    if (lower.contains('beras') || lower.contains('padi')) {
+      return const [Color(0xFFFFF9C4), Color(0xFFFFF176)];
+    }
+    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) {
+      return const [Color(0xFFFFEBEE), Color(0xFFFFCDD2)];
+    }
+    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) {
+      return const [Color(0xFFE8F5E9), Color(0xFFC8E6C9)];
+    }
+    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) {
+      return const [Color(0xFFFFF3E0), Color(0xFFFFCC80)];
+    }
+    return const [Color(0xFFE0F2F1), Color(0xFFB2DFDB)];
+  }
+
+  Color _getItemAccent(CartItem item) {
+    final lower = item.nama.toLowerCase();
+    if (lower.contains('beras')) return const Color(0xFFF57F17);
+    if (lower.contains('cabai') || lower.contains('bawang')) return const Color(0xFFD32F2F);
+    if (lower.contains('buah')) return const Color(0xFFE65100);
+    return const Color(0xFF2E7D32);
+  }
+
   Widget _buildCartCard(CartItem item) {
     final itemTotal = item.harga * item.jumlah;
 
@@ -438,17 +489,20 @@ class _CartPageState extends State<CartPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gambar / Thumbnail Produk Nyata
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: SizedBox(
-              width: 72,
-              height: 72,
-              child: ProductImage(
-                productName: item.nama,
-                fit: BoxFit.cover,
+          // Gambar / Thumbnail Produk Tematik
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _getItemGradient(item),
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(14),
             ),
+            child: Icon(_getItemIcon(item), size: 36, color: _getItemAccent(item)),
+          ),
           ),
           const SizedBox(width: 14),
 
@@ -483,6 +537,31 @@ class _CartPageState extends State<CartPage> {
                               fontSize: 13,
                             ),
                           ),
+                          if (item.mudahRusak)
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.bolt, size: 10, color: Colors.orange.shade900),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'Wajib Instan/Same-Day',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -665,12 +744,16 @@ class _CartPageState extends State<CartPage> {
                       onPressed: isProcessing
                           ? null
                           : () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const CheckoutPage(),
-                                ),
-                              );
+                              if (widget.onCheckout != null) {
+                                widget.onCheckout!();
+                              } else {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const CheckoutPage(),
+                                  ),
+                                );
+                              }
                             },
                       child: isProcessing
                           ? const SizedBox(

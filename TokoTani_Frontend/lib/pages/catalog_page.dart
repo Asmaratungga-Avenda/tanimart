@@ -136,17 +136,13 @@ class _CatalogPageState extends State<CatalogPage> {
         SnackBar(
           backgroundColor: const Color(0xFF2E7D32),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           content: Row(
             children: [
               const Icon(Icons.check_circle, color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  '${product.nama} (1 ${product.satuanJual}) masuk keranjang.',
-                ),
+                child: Text('${product.nama} (1 ${product.satuanJual}) masuk keranjang.'),
               ),
             ],
           ),
@@ -156,9 +152,7 @@ class _CatalogPageState extends State<CatalogPage> {
             onPressed: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const CartPage(showBackButton: true),
-                ),
+                MaterialPageRoute(builder: (_) => const CartPage(showBackButton: true)),
               );
               loadCartCount();
             },
@@ -170,9 +164,7 @@ class _CatalogPageState extends State<CatalogPage> {
       // Notifikasi galat di layar saat ini tanpa berpindah (Kriteria 6)
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: e.statusCode == 409
-              ? Colors.orange.shade900
-              : Colors.red.shade800,
+          backgroundColor: e.statusCode == 409 ? Colors.orange.shade900 : Colors.red.shade800,
           behavior: SnackBarBehavior.floating,
           content: Text(e.message),
         ),
@@ -183,9 +175,7 @@ class _CatalogPageState extends State<CatalogPage> {
           const SnackBar(
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            content: Text(
-              'Terjadi kesalahan sambungan saat menambah ke keranjang.',
-            ),
+            content: Text('Terjadi kesalahan sambungan saat menambah ke keranjang.'),
           ),
         );
       }
@@ -218,9 +208,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 onPressed: () async {
                   await Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const CartPage(showBackButton: true),
-                    ),
+                    MaterialPageRoute(builder: (_) => const CartPage(showBackButton: true)),
                   );
                   loadCartCount();
                 },
@@ -235,10 +223,7 @@ class _CatalogPageState extends State<CatalogPage> {
                       color: Color(0xFFE53935),
                       shape: BoxShape.circle,
                     ),
-                    constraints: const BoxConstraints(
-                      minWidth: 18,
-                      minHeight: 18,
-                    ),
+                    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                     child: Text(
                       cartItemCount > 99 ? '99+' : '$cartItemCount',
                       style: const TextStyle(
@@ -265,10 +250,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Cari produk pertanian...',
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: Color(0xFF2E7D32),
-                  ),
+                  prefixIcon: const Icon(Icons.search, color: Color(0xFF2E7D32)),
                   suffixIcon: searchCtrl.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
@@ -294,32 +276,32 @@ class _CatalogPageState extends State<CatalogPage> {
                 itemBuilder: (context, index) {
                   final cat = categories[index];
                   final isSelected = selectedKategori == cat;
-                  return ChoiceChip(
+                  final catIcon = _getCategoryIcon(cat);
+                  return FilterChip(
+                    avatar: Icon(
+                      catIcon,
+                      size: 16,
+                      color: isSelected ? Colors.white : const Color(0xFF2E7D32),
+                    ),
                     label: Text(cat),
                     selected: isSelected,
-                    selectedColor: const Color(0xFFE8F5E9),
+                    showCheckmark: false,
+                    backgroundColor: Colors.white,
+                    selectedColor: const Color(0xFF2E7D32),
                     labelStyle: TextStyle(
-                      color: isSelected
-                          ? const Color(0xFF2E7D32)
-                          : const Color(0xFF64748B),
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      color: isSelected ? Colors.white : const Color(0xFF334155),
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                       fontSize: 13,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                       side: BorderSide(
-                        color: isSelected
-                            ? const Color(0xFF2E7D32)
-                            : const Color(0xFFE2E8F0),
+                        color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFFE2E8F0),
                       ),
                     ),
                     onSelected: (val) {
-                      if (val) {
-                        setState(() => selectedKategori = cat);
-                        loadProducts();
-                      }
+                      setState(() => selectedKategori = cat);
+                      loadProducts();
                     },
                   );
                 },
@@ -362,20 +344,12 @@ class _CatalogPageState extends State<CatalogPage> {
                     color: Color(0xFFE8F5E9),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.search_off_rounded,
-                    size: 56,
-                    color: Color(0xFF2E7D32),
-                  ),
+                  child: const Icon(Icons.search_off_rounded, size: 56, color: Color(0xFF2E7D32)),
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   'Produk Tidak Ditemukan',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -389,9 +363,7 @@ class _CatalogPageState extends State<CatalogPage> {
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF2E7D32),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Reset Pencarian'),
@@ -422,7 +394,7 @@ class _CatalogPageState extends State<CatalogPage> {
                   crossAxisCount: crossAxisCount,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.68,
+                  childAspectRatio: constraints.maxWidth > 500 ? 0.68 : 0.56,
                 ),
                 itemBuilder: (context, index) {
                   final product = products[index];
@@ -435,6 +407,52 @@ class _CatalogPageState extends State<CatalogPage> {
     }
   }
 
+  IconData _getCategoryIcon(String category) {
+    final lower = category.toLowerCase();
+    if (lower.contains('beras') || lower.contains('biji')) return Icons.grain_rounded;
+    if (lower.contains('sayur')) return Icons.eco_rounded;
+    if (lower.contains('buah')) return Icons.apple_rounded;
+    if (lower.contains('bumbu') || lower.contains('rempah') || lower.contains('cabai')) return Icons.local_fire_department_rounded;
+    if (lower.contains('umbi') || lower.contains('kentang')) return Icons.spa_rounded;
+    if (lower == 'semua') return Icons.grid_view_rounded;
+    return Icons.grass_rounded;
+  }
+
+  IconData _getProductIcon(Product product) {
+    final lower = '${product.kategori} ${product.nama}'.toLowerCase();
+    if (lower.contains('beras') || lower.contains('padi')) return Icons.grain_rounded;
+    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) return Icons.local_fire_department_rounded;
+    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) return Icons.eco_rounded;
+    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) return Icons.apple_rounded;
+    if (lower.contains('umbi') || lower.contains('kentang')) return Icons.spa_rounded;
+    return product.mudahRusak ? Icons.local_florist_rounded : Icons.eco_rounded;
+  }
+
+  List<Color> _getProductGradient(Product product) {
+    final lower = '${product.kategori} ${product.nama}'.toLowerCase();
+    if (lower.contains('beras') || lower.contains('padi')) {
+      return const [Color(0xFFFFF9C4), Color(0xFFFFF176)];
+    }
+    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) {
+      return const [Color(0xFFFFEBEE), Color(0xFFFFCDD2)];
+    }
+    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) {
+      return const [Color(0xFFE8F5E9), Color(0xFFC8E6C9)];
+    }
+    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) {
+      return const [Color(0xFFFFF3E0), Color(0xFFFFCC80)];
+    }
+    return const [Color(0xFFE0F2F1), Color(0xFFB2DFDB)];
+  }
+
+  Color _getProductAccent(Product product) {
+    final lower = '${product.kategori} ${product.nama}'.toLowerCase();
+    if (lower.contains('beras')) return const Color(0xFFF57F17);
+    if (lower.contains('cabai') || lower.contains('bumbu') || lower.contains('rempah')) return const Color(0xFFD32F2F);
+    if (lower.contains('buah')) return const Color(0xFFE65100);
+    return const Color(0xFF2E7D32);
+  }
+
   Widget _buildProductCard(Product product) {
     final isOutOfStock = product.stok <= 0 || !product.tersedia;
 
@@ -443,7 +461,7 @@ class _CatalogPageState extends State<CatalogPage> {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ProductDetailPage(product: product),
+            builder: (_) => ProductDetailPage(productId: product.id, initialProduct: product),
           ),
         );
         loadCartCount();
@@ -456,9 +474,9 @@ class _CatalogPageState extends State<CatalogPage> {
           border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -467,30 +485,35 @@ class _CatalogPageState extends State<CatalogPage> {
           children: [
             // Gambar / Placeholder
             Expanded(
-              flex: 5,
+              flex: 4,
               child: Stack(
                 children: [
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: isOutOfStock
-                          ? Colors.grey.shade100
-                          : const Color(0xFFF1F8E9),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(15),
-                      ),
+                      gradient: isOutOfStock
+                          ? LinearGradient(colors: [Colors.grey.shade100, Colors.grey.shade200])
+                          : LinearGradient(
+                              colors: _getProductGradient(product),
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                     ),
                     child: Center(
-                      child: Icon(
-                        product.mudahRusak
-                            ? Icons.local_florist_rounded
-                            : Icons.eco_rounded,
-                        size: 48,
-                        color: isOutOfStock
-                            ? Colors.grey.shade400
-                            : (product.mudahRusak
-                                  ? Colors.orange.shade700
-                                  : const Color(0xFF2E7D32)),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _getProductIcon(product),
+                          size: 30,
+                          color: isOutOfStock
+                              ? Colors.grey.shade400
+                              : _getProductAccent(product),
+                        ),
                       ),
                     ),
                   ),
@@ -501,22 +524,21 @@ class _CatalogPageState extends State<CatalogPage> {
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
                           color: Colors.orange.shade800,
                           borderRadius: BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 4,
+                            ),
+                          ],
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.bolt_rounded,
-                              size: 10,
-                              color: Colors.white,
-                            ),
+                            Icon(Icons.bolt_rounded, size: 10, color: Colors.white),
                             SizedBox(width: 2),
                             Text(
                               'Same Day',
@@ -536,10 +558,8 @@ class _CatalogPageState extends State<CatalogPage> {
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(15),
-                          ),
+                          color: Colors.black.withValues(alpha: 0.45),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                         ),
                         child: const Center(
                           child: ContainerBadge(
@@ -567,10 +587,7 @@ class _CatalogPageState extends State<CatalogPage> {
                       children: [
                         Text(
                           product.kategori,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF64748B),
-                          ),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -580,9 +597,7 @@ class _CatalogPageState extends State<CatalogPage> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: isOutOfStock
-                                ? Colors.grey.shade600
-                                : const Color(0xFF1E293B),
+                            color: isOutOfStock ? Colors.grey.shade600 : const Color(0xFF1E293B),
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -598,21 +613,15 @@ class _CatalogPageState extends State<CatalogPage> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: isOutOfStock
-                                ? Colors.grey.shade600
-                                : const Color(0xFF2E7D32),
+                            color: isOutOfStock ? Colors.grey.shade600 : const Color(0xFF2E7D32),
                           ),
                         ),
                         Text(
                           'per ${product.satuanJual} • Sisa ${product.stok}',
                           style: TextStyle(
                             fontSize: 10,
-                            color: product.stok <= 5 && !isOutOfStock
-                                ? Colors.orange.shade800
-                                : const Color(0xFF64748B),
-                            fontWeight: product.stok <= 5 && !isOutOfStock
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            color: product.stok <= 5 && !isOutOfStock ? Colors.orange.shade800 : const Color(0xFF64748B),
+                            fontWeight: product.stok <= 5 && !isOutOfStock ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
                         const SizedBox(height: 6),
@@ -626,27 +635,18 @@ class _CatalogPageState extends State<CatalogPage> {
                               backgroundColor: const Color(0xFF2E7D32),
                               disabledBackgroundColor: Colors.grey.shade300,
                               disabledForegroundColor: Colors.grey.shade600,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               padding: EdgeInsets.zero,
                             ),
                             icon: Icon(
-                              isOutOfStock
-                                  ? Icons.block_rounded
-                                  : Icons.add_shopping_cart_rounded,
+                              isOutOfStock ? Icons.block_rounded : Icons.add_shopping_cart_rounded,
                               size: 14,
                             ),
                             label: Text(
                               isOutOfStock ? 'Habis' : '+ Keranjang',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                             ),
-                            onPressed: isOutOfStock
-                                ? null
-                                : () => quickAddToCart(product),
+                            onPressed: isOutOfStock ? null : () => quickAddToCart(product),
                           ),
                         ),
                       ],
@@ -694,21 +694,12 @@ class _CatalogPageState extends State<CatalogPage> {
           children: [
             Icon(icon, size: 64, color: Colors.red.shade400),
             const SizedBox(height: 16),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF64748B)),
-            ),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF64748B))),
             const SizedBox(height: 24),
             FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF2E7D32),
-              ),
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
               onPressed: loadProducts,
@@ -736,12 +727,9 @@ class ContainerBadge extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
 }
+
