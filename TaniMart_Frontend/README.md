@@ -1,6 +1,6 @@
-# TokoTani Frontend
+# Tani Mart Frontend
 
-Aplikasi Flutter untuk antarmuka TokoTani.
+Aplikasi Flutter untuk antarmuka Tani Mart.
 
 Jalankan perintah berikut dari folder ini:
 
