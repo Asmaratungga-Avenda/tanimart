@@ -9,9 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('order_items', function (Blueprint $table) {
-            $table->string('nama_produk')->nullable()->after('product_id');
-        });
+        if (! Schema::hasColumn('order_items', 'nama_produk')) {
+            Schema::table('order_items', function (Blueprint $table) {
+                $table->string('nama_produk')->nullable()->after('product_id');
+            });
+        }
 
         // Isi snapshot nama produk untuk baris lama tanpa mengubah harga transaksi.
         DB::table('order_items')
@@ -30,6 +32,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasColumn('order_items', 'nama_produk')) {
+            return;
+        }
+
         Schema::table('order_items', function (Blueprint $table) {
             $table->dropColumn('nama_produk');
         });

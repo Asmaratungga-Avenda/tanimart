@@ -10,26 +10,47 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->foreignId('pelanggan_id')
-                ->nullable()
-                ->after('id')
-                ->constrained('users')
-                ->nullOnDelete();
-            $table->date('tanggal_pengantaran')->nullable()->after('tanggal_antar');
-            $table->string('slot_pengantaran', 50)->nullable()->after('tanggal_pengantaran');
+            if (! Schema::hasColumn('orders', 'pelanggan_id')) {
+                $table->foreignId('pelanggan_id')
+                    ->nullable()
+                    ->after('id')
+                    ->constrained('users')
+                    ->nullOnDelete();
+            }
+
+            if (! Schema::hasColumn('orders', 'tanggal_pengantaran')) {
+                $table->date('tanggal_pengantaran')->nullable()->after('tanggal_antar');
+            }
+
+            if (! Schema::hasColumn('orders', 'slot_pengantaran')) {
+                $table->string('slot_pengantaran', 50)->nullable()->after('tanggal_pengantaran');
+            }
         });
 
-        // Data lama tetap dapat dibaca melalui tanggal_pengantaran.
-        DB::table('orders')
-            ->whereNull('tanggal_pengantaran')
-            ->update(['tanggal_pengantaran' => DB::raw('tanggal_antar')]);
+        if (Schema::hasColumn('orders', 'tanggal_pengantaran')
+            && Schema::hasColumn('orders', 'tanggal_antar')) {
+            // Data lama tetap dapat dibaca melalui tanggal_pengantaran.
+            DB::table('orders')
+                ->whereNull('tanggal_pengantaran')
+                ->update(['tanggal_pengantaran' => DB::raw('tanggal_antar')]);
+        }
     }
 
     public function down(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('pelanggan_id');
-            $table->dropColumn(['tanggal_pengantaran', 'slot_pengantaran']);
+            if (Schema::hasColumn('orders', 'pelanggan_id')) {
+                $table->dropConstrainedForeignId('pelanggan_id');
+            }
+
+            $columns = array_values(array_filter([
+                Schema::hasColumn('orders', 'tanggal_pengantaran') ? 'tanggal_pengantaran' : null,
+                Schema::hasColumn('orders', 'slot_pengantaran') ? 'slot_pengantaran' : null,
+            ]));
+
+            if ($columns !== []) {
+                $table->dropColumn($columns);
+            }
         });
     }
 };

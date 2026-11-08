@@ -459,10 +459,14 @@ pesanan masih mengembalikan `nama_produk` dan `harga_satuan` saat transaksi.
 
 - Kolom: `orders.idempotency_key`
 - Constraint: `UNIQUE`
+- Sidik jari request: `orders.idempotency_request_hash` (SHA-256, nullable)
 - Sumber nilai: header `X-Kunci-Idempoten` / `X-Idempotency-Key` /
   `Idempotency-Key`, atau body `idempotency_key`.
-- Jika kunci yang sama dikirim ulang, backend mengembalikan pesanan yang sudah ada
-  tanpa membuat pesanan baru atau mengurangi stok lagi.
+- Jika kunci dan sidik jari yang sama dikirim ulang, backend mengembalikan pesanan
+  yang sudah ada tanpa membuat pesanan baru atau mengurangi stok lagi.
+- Jika kunci sama tetapi sidik jari berbeda, backend menolak dengan **409**.
+- Detail kontrak, tabel keputusan, dan strategi transaksi ada di
+  `docs/CHECKOUT_SPESIFIKASI.md`.
 
 ### 8.2 Transisi status
 
@@ -495,6 +499,11 @@ Migration:
 - `database/migrations/2026_11_08_000002_add_wilayah_to_couriers_table.php`
 - `database/migrations/2026_11_08_000003_add_transaction_fields_to_orders_table.php`
 - `database/migrations/2026_11_08_000004_add_nama_produk_to_order_items_table.php`
+- `database/migrations/2026_11_08_000005_add_idempotency_hash_to_orders_table.php`
+
+Konfigurasi:
+
+- `config/checkout.php`
 
 Model:
 
@@ -509,7 +518,11 @@ Controller dan route:
 - `app/Http/Controllers/KeranjangController.php`
 - `app/Http/Controllers/KurirController.php`
 - `routes/api.php`
-- Pembaruan snapshot checkout: `app/Http/Controllers/CheckoutController.php`
+- Pembaruan checkout transaksional: `app/Http/Controllers/CheckoutController.php`
+
+Dokumentasi:
+
+- `docs/CHECKOUT_SPESIFIKASI.md`
 
 Seeder dan pengujian:
 
@@ -581,5 +594,9 @@ Hasil yang diharapkan: hanya ada satu baris untuk `produk_id = 1`, dengan
 - Payload tambah keranjang memakai `produk_id` dan `jumlah`.
 - Payload ubah jumlah memakai `jumlah`.
 - Frontend membaca `data.items` dan `data.subtotal`; keduanya disediakan server.
-- Frontend menangani `409` sebagai konflik stok dan `422` sebagai kesalahan
-  validasi, sesuai respons backend.
+- Checkout mengirim header `X-Kunci-Idempoten` (wajib), `X-Pelanggan-Id`,
+  `kurir_id`/`wilayah_id`, `payment_method_id`, `tanggal_pengantaran`, dan
+  `slot_pengantaran` (`pagi`/`siang`/`sore`).
+- Frontend menangani `409` sebagai konflik stok/idempotensi dan `422` sebagai
+  kesalahan validasi/domain, sesuai respons backend.
+- Spesifikasi lengkap checkout ada di `docs/CHECKOUT_SPESIFIKASI.md`.

@@ -22,6 +22,11 @@ class Order extends Model
         'tanggal_pengantaran',
         'slot_pengantaran',
         'idempotency_key',
+        'idempotency_request_hash',
+    ];
+
+    protected $hidden = [
+        'idempotency_request_hash',
     ];
 
     protected function casts(): array

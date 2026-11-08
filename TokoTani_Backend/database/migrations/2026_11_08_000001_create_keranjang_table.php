@@ -8,6 +8,33 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Database lokal lama mungkin sudah memiliki tabel keranjang dengan
+        // nama kolom domain lama (user_id/produk_id). Selaraskan tanpa
+        // menghapus data yang sudah ada.
+        if (Schema::hasTable('keranjang')) {
+            if (Schema::hasColumn('keranjang', 'user_id')
+                && ! Schema::hasColumn('keranjang', 'pelanggan_id')) {
+                Schema::table('keranjang', function (Blueprint $table) {
+                    $table->renameColumn('user_id', 'pelanggan_id');
+                });
+            }
+
+            if (Schema::hasColumn('keranjang', 'produk_id')
+                && ! Schema::hasColumn('keranjang', 'product_id')) {
+                Schema::table('keranjang', function (Blueprint $table) {
+                    $table->renameColumn('produk_id', 'product_id');
+                });
+            }
+
+            if (Schema::hasColumn('keranjang', 'catatan')) {
+                Schema::table('keranjang', function (Blueprint $table) {
+                    $table->dropColumn('catatan');
+                });
+            }
+
+            return;
+        }
+
         Schema::create('keranjang', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pelanggan_id')->constrained('users')->cascadeOnDelete();
