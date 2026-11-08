@@ -1,8 +1,17 @@
 <?php
 
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\KeranjangController;
+use App\Http\Controllers\KurirController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
+
+// Keranjang Belanja
+Route::delete('/keranjang', [KeranjangController::class, 'clear']);
+Route::get('/keranjang', [KeranjangController::class, 'index']);
+Route::post('/keranjang', [KeranjangController::class, 'store']);
+Route::put('/keranjang/{id}', [KeranjangController::class, 'update']);
+Route::delete('/keranjang/{id}', [KeranjangController::class, 'destroy']);
 
 // Checkout & Orders
 Route::post('/checkout', [CheckoutController::class, 'store']);
@@ -12,8 +21,8 @@ Route::get('/pesanan/{id}', [CheckoutController::class, 'show']);
 Route::get('/orders', [CheckoutController::class, 'index']);
 
 // Kurir & Metode Pembayaran
-Route::get('/kurir', [CheckoutController::class, 'couriers']);
-Route::get('/couriers', [CheckoutController::class, 'couriers']);
+Route::get('/kurir', [KurirController::class, 'index']);
+Route::get('/couriers', [KurirController::class, 'index']);
 Route::get('/metode-pembayaran', [CheckoutController::class, 'paymentMethods']);
 Route::get('/payment-methods', [CheckoutController::class, 'paymentMethods']);
 

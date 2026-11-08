@@ -40,6 +40,7 @@ class CheckoutTest extends TestCase
         ]);
         $this->assertDatabaseHas('order_items', [
             'product_id' => $product->id,
+            'nama_produk' => 'Bayam Tes',
             'quantity' => 2,
             'harga_satuan' => 5000,
             'subtotal' => 10000,
@@ -275,10 +276,38 @@ class CheckoutTest extends TestCase
 
         $this->assertDatabaseCount('categories', 2);
         $this->assertDatabaseCount('products', 12);
-        $this->assertDatabaseCount('couriers', 2);
+        $this->assertDatabaseCount('couriers', 3);
         $this->assertDatabaseCount('payment_methods', 2);
         $this->assertDatabaseCount('orders', 1);
         $this->assertDatabaseCount('order_items', 1);
+    }
+
+    public function test_order_detail_keeps_product_snapshot_after_catalog_changes(): void
+    {
+        $product = $this->createProduct(['nama' => 'Bayam Snapshot', 'harga' => 5000]);
+        $courier = Courier::create(['nama' => 'Kurir Tes', 'tarif' => 10000]);
+        $paymentMethod = PaymentMethod::create(['nama' => 'Transfer Tes']);
+
+        $orderId = $this->postJson('/api/checkout', $this->checkoutPayload(
+            $product,
+            $courier,
+            $paymentMethod,
+            now()->toDateString()
+        ))->assertCreated()->json('data.id');
+
+        $product->update(['nama' => 'Bayam Nama Baru', 'harga' => 9000]);
+
+        $this->getJson("/api/pesanan/{$orderId}")
+            ->assertOk()
+            ->assertJsonPath('data.items.0.nama_produk', 'Bayam Snapshot')
+            ->assertJsonPath('data.items.0.harga_satuan', 5000)
+            ->assertJsonPath('data.items.0.subtotal', 10000);
+
+        $this->assertDatabaseHas('order_items', [
+            'order_id' => $orderId,
+            'nama_produk' => 'Bayam Snapshot',
+            'harga_satuan' => 5000,
+        ]);
     }
 
     private function createProduct(array $overrides = []): Product

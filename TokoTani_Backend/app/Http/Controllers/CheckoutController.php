@@ -132,6 +132,8 @@ class CheckoutController extends Controller
             'items.*.product_id' => 'required|integer|distinct|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'tanggal_antar' => 'required|date_format:Y-m-d|after_or_equal:today',
+            'slot_pengantaran' => 'nullable|string|max:50',
+            'pelanggan_id' => 'nullable|integer|exists:users,id',
             'idempotency_key' => 'nullable|string|max:255',
         ]);
 
@@ -203,6 +205,7 @@ class CheckoutController extends Controller
                     $product->save();
                     $orderItems[] = [
                         'product_id' => $product->id,
+                        'nama_produk' => $product->nama,
                         'quantity' => $item['quantity'],
                         'harga_satuan' => $product->harga,
                         'subtotal' => $itemSubtotal,
@@ -216,6 +219,7 @@ class CheckoutController extends Controller
                 $ongkir = $kurir->tarif;
 
                 $order = Order::create([
+                    'pelanggan_id' => $validated['pelanggan_id'] ?? null,
                     'nama_penerima' => $validated['nama_penerima'],
                     'alamat_penerima' => $validated['alamat_penerima'],
                     'kurir_id' => $validated['kurir_id'],
@@ -226,6 +230,8 @@ class CheckoutController extends Controller
                     'status' => 'menunggu_pembayaran',
                     'idempotency_key' => $idempotencyKey,
                     'tanggal_antar' => $validated['tanggal_antar'],
+                    'tanggal_pengantaran' => $validated['tanggal_antar'],
+                    'slot_pengantaran' => $validated['slot_pengantaran'] ?? null,
                 ]);
 
                 $order->items()->createMany($orderItems);

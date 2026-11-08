@@ -9,6 +9,7 @@ class Courier extends Model
 {
     protected $fillable = [
         'nama',
+        'wilayah',
         'tarif',
         'aktif',
     ];
@@ -26,4 +27,3 @@ class Courier extends Model
         return $this->hasMany(Order::class, 'kurir_id');
     }
 }
-

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Order extends Model
 {
     protected $fillable = [
+        'pelanggan_id',
         'nama_penerima',
         'alamat_penerima',
         'kurir_id',
@@ -18,17 +19,26 @@ class Order extends Model
         'total_harga',
         'status',
         'tanggal_antar',
+        'tanggal_pengantaran',
+        'slot_pengantaran',
         'idempotency_key',
     ];
 
     protected function casts(): array
     {
         return [
+            'pelanggan_id' => 'integer',
             'subtotal' => 'integer',
             'ongkir' => 'integer',
             'total_harga' => 'integer',
             'tanggal_antar' => 'date:Y-m-d',
+            'tanggal_pengantaran' => 'date:Y-m-d',
         ];
+    }
+
+    public function pelanggan(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pelanggan_id');
     }
 
     public function courier(): BelongsTo
