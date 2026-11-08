@@ -257,7 +257,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => OrderDetailPage(
+            builder: (_) => OrderDetailPage(
             orderId: orderId,
             initialOrder: orderModel,
           ),

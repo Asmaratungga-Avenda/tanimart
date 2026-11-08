@@ -83,7 +83,7 @@ class NotificationService {
   }
 
   /// Tambah notifikasi pesanan baru seketika saat Checkout berhasil
-  static void addOrderNotification(Order order) {
+  static void addOrderNotification(OrderModel order) {
     final newItem = AppNotificationItem(
       id: 'notif_order_${order.id}_${DateTime.now().millisecondsSinceEpoch}',
       title: 'Pesanan #${order.id} Berhasil Dibuat! 🎉',

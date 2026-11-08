@@ -13,7 +13,7 @@ class OrdersPage extends StatefulWidget {
 }
 
 class _OrdersPageState extends State<OrdersPage> {
-  List<Order> _orders = [];
+  List<OrderModel> _orders = [];
   bool _isLoading = true;
   String? _error;
 
@@ -135,7 +135,7 @@ class _OrdersPageState extends State<OrdersPage> {
             context,
             MaterialPageRoute(
               builder: (_) =>
-                  OrderDetailPage(orderId: _orders[i].id, order: _orders[i]),
+                  OrderDetailPage(orderId: _orders[i].id, initialOrder: _orders[i]),
             ),
           ),
         ),
@@ -145,7 +145,7 @@ class _OrdersPageState extends State<OrdersPage> {
 }
 
 class _OrderCard extends StatelessWidget {
-  final Order order;
+  final OrderModel order;
   final VoidCallback onTap;
 
   static const _primaryGreen = Color(0xFF2E7D32);

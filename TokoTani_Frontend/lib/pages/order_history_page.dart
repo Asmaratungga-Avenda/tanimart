@@ -21,7 +21,7 @@ class OrderHistoryPage extends StatefulWidget {
 class _OrderHistoryPageState extends State<OrderHistoryPage> {
   // 4 Keadaan Layar wajib
   KeadaanMuat state = KeadaanMuat.memuat;
-  List<Order> orders = [];
+  List<OrderModel> orders = [];
   ApiException? lastError;
 
   @override
@@ -246,7 +246,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
     }
   }
 
-  Widget _buildOrderCard(Order order) {
+  Widget _buildOrderCard(OrderModel order) {
     final statusColor = _getStatusColor(order.status);
     final statusLabel = _getStatusLabel(order.status);
 
