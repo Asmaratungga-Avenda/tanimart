@@ -93,6 +93,43 @@ class CheckoutController extends Controller
         );
     }
 
+    public function updateStatus(Request $request, $id)
+    {
+        $order = Order::with(['items.product', 'courier', 'paymentMethod'])->find($id);
+
+        if (! $order) {
+            return $this->jsonResponse(
+                'gagal',
+                404,
+                'Pesanan tidak ditemukan'
+            );
+        }
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|string|in:menunggu_pembayaran,dibayar,diproses,dikirim,selesai,dibatalkan',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->jsonResponse(
+                'gagal',
+                422,
+                'Validasi gagal',
+                null,
+                $validator->errors()
+            );
+        }
+
+        $order->status = $request->input('status');
+        $order->save();
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Status pesanan berhasil diperbarui',
+            $order->load(['items.product', 'courier', 'paymentMethod'])
+        );
+    }
+
     public function store(Request $request)
     {
         // Mendukung kunci idempoten baik dari header maupun body JSON

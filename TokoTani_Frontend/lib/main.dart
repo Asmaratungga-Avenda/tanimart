@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pages/cart_page.dart';
+import 'pages/checkout_page.dart';
 import 'pages/manage_product_page.dart';
 import 'pages/product_form_page.dart';
 import 'services/api_service.dart';
@@ -246,6 +247,7 @@ class _MainFocusedPageState extends State<MainFocusedPage> {
         ),
         child: SafeArea(
           child: Center(
+            heightFactor: 1.0,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
               child: NavigationBar(
@@ -436,6 +438,20 @@ class _MenuPageState extends State<MenuPage> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ProductFormPage()),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Menu 4: Halaman Checkout
+          _MenuCard(
+            icon: Icons.shopping_bag_outlined,
+            title: 'Checkout Pesanan',
+            subtitle: 'Tampilan checkout dengan model list barang, harga, jumlah, dan urutan barang sesuai jumlah.',
+            badgeText: 'List & Urutan',
+            badgeColor: Colors.teal,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CheckoutPage()),
             ),
           ),
         ],

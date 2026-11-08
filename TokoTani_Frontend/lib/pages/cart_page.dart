@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/cart_item.dart';
 import '../services/api_service.dart';
 import '../widgets/responsive_wrapper.dart';
+import 'checkout_page.dart';
 
 class CartPage extends StatefulWidget {
   final bool showBackButton;
@@ -587,6 +588,7 @@ class _CartPageState extends State<CartPage> {
       child: SafeArea(
         top: false,
         child: Center(
+          heightFactor: 1.0,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: Padding(
@@ -599,44 +601,29 @@ class _CartPageState extends State<CartPage> {
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Text(
-                                'Total Belanja',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF64748B),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Total Belanja (${items.length} item)',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE8F5E9),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '${items.length} item',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF2E7D32),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Subtotal dari API server',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Subtotal dari API server',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 12),
                       Text(
                         formatRupiah(subtotal),
                         style: const TextStyle(
@@ -660,25 +647,28 @@ class _CartPageState extends State<CartPage> {
                       ),
                       onPressed: isProcessing
                           ? null
-                          : () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: const Color(0xFF2E7D32),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  content: Row(
-                                    children: [
-                                      const Icon(Icons.check_circle, color: Colors.white),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          'Subtotal ${formatRupiah(subtotal)} berhasil divalidasi oleh server. (Alur Checkout ditangani oleh Anggota 6)',
-                                        ),
-                                      ),
-                                    ],
+                          : () async {
+                              if (items.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Keranjang belanja masih kosong.'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
+                              final result = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CheckoutPage(
+                                    items: items,
+                                    subtotal: subtotal,
                                   ),
                                 ),
                               );
+                              if (result == true) {
+                                loadCart();
+                              }
                             },
                       child: isProcessing
                           ? const SizedBox(
