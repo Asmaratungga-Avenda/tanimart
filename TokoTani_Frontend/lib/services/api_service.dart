@@ -347,9 +347,6 @@ class ApiService {
       final list = data is List ? data : <dynamic>[];
       return list.map((e) => Courier.fromJson(Map<String, dynamic>.from(e))).toList();
     } catch (e) {
-      if (useMock || e is SocketException || e is http.ClientException) {
-        return _mockGetCouriers();
-      }
       throw _handleNetworkError(e);
     }
   }
@@ -364,9 +361,6 @@ class ApiService {
       final list = data is List ? data : <dynamic>[];
       return list.map((e) => PaymentMethod.fromJson(Map<String, dynamic>.from(e))).toList();
     } catch (e) {
-      if (useMock || e is SocketException || e is http.ClientException) {
-        return _mockGetPaymentMethods();
-      }
       throw _handleNetworkError(e);
     }
   }
@@ -380,9 +374,6 @@ class ApiService {
       final data = _extractData(body);
       return Product.fromJson(Map<String, dynamic>.from(data));
     } catch (e) {
-      if (useMock || e is SocketException || e is http.ClientException) {
-        return _mockGetProduct(id);
-      }
       throw _handleNetworkError(e);
     }
   }
@@ -397,9 +388,6 @@ class ApiService {
       final list = data is List ? data : <dynamic>[];
       return list.map((e) => e.toString()).toList();
     } catch (e) {
-      if (useMock || e is SocketException || e is http.ClientException) {
-        return _mockGetCategories();
-      }
       throw _handleNetworkError(e);
     }
   }
@@ -416,9 +404,6 @@ class ApiService {
       final res = await _send('POST', '/checkout', payload, extra);
       return res;
     } catch (e) {
-      if (useMock || e is SocketException || e is http.ClientException) {
-        return _mockCheckout(payload, idempotencyKey: idempotencyKey);
-      }
       throw _handleNetworkError(e);
     }
   }
@@ -433,9 +418,6 @@ class ApiService {
       final list = data is List ? data : <dynamic>[];
       return list.map((e) => OrderModel.fromJson(Map<String, dynamic>.from(e))).toList();
     } catch (e) {
-      if (useMock || e is SocketException || e is http.ClientException) {
-        return _mockGetOrders();
-      }
       throw _handleNetworkError(e);
     }
   }
@@ -449,9 +431,6 @@ class ApiService {
       final data = _extractData(body);
       return OrderModel.fromJson(Map<String, dynamic>.from(data));
     } catch (e) {
-      if (useMock || e is SocketException || e is http.ClientException) {
-        return _mockGetOrder(id);
-      }
       throw _handleNetworkError(e);
     }
   }
@@ -464,9 +443,6 @@ class ApiService {
       final data = _extractData(res);
       return OrderModel.fromJson(Map<String, dynamic>.from(data));
     } catch (e) {
-      if (useMock || e is SocketException || e is http.ClientException) {
-        return _mockUpdateOrderStatus(id, status);
-      }
       throw _handleNetworkError(e);
     }
   }

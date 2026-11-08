@@ -1,9 +1,12 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/cart_item.dart';
 import '../models/courier.dart';
+import '../models/order.dart';
 import '../models/payment_method.dart';
 import '../services/api_service.dart';
 import '../widgets/responsive_wrapper.dart';
+import 'order_detail_page.dart';
 
 class CheckoutPage extends StatefulWidget {
   final List<CartItem>? items;
@@ -22,9 +25,19 @@ class CheckoutPage extends StatefulWidget {
 class _CheckoutPageState extends State<CheckoutPage> {
   // Data pengiriman & form
   final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _namaCtrl;
+  late final TextEditingController _alamatCtrl;
   String _namaPenerima = 'Budi Santoso';
   String _alamatPenerima = 'Jl. Melati No. 123, Lowokwaru, Kota Malang';
   DateTime _tanggalAntar = DateTime.now();
+
+  // Kunci Idempoten (Kriteria 4 Checkout: dibuat sekali per percobaan, dipakai ulang saat coba lagi)
+  String? _idempotencyKey;
+
+  // Galat spesifik
+  Map<String, String> _serverErrors = {};
+  String? _conflictError;
+  ApiException? _generalError;
 
   // Data barang — langsung dari widget.items bila ada, bukan async
   List<CartItem> _items = [];
@@ -36,21 +49,21 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool _sortAscending = false;
 
   // Kurir & Pembayaran dengan data default langsung (tidak async di initState)
-  final List<Courier> _couriers = const [
-    Courier(id: 1, nama: 'JNE Regular', tarif: 15000, aktif: true),
-    Courier(id: 2, nama: 'SiCepat HALU', tarif: 12000, aktif: true),
-    Courier(id: 3, nama: 'Gojek Instant', tarif: 25000, aktif: true),
+  List<Courier> _couriers = [
+    const Courier(id: 1, nama: 'JNE Regular', tarif: 15000, aktif: true),
+    const Courier(id: 2, nama: 'SiCepat HALU', tarif: 12000, aktif: true),
+    const Courier(id: 3, nama: 'Gojek Instant', tarif: 25000, aktif: true),
   ];
   Courier? _selectedCourier;
 
-  final List<PaymentMethod> _paymentMethods = const [
-    PaymentMethod(
+  List<PaymentMethod> _paymentMethods = [
+    const PaymentMethod(
       id: 1,
       nama: 'COD (Bayar di Tempat)',
       deskripsi: 'Bayar saat pesanan tiba di tujuan',
       aktif: true,
     ),
-    PaymentMethod(
+    const PaymentMethod(
       id: 2,
       nama: 'Transfer Bank',
       deskripsi: 'Transfer melalui rekening BCA / BRI / Mandiri',
@@ -63,6 +76,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
   void initState() {
     super.initState();
 
+    _namaCtrl = TextEditingController(text: _namaPenerima);
+    _alamatCtrl = TextEditingController(text: _alamatPenerima);
+
     // Jika items sudah dikirim dari halaman sebelumnya (CartPage), langsung pakai
     if (widget.items != null && widget.items!.isNotEmpty) {
       _items = List<CartItem>.from(widget.items!);
@@ -72,10 +88,40 @@ class _CheckoutPageState extends State<CheckoutPage> {
     _selectedCourier = _couriers.first;
     _selectedPayment = _paymentMethods.first;
 
-    // Fetch data dari server hanya jika items belum ada (opsional, background)
-    if (_items.isEmpty) {
+    // Fetch kurir & pembayaran dari server jika tidak dalam mode pengujian terisolasi
+    if (widget.items == null) {
+      _loadCouriersAndPayments();
       _fetchCartFromServer();
     }
+  }
+
+  @override
+  void dispose() {
+    _namaCtrl.dispose();
+    _alamatCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCouriersAndPayments() async {
+    try {
+      final couriers = await ApiService.getCouriers();
+      if (mounted && couriers.isNotEmpty) {
+        setState(() {
+          _couriers = couriers;
+          _selectedCourier = couriers.first;
+        });
+      }
+    } catch (_) {}
+
+    try {
+      final payments = await ApiService.getPaymentMethods();
+      if (mounted && payments.isNotEmpty) {
+        setState(() {
+          _paymentMethods = payments;
+          _selectedPayment = payments.first;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchCartFromServer() async {
@@ -119,67 +165,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
   }
 
-  void _showEditAddressDialog() {
-    final namaCtrl = TextEditingController(text: _namaPenerima);
-    final alamatCtrl = TextEditingController(text: _alamatPenerima);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.edit_location_alt_outlined, color: Color(0xFF2E7D32)),
-            SizedBox(width: 8),
-            Text('Ubah Data Penerima', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: namaCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nama Penerima',
-                hintText: 'Masukkan nama penerima...',
-                prefixIcon: Icon(Icons.person_outline),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: alamatCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Alamat Pengiriman',
-                hintText: 'Masukkan alamat lengkap pengiriman...',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
-            onPressed: () {
-              if (namaCtrl.text.trim().isNotEmpty && alamatCtrl.text.trim().isNotEmpty) {
-                setState(() {
-                  _namaPenerima = namaCtrl.text.trim();
-                  _alamatPenerima = alamatCtrl.text.trim();
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _pickDeliveryDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -207,6 +192,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _processCheckout() async {
+    setState(() {
+      _serverErrors.clear();
+      _conflictError = null;
+      _generalError = null;
+    });
+
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -214,6 +205,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
           backgroundColor: Colors.red,
         ),
       );
+      return;
+    }
+
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
@@ -229,9 +224,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     setState(() => _isSubmitting = true);
 
+    // Kunci Idempoten: dibuat sekali per percobaan, dipakai ulang ketika menekan coba lagi
+    _idempotencyKey ??= 'IDEMP-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(999999)}';
+
     final payload = {
-      'nama_penerima': _namaPenerima,
-      'alamat_penerima': _alamatPenerima,
+      'nama_penerima': _namaCtrl.text.trim(),
+      'alamat_penerima': _alamatCtrl.text.trim(),
       'kurir_id': _selectedCourier!.id,
       'payment_method_id': _selectedPayment!.id,
       'tanggal_antar': '${_tanggalAntar.year}-${_tanggalAntar.month.toString().padLeft(2, '0')}-${_tanggalAntar.day.toString().padLeft(2, '0')}',
@@ -239,109 +237,171 @@ class _CheckoutPageState extends State<CheckoutPage> {
     };
 
     try {
-      final res = await ApiService.checkout(payload);
+      final res = await ApiService.checkout(payload, idempotencyKey: _idempotencyKey);
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      _showSuccessDialog(res);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal memproses checkout: $e'),
-          backgroundColor: Colors.red.shade800,
+      _idempotencyKey = null; // Berhasil, bersihkan kunci idempoten
+
+      final orderData = res['data'] ?? res;
+      final rawId = (orderData is Map ? orderData['id'] : null) ?? 1;
+      final orderId = rawId is int ? rawId : int.tryParse('$rawId') ?? 1;
+
+      OrderModel? orderModel;
+      if (orderData is Map) {
+        try {
+          orderModel = OrderModel.fromJson(Map<String, dynamic>.from(orderData));
+        } catch (_) {}
+      }
+
+      // Menuju rincian pesanan setelah 201 (Kriteria Perpindahan)
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OrderDetailPage(
+            orderId: orderId,
+            initialOrder: orderModel,
+          ),
         ),
       );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+
+      if (e.statusCode == 422 || e.errorType == ApiErrorType.validation) {
+        // Validasi gagal 422: tampilkan galat per kolom di bawah kolom bersangkutan
+        setState(() {
+          _serverErrors = e.fieldErrors;
+        });
+        _formKey.currentState?.validate();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            content: Text('Validasi formulir gagal. Periksa kolom yang bertanda merah.'),
+          ),
+        );
+      } else if (e.statusCode == 409 || e.errorType == ApiErrorType.conflict) {
+        // Bentrok keadaan 409: pesan server di layar yang sedang dibuka, tanpa berpindah
+        setState(() {
+          _conflictError = e.message;
+        });
+      } else {
+        // Sambungan gagal, batas waktu terlampaui, galat 500: tampilkan banner + tombol coba lagi
+        setState(() {
+          _generalError = e;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _generalError = const ApiException(
+          statusCode: 500,
+          message: 'Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.',
+          errorType: ApiErrorType.server,
+        );
+      });
     }
   }
 
-  void _showSuccessDialog(Map<String, dynamic> response) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+  Widget _buildConflictErrorBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade300),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 26),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bentrok Keadaan (409)',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _conflictError!,
+                  style: TextStyle(color: Colors.red.shade800, fontSize: 13, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: () => setState(() => _conflictError = null),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGeneralErrorBanner() {
+    final err = _generalError!;
+    final isConn = err.errorType == ApiErrorType.connection;
+    final isTimeout = err.errorType == ApiErrorType.timeout;
+    final isServer = err.errorType == ApiErrorType.server;
+
+    final title = isConn
+        ? 'Tidak Ada Sambungan'
+        : isTimeout
+            ? 'Batas Waktu Terlampaui'
+            : isServer
+                ? 'Galat Server (500)'
+                : 'Gangguan Sistem';
+
+    final icon = isConn
+        ? Icons.wifi_off_rounded
+        : isTimeout
+            ? Icons.timer_off_outlined
+            : Icons.cloud_off_outlined;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE8F5E9),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 48),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Pesanan Berhasil Dibuat!',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pesanan atas nama $_namaPenerima telah diterima dan sedang dipersiapkan oleh petani lokal.',
-                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Kurir Pengiriman', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                        Text(_selectedCourier?.nama ?? '-', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Metode Bayar', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                        Text(_selectedPayment?.nama ?? '-', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const Divider(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total Pembayaran', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        Text(
-                          _formatRupiah(_totalBayar),
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
-                        ),
-                      ],
-                    ),
-                  ],
+              Icon(icon, color: Colors.orange.shade800, size: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900),
                 ),
               ),
             ],
           ),
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
+          const SizedBox(height: 6),
+          Text(
+            err.message,
+            style: TextStyle(fontSize: 13, color: Colors.brown.shade900),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF2E7D32),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
-              onPressed: () {
-                Navigator.pop(ctx); // tutup dialog
-                Navigator.pop(context, true); // kembali ke halaman sebelumnya
-              },
-              child: const Text('Selesai & Kembali'),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Coba Lagi'),
+              onPressed: _isSubmitting ? null : _processCheckout,
             ),
           ),
         ],
@@ -386,6 +446,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
                   children: [
+                    if (_conflictError != null) _buildConflictErrorBanner(),
+                    if (_generalError != null) _buildGeneralErrorBanner(),
+
                     // ==========================================
                     // 1. DAFTAR BARANG CHECKOUT (MODEL LIST KE BAWAH)
                     // ==========================================
@@ -778,47 +841,80 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Widget _buildAddressCard() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _namaPenerima,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  _alamatPenerima,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.3),
-                ),
-              ],
-            ),
+                child: const Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Data Penerima & Alamat',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: _showEditAddressDialog,
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF2E7D32),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _namaCtrl,
+            decoration: InputDecoration(
+              labelText: 'Nama Penerima *',
+              prefixIcon: const Icon(Icons.person_outline),
+              errorText: _serverErrors['nama_penerima'],
             ),
-            child: const Text('Ubah', style: TextStyle(fontWeight: FontWeight.bold)),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return 'Nama penerima wajib diisi.';
+              }
+              if (_serverErrors.containsKey('nama_penerima')) {
+                return _serverErrors['nama_penerima'];
+              }
+              return null;
+            },
+            onChanged: (val) {
+              _namaPenerima = val;
+              if (_serverErrors.containsKey('nama_penerima')) {
+                setState(() => _serverErrors.remove('nama_penerima'));
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _alamatCtrl,
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: 'Alamat Pengiriman *',
+              prefixIcon: const Icon(Icons.location_on_outlined),
+              errorText: _serverErrors['alamat_penerima'],
+            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return 'Kolom alamat wajib diisi.';
+              }
+              if (_serverErrors.containsKey('alamat_penerima')) {
+                return _serverErrors['alamat_penerima'];
+              }
+              return null;
+            },
+            onChanged: (val) {
+              _alamatPenerima = val;
+              if (_serverErrors.containsKey('alamat_penerima')) {
+                setState(() => _serverErrors.remove('alamat_penerima'));
+              }
+            },
           ),
         ],
       ),

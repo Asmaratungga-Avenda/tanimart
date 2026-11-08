@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'pages/cart_page.dart';
+import 'pages/catalog_page.dart';
 import 'pages/checkout_page.dart';
 import 'pages/manage_product_page.dart';
+import 'pages/order_history_page.dart';
 import 'pages/product_form_page.dart';
 import 'services/api_service.dart';
 import 'widgets/responsive_wrapper.dart';
@@ -101,17 +103,19 @@ class MainFocusedPage extends StatefulWidget {
 
 class _MainFocusedPageState extends State<MainFocusedPage> {
   late int _currentIndex;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _pages = [
+      const CatalogPage(),
+      CartPage(onGoToCatalog: () => setState(() => _currentIndex = 0)),
+      OrderHistoryPage(onGoToCatalog: () => setState(() => _currentIndex = 0)),
+      const ManageProductsPage(),
+    ];
   }
-
-  final List<Widget> _pages = const [
-    CartPage(),
-    ManageProductsPage(),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -258,9 +262,19 @@ class _MainFocusedPageState extends State<MainFocusedPage> {
                 indicatorColor: const Color(0xFFE8F5E9),
                 destinations: const [
                   NavigationDestination(
+                    icon: Icon(Icons.storefront_outlined),
+                    selectedIcon: Icon(Icons.storefront, color: Color(0xFF2E7D32)),
+                    label: 'Katalog',
+                  ),
+                  NavigationDestination(
                     icon: Icon(Icons.shopping_cart_outlined),
                     selectedIcon: Icon(Icons.shopping_cart, color: Color(0xFF2E7D32)),
                     label: 'Keranjang Belanja',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.receipt_long_outlined),
+                    selectedIcon: Icon(Icons.receipt_long, color: Color(0xFF2E7D32)),
+                    label: 'Riwayat Pesanan',
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.inventory_2_outlined),
@@ -395,7 +409,7 @@ class _MenuPageState extends State<MenuPage> {
 
           const SizedBox(height: 16),
           const Text(
-            'Menu Navigasi Tugas',
+            'Menu Navigasi Tugas (7 Halaman Wajib)',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 10),
@@ -428,7 +442,21 @@ class _MenuPageState extends State<MenuPage> {
           ),
           const SizedBox(height: 12),
 
-          // Menu 3: Tambah Produk Baru
+          // Menu 3: Katalog Produk Pertanian
+          _MenuCard(
+            icon: Icons.storefront_outlined,
+            title: 'Katalog Produk Pertanian',
+            subtitle: 'Daftar produk dengan penyaring kategori, pencarian nama, penanda stok habis, & badge keranjang.',
+            badgeText: 'GET /api/produk',
+            badgeColor: Colors.teal,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CatalogPage(showBackButton: true)),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Menu 4: Tambah Produk Baru
           _MenuCard(
             icon: Icons.add_box_outlined,
             title: 'Tambah Produk Baru',
@@ -442,7 +470,7 @@ class _MenuPageState extends State<MenuPage> {
           ),
           const SizedBox(height: 12),
 
-          // Menu 4: Halaman Checkout
+          // Menu 5: Halaman Checkout
           _MenuCard(
             icon: Icons.shopping_bag_outlined,
             title: 'Checkout Pesanan',
@@ -452,6 +480,20 @@ class _MenuPageState extends State<MenuPage> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const CheckoutPage()),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Menu 6: Riwayat Pesanan
+          _MenuCard(
+            icon: Icons.receipt_long_outlined,
+            title: 'Riwayat Pesanan',
+            subtitle: 'Daftar pesanan terurut dari yang terbaru beserta status, menuju rincian pesanan.',
+            badgeText: 'GET /api/pesanan',
+            badgeColor: Colors.indigo,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const OrderHistoryPage(showBackButton: true)),
             ),
           ),
         ],

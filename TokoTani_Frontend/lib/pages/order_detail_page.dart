@@ -172,6 +172,75 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     }
   }
 
+  Widget _buildStatusTimeline(String status) {
+    final s = status.toLowerCase();
+    final isPaid = s == 'dibayar' || s == 'diproses' || s == 'dikirim' || s == 'selesai';
+    final isProcessing = s == 'diproses' || s == 'dikirim' || s == 'selesai';
+    final isDone = s == 'selesai';
+
+    Widget buildStep(String label, bool active, bool current, IconData icon) {
+      final color = active ? const Color(0xFF2E7D32) : (current ? Colors.orange.shade800 : const Color(0xFFCBD5E1));
+      return Column(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: active ? const Color(0xFF2E7D32) : (current ? Colors.orange.shade50 : const Color(0xFFF1F5F9)),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 2),
+            ),
+            child: Icon(
+              active ? Icons.check : icon,
+              size: 16,
+              color: active ? Colors.white : color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: active || current ? FontWeight.bold : FontWeight.normal,
+              color: active || current ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget buildLine(bool active) {
+      return Expanded(
+        child: Container(
+          height: 2,
+          margin: const EdgeInsets.only(bottom: 16),
+          color: active ? const Color(0xFF2E7D32) : const Color(0xFFE2E8F0),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          buildStep('Pesan', true, false, Icons.receipt_outlined),
+          buildLine(isPaid),
+          buildStep('Bayar', isPaid, s == 'menunggu_pembayaran', Icons.payment_outlined),
+          buildLine(isProcessing),
+          buildStep('Proses', isProcessing, s == 'dibayar', Icons.agriculture_outlined),
+          buildLine(isDone),
+          buildStep('Tiba', isDone, s == 'dikirim', Icons.check_circle_outline),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -257,6 +326,10 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
           children: [
+            // Timeline Progres Status Transaksi
+            _buildStatusTimeline(o.status),
+            const SizedBox(height: 12),
+
             // Status Pesanan Card
             Container(
               padding: const EdgeInsets.all(16),

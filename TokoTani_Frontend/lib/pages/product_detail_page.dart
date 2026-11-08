@@ -97,17 +97,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
             ],
           ),
-          action: SnackBarAction(
-            label: 'Buka Keranjang',
-            textColor: Colors.amberAccent,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CartPage(showBackButton: true)),
-              );
-            },
-          ),
+          duration: const Duration(seconds: 2),
         ),
+      );
+
+      // Menuju keranjang setelah berhasil menambah (Kriteria Perpindahan)
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CartPage(showBackButton: true)),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -229,7 +226,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             const SizedBox(height: 16),
 
             // Kategori & Badge Domain (Mudah Rusak)
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -359,6 +358,38 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
             const SizedBox(height: 20),
 
+            // Kartu Profil Tani & Keunggulan Produk
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  _buildTrustItem(
+                    icon: Icons.place_outlined,
+                    title: 'Asal Daerah Panen',
+                    subtitle: 'Petani Mitra Nusantara (Jawa Timur & sekitarnya)',
+                  ),
+                  const Divider(height: 16),
+                  _buildTrustItem(
+                    icon: Icons.verified_user_outlined,
+                    title: 'Jaminan Mutu & Kesegaran',
+                    subtitle: '100% Produk Segar Langsung Dari Petani Lokal',
+                  ),
+                  const Divider(height: 16),
+                  _buildTrustItem(
+                    icon: Icons.local_shipping_outlined,
+                    title: 'Metode Pengiriman',
+                    subtitle: p.mudahRusak ? 'Wajib Same Day Demi Kesegaran Produk' : 'Tersedia Kurir Reguler & Instan',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
             // Atribut Khas Domain Pertanian
             if (p.mudahRusak)
               Container(
@@ -384,7 +415,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           const SizedBox(height: 4),
                           Text(
                             'Produk ini mudah layu/rusak. Pada saat checkout, sistem server mewajibkan pengiriman pada hari yang sama (Same Day) untuk menjaga kesegaran.',
-                            style: TextStyle(fontSize: 12, color: Colors.orange.shade950, height: 1.4),
+                            style: TextStyle(fontSize: 12, color: Colors.orange.shade900, height: 1.4),
                           ),
                         ],
                       ),
@@ -395,6 +426,42 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           ],
         );
     }
+  }
+
+  Widget _buildTrustItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: const Color(0xFF2E7D32), size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildBottomBar() {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/cart_item.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
 import '../widgets/responsive_wrapper.dart';
@@ -131,6 +130,7 @@ class _CatalogPageState extends State<CatalogPage> {
       await ApiService.addCart(product.id, 1);
       if (!mounted) return;
       await loadCartCount();
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -276,13 +276,21 @@ class _CatalogPageState extends State<CatalogPage> {
                 itemBuilder: (context, index) {
                   final cat = categories[index];
                   final isSelected = selectedKategori == cat;
-                  return ChoiceChip(
+                  final catIcon = _getCategoryIcon(cat);
+                  return FilterChip(
+                    avatar: Icon(
+                      catIcon,
+                      size: 16,
+                      color: isSelected ? Colors.white : const Color(0xFF2E7D32),
+                    ),
                     label: Text(cat),
                     selected: isSelected,
-                    selectedColor: const Color(0xFFE8F5E9),
+                    showCheckmark: false,
+                    backgroundColor: Colors.white,
+                    selectedColor: const Color(0xFF2E7D32),
                     labelStyle: TextStyle(
-                      color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFF64748B),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? Colors.white : const Color(0xFF334155),
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                       fontSize: 13,
                     ),
                     shape: RoundedRectangleBorder(
@@ -292,10 +300,8 @@ class _CatalogPageState extends State<CatalogPage> {
                       ),
                     ),
                     onSelected: (val) {
-                      if (val) {
-                        setState(() => selectedKategori = cat);
-                        loadProducts();
-                      }
+                      setState(() => selectedKategori = cat);
+                      loadProducts();
                     },
                   );
                 },
@@ -388,7 +394,7 @@ class _CatalogPageState extends State<CatalogPage> {
                   crossAxisCount: crossAxisCount,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.68,
+                  childAspectRatio: constraints.maxWidth > 500 ? 0.68 : 0.56,
                 ),
                 itemBuilder: (context, index) {
                   final product = products[index];
@@ -399,6 +405,52 @@ class _CatalogPageState extends State<CatalogPage> {
           ),
         );
     }
+  }
+
+  IconData _getCategoryIcon(String category) {
+    final lower = category.toLowerCase();
+    if (lower.contains('beras') || lower.contains('biji')) return Icons.grain_rounded;
+    if (lower.contains('sayur')) return Icons.eco_rounded;
+    if (lower.contains('buah')) return Icons.apple_rounded;
+    if (lower.contains('bumbu') || lower.contains('rempah') || lower.contains('cabai')) return Icons.local_fire_department_rounded;
+    if (lower.contains('umbi') || lower.contains('kentang')) return Icons.spa_rounded;
+    if (lower == 'semua') return Icons.grid_view_rounded;
+    return Icons.grass_rounded;
+  }
+
+  IconData _getProductIcon(Product product) {
+    final lower = '${product.kategori} ${product.nama}'.toLowerCase();
+    if (lower.contains('beras') || lower.contains('padi')) return Icons.grain_rounded;
+    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) return Icons.local_fire_department_rounded;
+    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) return Icons.eco_rounded;
+    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) return Icons.apple_rounded;
+    if (lower.contains('umbi') || lower.contains('kentang')) return Icons.spa_rounded;
+    return product.mudahRusak ? Icons.local_florist_rounded : Icons.eco_rounded;
+  }
+
+  List<Color> _getProductGradient(Product product) {
+    final lower = '${product.kategori} ${product.nama}'.toLowerCase();
+    if (lower.contains('beras') || lower.contains('padi')) {
+      return const [Color(0xFFFFF9C4), Color(0xFFFFF176)];
+    }
+    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) {
+      return const [Color(0xFFFFEBEE), Color(0xFFFFCDD2)];
+    }
+    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) {
+      return const [Color(0xFFE8F5E9), Color(0xFFC8E6C9)];
+    }
+    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) {
+      return const [Color(0xFFFFF3E0), Color(0xFFFFCC80)];
+    }
+    return const [Color(0xFFE0F2F1), Color(0xFFB2DFDB)];
+  }
+
+  Color _getProductAccent(Product product) {
+    final lower = '${product.kategori} ${product.nama}'.toLowerCase();
+    if (lower.contains('beras')) return const Color(0xFFF57F17);
+    if (lower.contains('cabai') || lower.contains('bumbu') || lower.contains('rempah')) return const Color(0xFFD32F2F);
+    if (lower.contains('buah')) return const Color(0xFFE65100);
+    return const Color(0xFF2E7D32);
   }
 
   Widget _buildProductCard(Product product) {
@@ -422,9 +474,9 @@ class _CatalogPageState extends State<CatalogPage> {
           border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -433,22 +485,35 @@ class _CatalogPageState extends State<CatalogPage> {
           children: [
             // Gambar / Placeholder
             Expanded(
-              flex: 5,
+              flex: 4,
               child: Stack(
                 children: [
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: isOutOfStock ? Colors.grey.shade100 : const Color(0xFFF1F8E9),
+                      gradient: isOutOfStock
+                          ? LinearGradient(colors: [Colors.grey.shade100, Colors.grey.shade200])
+                          : LinearGradient(
+                              colors: _getProductGradient(product),
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                     ),
                     child: Center(
-                      child: Icon(
-                        product.mudahRusak ? Icons.local_florist_rounded : Icons.eco_rounded,
-                        size: 48,
-                        color: isOutOfStock
-                            ? Colors.grey.shade400
-                            : (product.mudahRusak ? Colors.orange.shade700 : const Color(0xFF2E7D32)),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _getProductIcon(product),
+                          size: 30,
+                          color: isOutOfStock
+                              ? Colors.grey.shade400
+                              : _getProductAccent(product),
+                        ),
                       ),
                     ),
                   ),
@@ -459,10 +524,16 @@ class _CatalogPageState extends State<CatalogPage> {
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
                           color: Colors.orange.shade800,
                           borderRadius: BorderRadius.circular(6),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.15),
+                              blurRadius: 4,
+                            ),
+                          ],
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
@@ -487,7 +558,7 @@ class _CatalogPageState extends State<CatalogPage> {
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
+                          color: Colors.black.withValues(alpha: 0.45),
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                         ),
                         child: const Center(
@@ -516,7 +587,7 @@ class _CatalogPageState extends State<CatalogPage> {
                       children: [
                         Text(
                           product.kategori,
-                          style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
