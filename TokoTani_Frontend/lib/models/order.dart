@@ -94,6 +94,22 @@ class Order {
       paymentMethod: paymentData is Map ? PaymentMethod.fromJson(Map<String, dynamic>.from(paymentData)) : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'nama_penerima': namaPenerima,
+    'alamat_penerima': alamatPenerima,
+    'kurir_id': kurirId,
+    'payment_method_id': paymentMethodId,
+    'subtotal': subtotal,
+    'ongkir': ongkir,
+    'total_harga': totalHarga,
+    'status': status,
+    'tanggal_antar': tanggalAntar,
+    if (createdAt != null) 'created_at': createdAt,
+    if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+    'items': items.map((i) => i.toJson()).toList(),
+  };
 }
 
 class OrderItem {
@@ -111,13 +127,13 @@ class OrderItem {
     required this.id,
     required this.orderId,
     required this.productId,
-    String? namaProduk,
+    this.namaProduk = 'Produk',
     required this.quantity,
     required this.hargaSatuan,
     required this.subtotal,
     this.fotoProduk,
     this.product,
-  }) : namaProduk = namaProduk ?? product?.nama ?? 'Produk';
+  });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
     final produk = json['product'] ?? json['produk'];
@@ -139,6 +155,17 @@ class OrderItem {
       product: parsedProduct,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'order_id': orderId,
+    'product_id': productId,
+    'nama_produk': namaProduk,
+    'quantity': quantity,
+    'harga_satuan': hargaSatuan,
+    'subtotal': subtotal,
+    if (fotoProduk != null) 'foto': fotoProduk,
+  };
 }
 
 typedef OrderModel = Order;

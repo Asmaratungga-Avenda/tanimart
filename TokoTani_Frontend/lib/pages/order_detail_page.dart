@@ -8,11 +8,13 @@ class OrderDetailPage extends StatefulWidget {
   final int orderId;
   final OrderModel? initialOrder;
 
-  const OrderDetailPage({
+  OrderDetailPage({
     super.key,
-    required this.orderId,
-    this.initialOrder,
-  });
+    int? orderId,
+    OrderModel? initialOrder,
+    OrderModel? order,
+  })  : orderId = orderId ?? order?.id ?? initialOrder?.id ?? 0,
+        initialOrder = initialOrder ?? order;
 
   @override
   State<OrderDetailPage> createState() => _OrderDetailPageState();

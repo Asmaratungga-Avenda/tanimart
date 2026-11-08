@@ -138,7 +138,7 @@ class _MainFocusedPageState extends State<MainFocusedPage> {
             ),
             const SizedBox(width: 8),
             const Text(
-              'AgriMart',
+              'TokoTani',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,

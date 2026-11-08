@@ -187,6 +187,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
         child: Form(
           key: formKey,
           child: ListView(
+            // ignore: deprecated_member_use
+            cacheExtent: 2000.0,
             padding: const EdgeInsets.all(16),
           children: [
             // Nama Produk

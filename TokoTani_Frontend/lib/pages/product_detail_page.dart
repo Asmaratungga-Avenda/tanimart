@@ -8,11 +8,13 @@ class ProductDetailPage extends StatefulWidget {
   final int productId;
   final Product? initialProduct;
 
-  const ProductDetailPage({
+  ProductDetailPage({
     super.key,
-    required this.productId,
-    this.initialProduct,
-  });
+    int? productId,
+    Product? initialProduct,
+    Product? product,
+  })  : productId = productId ?? product?.id ?? initialProduct?.id ?? 0,
+        initialProduct = initialProduct ?? product;
 
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();

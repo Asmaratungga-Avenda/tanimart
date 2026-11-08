@@ -32,7 +32,6 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
 
   static const _primaryGreen = AppTheme.primaryGreen;
-  static const _lightGreen = AppTheme.lightGreen;
   static const _bgColor = AppTheme.background;
   static const _textPrimary = AppTheme.textPrimary;
   static const _textSecondary = AppTheme.textSecondary;

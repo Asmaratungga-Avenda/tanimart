@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../core/widgets/product_image.dart';
 import '../models/cart_item.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
@@ -502,7 +501,6 @@ class _CartPageState extends State<CartPage> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(_getItemIcon(item), size: 36, color: _getItemAccent(item)),
-          ),
           ),
           const SizedBox(width: 14),
 

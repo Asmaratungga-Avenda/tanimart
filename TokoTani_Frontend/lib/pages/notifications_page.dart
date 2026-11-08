@@ -95,7 +95,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       ),
       body: ValueListenableBuilder<int>(
         valueListenable: NotificationService.unreadCountNotifier,
-        builder: (context, _, __) {
+        builder: (context, unreadCount, child) {
           final items = NotificationService.notifications;
           if (items.isEmpty) {
             return _buildEmptyState();

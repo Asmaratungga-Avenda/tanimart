@@ -26,6 +26,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Katalog Produk Pertanian'), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget); // Kolom pencarian ?cari=
@@ -47,7 +48,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        const MaterialApp(
+        MaterialApp(
           home: ProductDetailPage(
             productId: 1,
             initialProduct: testProduct,
@@ -55,6 +56,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Beras Rojolele Organik'), findsWidgets);
       expect(find.text('Mudah Rusak (Wajib Same Day)'), findsOneWidget); // Domain rule badge
@@ -68,6 +70,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Keranjang Belanja'), findsOneWidget);
       expect(find.byType(ListView), findsOneWidget); // ListView.builder
@@ -81,6 +84,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Checkout Pesanan'), findsOneWidget);
       expect(find.text('Data Penerima & Alamat'), findsOneWidget);
@@ -114,11 +118,12 @@ void main() {
         courier: const Courier(id: 1, nama: 'JNE Regular', tarif: 15000, aktif: true),
         paymentMethod: const PaymentMethod(id: 1, nama: 'Transfer Bank', deskripsi: 'Transfer', aktif: true),
         createdAt: '2026-11-08 09:00:00',
-        items: const [
+        items: [
           OrderItemModel(
             id: 1,
             orderId: 101,
             productId: 1,
+            namaProduk: 'Beras Pandan Wangi',
             quantity: 1,
             hargaSatuan: 50000,
             subtotal: 50000,
@@ -136,6 +141,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Pesanan #101'), findsWidgets);
       expect(find.text('Menunggu Pembayaran'), findsWidgets);
@@ -149,6 +155,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Riwayat Pesanan'), findsOneWidget);
     });
@@ -160,6 +167,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.text('Kelola Produk'), findsOneWidget);
       expect(find.text('Tambah Produk'), findsOneWidget); // FAB Tambah

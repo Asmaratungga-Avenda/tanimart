@@ -410,31 +410,25 @@ class ApiService {
     }
   }
 
-  /// GET /api/kategori
-  static Future<List<String>> getCategories() async {
-    if (useMock) return _mockGetCategories();
-    try {
-      final response = await http.get(_uri('/kategori'), headers: headers).timeout(timeoutDuration);
-      final body = _decodeResponse(response);
-      final data = _extractData(body);
-      final list = data is List ? data : <dynamic>[];
-      return list.map((e) => e.toString()).toList();
-    } catch (e) {
-      throw _handleNetworkError(e);
-    }
-  }
-
   /// POST /api/checkout
   /// Menyertakan header X-Kunci-Idempoten (idempotency key) untuk mencegah duplikasi pesanan.
   static Future<Map<String, dynamic>> checkout(
     Map<String, dynamic> payload, {
     String? idempotencyKey,
   }) async {
-    if (useMock) return _mockCheckout(payload, idempotencyKey: idempotencyKey);
-    final extra = idempotencyKey != null ? {'X-Kunci-Idempoten': idempotencyKey} : null;
+    if (useMock) {
+      final mockOrder = await _mockCheckout(payload);
+      return {'data': mockOrder.toJson()};
+    }
+    final reqHeaders = Map<String, String>.from(headers);
+    if (idempotencyKey != null) {
+      reqHeaders['X-Kunci-Idempoten'] = idempotencyKey;
+    }
     try {
-      final res = await _send('POST', '/checkout', payload, extra);
-      return res;
+      final response = await http
+          .post(_uri('/checkout'), headers: reqHeaders, body: jsonEncode(payload))
+          .timeout(const Duration(seconds: 30));
+      return _decodeResponse(response);
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -477,6 +471,9 @@ class ApiService {
     }
   }
 
+  /// GET /api/pesanan/{id} (Alias)
+  static Future<Order> getOrder(int id) => getOrderDetail(id);
+
   /// PATCH /api/pesanan/{id}/status
   static Future<Order> updateOrderStatus(int id, String status) async {
     if (useMock) return _mockUpdateOrderStatus(id, status);
@@ -492,25 +489,6 @@ class ApiService {
       );
     }
     return Order.fromJson(Map<String, dynamic>.from(data));
-  }
-
-  // -------------------------------------------------------------
-  // ENDPOINT CHECKOUT
-  // -------------------------------------------------------------
-
-  /// POST /api/checkout
-  static Future<Order> checkout(Map<String, dynamic> payload) async {
-    if (useMock) return _mockCheckout(payload);
-    try {
-      final response = await http
-          .post(_uri('/checkout'), headers: headers, body: jsonEncode(payload))
-          .timeout(const Duration(seconds: 30));
-      final body = _decodeResponse(response);
-      final data = _extractData(body);
-      return Order.fromJson(Map<String, dynamic>.from(data));
-    } catch (e) {
-      throw _handleNetworkError(e);
-    }
   }
 
   // -------------------------------------------------------------
@@ -797,6 +775,18 @@ class ApiService {
       list = list.where((p) => p.nama.toLowerCase().contains(q)).toList();
     }
     return list;
+  }
+
+  static Future<Product> _mockGetProduct(int id) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return _mockProducts.firstWhere(
+      (p) => p.id == id,
+      orElse: () => throw const ApiException(
+        statusCode: 404,
+        message: 'Produk tidak ditemukan.',
+        errorType: ApiErrorType.notFound,
+      ),
+    );
   }
 
   static Future<List<String>> _mockGetCategories() async {

@@ -103,25 +103,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _loadCouriersAndPayments() async {
-    try {
-      final couriers = await ApiService.getCouriers();
-      if (mounted && couriers.isNotEmpty) {
-        setState(() {
-          _couriers = couriers;
-          _selectedCourier = couriers.first;
-        });
-      }
-    } catch (_) {}
-
-    try {
-      final payments = await ApiService.getPaymentMethods();
-      if (mounted && payments.isNotEmpty) {
-        setState(() {
-          _paymentMethods = payments;
-          _selectedPayment = payments.first;
-        });
-      }
-    } catch (_) {}
+    await Future.wait([
+      ApiService.getCouriers().then((couriers) {
+        if (mounted && couriers.isNotEmpty) {
+          setState(() {
+            _couriers = couriers;
+            _selectedCourier = couriers.first;
+          });
+        }
+      }).catchError((_) {}),
+      ApiService.getPaymentMethods().then((payments) {
+        if (mounted && payments.isNotEmpty) {
+          setState(() {
+            _paymentMethods = payments;
+            _selectedPayment = payments.first;
+          });
+        }
+      }).catchError((_) {}),
+    ]);
   }
 
   Future<void> _fetchCartFromServer() async {
