@@ -1,18 +1,18 @@
-# Tani Mart
+# TokoTani
 
-Aplikasi e-commerce produk pertanian dan kebutuhan harian — **Tani Mart**.
+Aplikasi e-commerce produk pertanian dan kebutuhan harian — **TokoTani**.
 
 Repository ini berisi dua aplikasi yang dikelola terpisah:
 
-- `TaniMart_Backend/` — REST API berbasis Laravel 13 + Filament v5 Admin Panel.
-- `TaniMart_Frontend/` — Aplikasi mobile Flutter (Android & Desktop).
+- `TokoTani_Backend/` — REST API berbasis Laravel 13 + Filament v5 Admin Panel.
+- `TokoTani_Frontend/` — Aplikasi mobile Flutter (Android & Desktop).
 
 ## Frontend
 
 Jalankan perintah berikut dari folder frontend:
 
 ```shell
-cd TaniMart_Frontend
+cd TokoTani_Frontend
 flutter pub get
 flutter test
 flutter run
@@ -21,7 +21,7 @@ flutter run
 ## Backend
 
 ```shell
-cd TaniMart_Backend
+cd TokoTani_Backend
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 

@@ -1,6 +1,6 @@
-# Tani Mart Database Schema Specification
+# TokoTani Database Schema Specification
 
-Dokumen ini menjelaskan struktur skema basis data MySQL/SQLite untuk backend aplikasi **Tani Mart** (Tani Mart), hubungan antar entitas (relasi Eloquent), serta aturan integritas data (*business invariants*).
+Dokumen ini menjelaskan struktur skema basis data MySQL/SQLite untuk backend aplikasi **TokoTani** (TokoTani), hubungan antar entitas (relasi Eloquent), serta aturan integritas data (*business invariants*).
 
 ---
 
