@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
@@ -288,6 +289,9 @@ class CheckoutController extends Controller
 
                 return $order->load('items');
             });
+
+            $customerId = $request->header('X-Pelanggan-Id') ?? '1';
+            Cache::put("cart_user_{$customerId}", [], 86400);
 
             return $this->jsonResponse(
                 'sukses',

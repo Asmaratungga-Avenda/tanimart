@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
-import '../core/widgets/product_image.dart';
 import '../models/cart_item.dart';
 import '../services/api_service.dart';
-import '../services/notification_service.dart';
 import '../widgets/responsive_wrapper.dart';
+import 'catalog_page.dart';
 import 'checkout_page.dart';
 
 class CartPage extends StatefulWidget {
   final bool showBackButton;
-  final VoidCallback? onCheckout;
+  final VoidCallback? onGoToCatalog;
 
-  const CartPage({super.key, this.showBackButton = false, this.onCheckout});
+  const CartPage({
+    super.key,
+    this.showBackButton = false,
+    this.onGoToCatalog,
+  });
 
   @override
   State<CartPage> createState() => _CartPageState();
@@ -51,8 +54,6 @@ class _CartPageState extends State<CartPage> {
         subtotal = result.subtotal;
         state = items.isEmpty ? KeadaanMuat.kosong : KeadaanMuat.berhasil;
       });
-      NotificationService.cartCountNotifier.value =
-          result.items.fold(0, (sum, i) => sum + i.jumlah);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -340,8 +341,15 @@ class _CartPageState extends State<CartPage> {
                   icon: const Icon(Icons.storefront_outlined),
                   label: const Text('Mulai Belanja Produk Segar'),
                   onPressed: () {
-                    if (Navigator.canPop(context)) {
+                    if (widget.onGoToCatalog != null) {
+                      widget.onGoToCatalog!();
+                    } else if (Navigator.canPop(context)) {
                       Navigator.pop(context);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CatalogPage(showBackButton: true)),
+                      );
                     }
                   },
                 ),
@@ -418,6 +426,43 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
+  IconData _getItemIcon(CartItem item) {
+    final lower = item.nama.toLowerCase();
+    if (lower.contains('beras') || lower.contains('padi')) return Icons.grain_rounded;
+    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) {
+      return Icons.local_fire_department_rounded;
+    }
+    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) return Icons.eco_rounded;
+    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) return Icons.apple_rounded;
+    if (lower.contains('umbi') || lower.contains('kentang')) return Icons.spa_rounded;
+    return item.mudahRusak ? Icons.local_florist_rounded : Icons.eco_rounded;
+  }
+
+  List<Color> _getItemGradient(CartItem item) {
+    final lower = item.nama.toLowerCase();
+    if (lower.contains('beras') || lower.contains('padi')) {
+      return const [Color(0xFFFFF9C4), Color(0xFFFFF176)];
+    }
+    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) {
+      return const [Color(0xFFFFEBEE), Color(0xFFFFCDD2)];
+    }
+    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) {
+      return const [Color(0xFFE8F5E9), Color(0xFFC8E6C9)];
+    }
+    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) {
+      return const [Color(0xFFFFF3E0), Color(0xFFFFCC80)];
+    }
+    return const [Color(0xFFE0F2F1), Color(0xFFB2DFDB)];
+  }
+
+  Color _getItemAccent(CartItem item) {
+    final lower = item.nama.toLowerCase();
+    if (lower.contains('beras')) return const Color(0xFFF57F17);
+    if (lower.contains('cabai') || lower.contains('bawang')) return const Color(0xFFD32F2F);
+    if (lower.contains('buah')) return const Color(0xFFE65100);
+    return const Color(0xFF2E7D32);
+  }
+
   Widget _buildCartCard(CartItem item) {
     final itemTotal = item.harga * item.jumlah;
 
@@ -438,17 +483,19 @@ class _CartPageState extends State<CartPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gambar / Thumbnail Produk Nyata
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: SizedBox(
-              width: 72,
-              height: 72,
-              child: ProductImage(
-                productName: item.nama,
-                fit: BoxFit.cover,
+          // Gambar / Thumbnail Produk Tematik
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _getItemGradient(item),
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(14),
             ),
+            child: Icon(_getItemIcon(item), size: 36, color: _getItemAccent(item)),
           ),
           const SizedBox(width: 14),
 
@@ -483,6 +530,31 @@ class _CartPageState extends State<CartPage> {
                               fontSize: 13,
                             ),
                           ),
+                          if (item.mudahRusak)
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.bolt, size: 10, color: Colors.orange.shade900),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    'Wajib Instan/Same-Day',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -591,6 +663,7 @@ class _CartPageState extends State<CartPage> {
       child: SafeArea(
         top: false,
         child: Center(
+          heightFactor: 1.0,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: Padding(
@@ -603,44 +676,29 @@ class _CartPageState extends State<CartPage> {
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Text(
-                                'Total Belanja',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF64748B),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Total Belanja (${items.length} item)',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE8F5E9),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '${items.length} item',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF2E7D32),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Subtotal dari API server',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                          ),
-                        ],
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Subtotal dari API server',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 12),
                       Text(
                         formatRupiah(subtotal),
                         style: const TextStyle(
@@ -664,13 +722,28 @@ class _CartPageState extends State<CartPage> {
                       ),
                       onPressed: isProcessing
                           ? null
-                          : () {
-                              Navigator.push(
+                          : () async {
+                              if (items.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Keranjang belanja masih kosong.'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
+                              final result = await Navigator.push<bool>(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const CheckoutPage(),
+                                  builder: (_) => CheckoutPage(
+                                    items: items,
+                                    subtotal: subtotal,
+                                  ),
                                 ),
                               );
+                              if (result == true) {
+                                loadCart();
+                              }
                             },
                       child: isProcessing
                           ? const SizedBox(
