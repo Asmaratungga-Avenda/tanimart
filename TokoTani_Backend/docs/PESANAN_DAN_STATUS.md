@@ -370,13 +370,18 @@ Nilai `subtotal`, `ongkir`, atau `total` dari klien diabaikan.
 | File | Perubahan |
 |------|-----------|
 | `routes/api.php` | Route daftar, detail, dan `PATCH` status pesanan |
-| `app/Http/Controllers/CheckoutController.php` | Urutan riwayat, detail, update status, checkout transaksional |
+| `app/Http/Controllers/CheckoutController.php` | Urutan riwayat, detail, update status, checkout transaksional, idempotensi paralel |
 | `app/Models/Pesanan.php` | Daftar status dan peta transisi |
 | `app/Models/Order.php` | Fillable/hidden hash idempotensi |
 | `app/Models/OrderItem.php` | Snapshot item |
 | `app/Http/Controllers/KurirController.php` | Respons kurir/wilayah + tarif |
 | `tests/Feature/CheckoutTest.php` | Pengujian riwayat, detail, status, checkout |
 | `tests/Feature/KurirTest.php` | Pengujian wilayah dan tarif |
+| `tests/Feature/PesananAcceptanceTest.php` | Pengujian acceptance endpoint, status, pembayaran, dan checkout sekuensial |
+| `tests/Feature/CheckoutConcurrencyTest.php` | Pengujian dua checkout hampir bersamaan |
+| `tests/Support/CheckoutFixtures.php` | Fixture bersama data checkout |
+| `tests/Support/checkout_request.php` | Proses anak untuk request checkout paralel |
+| `docs/PENGUJIAN_PESANAN_DAN_CHECKOUT.md` | Penjelasan pengujian dan konkurensi |
 | `docs/PESANAN_DAN_STATUS.md` | Dokumen ini |
 | `docs/CHECKOUT_SPESIFIKASI.md` | Rujukan checkout transaksional |
 | `docs/ERD_TRANSAKSI.md` | Rujukan status dan file |
@@ -390,15 +395,19 @@ Perintah:
 ```shell
 php artisan test --filter=CheckoutTest
 php artisan test --filter=KurirTest
+php artisan test --filter=PesananAcceptanceTest
+php artisan test --filter=CheckoutConcurrencyTest
 php artisan test
 ```
 
 Hasil terakhir:
 
 ```text
-CheckoutTest : 32 tests, 181 assertions, passed
-KurirTest    : 1 test, 7 assertions, passed
-Semua test   : 47 tests, 256 assertions, passed
+CheckoutTest           : 32 tests, 181 assertions, passed
+KurirTest              : 1 test, 7 assertions, passed
+PesananAcceptanceTest  : 12 tests, 141 assertions, passed
+CheckoutConcurrencyTest: 2 tests, 24 assertions, passed
+Semua test             : 61 tests, 421 assertions, passed
 ```
 
 Skenario penting yang diuji:
@@ -415,6 +424,15 @@ Skenario penting yang diuji:
 - Respons kurir memuat `wilayah` dan `tarif`.
 - Checkout: stok, batas mudah rusak, same-day, total server, idempotensi,
   rollback, dan pembersihan keranjang.
+- Dua metode pembayaran tersimpan dan tampil pada endpoint.
+- Status tidak dapat melompati tahap atau menghidupkan pesanan
+  `selesai`/`dibatalkan`.
+- Dua checkout paralel pada stok terbatas hanya menghasilkan satu pesanan.
+- Dua request paralel dengan kunci idempoten sama menghasilkan satu pesanan
+  dan satu respons idempoten.
+- Pemeriksaan database memastikan tidak ada pesanan ganda atau perubahan
+  stok/keranjang setengah jadi. Detail lengkap ada di
+  `docs/PENGUJIAN_PESANAN_DAN_CHECKOUT.md`.
 
 ---
 

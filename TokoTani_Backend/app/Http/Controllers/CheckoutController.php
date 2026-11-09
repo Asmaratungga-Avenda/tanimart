@@ -460,6 +460,20 @@ class CheckoutController extends Controller
                 $order
             );
         } catch (HttpResponseException $e) {
+            // Dua request dengan kunci idempoten sama dapat lolos pengecekan awal
+            // secara bersamaan. Request kedua baru gagal setelah request pertama
+            // commit, sehingga pesanan lama harus dikembalikan sebagai respons
+            // idempoten, bukan error.
+            if ($idempotencyKey !== null) {
+                $existingOrder = Order::with(['items', 'courier', 'paymentMethod'])
+                    ->where('idempotency_key', $idempotencyKey)
+                    ->first();
+
+                if ($existingOrder) {
+                    return $this->idempotentResponse($existingOrder, $fingerprint);
+                }
+            }
+
             return $e->getResponse();
         } catch (QueryException $e) {
             if ($idempotencyKey !== null) {
