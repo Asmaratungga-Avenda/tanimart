@@ -10,11 +10,7 @@ class OrderDetailPage extends StatefulWidget {
   final int orderId;
   final OrderModel? initialOrder;
 
-  const OrderDetailPage({
-    super.key,
-    required this.orderId,
-    this.initialOrder,
-  });
+  const OrderDetailPage({super.key, required this.orderId, this.initialOrder});
 
   @override
   State<OrderDetailPage> createState() => _OrderDetailPageState();
@@ -82,7 +78,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 Icon(Icons.check_circle_rounded, color: theme.onPrimary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Pembayaran berhasil diverifikasi oleh server!'),
+                  child: Text(
+                    'Konfirmasi pembayaran terkirim dan menunggu verifikasi admin.',
+                  ),
                 ),
               ],
             ),
@@ -104,7 +102,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
           SnackBar(
             backgroundColor: theme.errorRed,
             behavior: SnackBarBehavior.floating,
-            content: Text('Terjadi gangguan jaringan saat memproses pembayaran.'),
+            content: Text(
+              'Terjadi gangguan jaringan saat memproses pembayaran.',
+            ),
           ),
         );
       }
@@ -128,9 +128,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       case 'selesai':
         return theme.primaryGreen;
       case 'menunggu_pembayaran':
+      case 'menunggu_konfirmasi':
         return theme.warning;
       case 'diproses':
       case 'dikirim':
+      case 'tiba':
         return theme.info;
       case 'dibatalkan':
         return theme.errorRed;
@@ -143,12 +145,16 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     switch (status.toLowerCase()) {
       case 'menunggu_pembayaran':
         return 'Menunggu Pembayaran';
+      case 'menunggu_konfirmasi':
+        return 'Menunggu Verifikasi Pembayaran';
       case 'dibayar':
         return 'Sudah Dibayar';
       case 'diproses':
         return 'Sedang Dipersiapkan Petani';
       case 'dikirim':
         return 'Dalam Pengiriman';
+      case 'tiba':
+        return 'Pesanan Telah Tiba';
       case 'selesai':
         return 'Pesanan Selesai';
       case 'dibatalkan':
@@ -160,16 +166,23 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
   Widget _buildStatusTimeline(String status, AppColors theme) {
     final s = status.toLowerCase();
-    final isPaid = s == 'dibayar' || s == 'diproses' || s == 'dikirim' || s == 'selesai';
-    final isProcessing = s == 'diproses' || s == 'dikirim' || s == 'selesai';
+    final isPaid =
+        s == 'dibayar' ||
+        s == 'diproses' ||
+        s == 'dikirim' ||
+        s == 'tiba' ||
+        s == 'tiba' ||
+        s == 'selesai';
+    final isProcessing =
+        s == 'diproses' || s == 'dikirim' || s == 'tiba' || s == 'selesai';
     final isDone = s == 'selesai';
 
     Widget buildStep(String label, bool active, bool current, IconData icon) {
       final color = active
           ? theme.primaryGreen
           : current
-              ? theme.warning
-              : theme.borderColor;
+          ? theme.warning
+          : theme.borderColor;
       return Column(
         children: [
           Container(
@@ -179,8 +192,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               color: active
                   ? theme.primaryGreen
                   : current
-                      ? theme.warningContainer
-                      : theme.mutedContainer,
+                  ? theme.warningContainer
+                  : theme.mutedContainer,
               shape: BoxShape.circle,
               border: Border.all(color: color, width: 2),
             ),
@@ -195,8 +208,12 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
             label,
             style: TextStyle(
               fontSize: 10,
-              fontWeight: active || current ? FontWeight.bold : FontWeight.normal,
-              color: active || current ? theme.textPrimary : theme.textSecondary,
+              fontWeight: active || current
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+              color: active || current
+                  ? theme.textPrimary
+                  : theme.textSecondary,
             ),
           ),
         ],
@@ -225,11 +242,26 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         children: [
           buildStep('Pesan', true, false, Icons.receipt_outlined),
           buildLine(isPaid),
-          buildStep('Bayar', isPaid, s == 'menunggu_pembayaran', Icons.payment_outlined),
+          buildStep(
+            'Bayar',
+            isPaid,
+            s == 'menunggu_pembayaran' || s == 'menunggu_konfirmasi',
+            Icons.payment_outlined,
+          ),
           buildLine(isProcessing),
-          buildStep('Proses', isProcessing, s == 'dibayar', Icons.agriculture_outlined),
+          buildStep(
+            'Proses',
+            isProcessing,
+            s == 'dibayar',
+            Icons.agriculture_outlined,
+          ),
           buildLine(isDone),
-          buildStep('Tiba', isDone, s == 'dikirim', Icons.check_circle_outline),
+          buildStep(
+            'Tiba',
+            isDone || s == 'tiba',
+            s == 'dikirim',
+            Icons.check_circle_outline,
+          ),
         ],
       ),
     );
@@ -247,7 +279,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         return Scaffold(
           backgroundColor: theme.backgroundColor,
           appBar: AppBar(
-            title: Text(order != null ? 'Pesanan #${order.id}' : 'Rincian Pesanan'),
+            title: Text(
+              order != null ? 'Pesanan #${order.id}' : 'Rincian Pesanan',
+            ),
             centerTitle: true,
             backgroundColor: theme.surfaceColor,
             foregroundColor: theme.textPrimary,
@@ -263,7 +297,12 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     );
   }
 
-  Widget _buildBody(OrderProvider provider, OrderModel? o, bool isLoading, String? errorMessage) {
+  Widget _buildBody(
+    OrderProvider provider,
+    OrderModel? o,
+    bool isLoading,
+    String? errorMessage,
+  ) {
     final theme = AppColors.of(context);
     if (isLoading && o == null) {
       return Center(
@@ -284,12 +323,20 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 color: theme.textSecondary,
               ),
               const SizedBox(height: 16),
-              const Text('Pesanan Tidak Ditemukan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                'Pesanan Tidak Ditemukan',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
-              Text(errorMessage ?? 'Pesanan tidak ditemukan pada sistem.', textAlign: TextAlign.center),
+              Text(
+                errorMessage ?? 'Pesanan tidak ditemukan pada sistem.',
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
               FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: theme.primaryGreen),
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.primaryGreen,
+                ),
                 onPressed: backToCatalog,
                 child: const Text('Kembali ke Katalog Utama'),
               ),
@@ -331,7 +378,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  o.status == 'dibayar' ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                  o.status == 'dibayar'
+                      ? Icons.check_circle_rounded
+                      : Icons.pending_actions_rounded,
                   color: statusColor,
                   size: 28,
                 ),
@@ -362,7 +411,10 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       const SizedBox(height: 2),
                       Text(
                         'Waktu: ${o.createdAt!.substring(0, 16).replaceAll('T', ' ')}',
-                        style: TextStyle(fontSize: 11, color: theme.textSecondary),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.textSecondary,
+                        ),
                       ),
                     ],
                   ],
@@ -411,11 +463,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       color: theme.lightGreen,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(
-                      Icons.eco,
-                      color: theme.primaryGreen,
-                      size: 22,
-                    ),
+                    child: Icon(Icons.eco, color: theme.primaryGreen, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -424,7 +472,10 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       children: [
                         Text(
                           productName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -477,9 +528,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               const SizedBox(height: 8),
               _buildRowInfo('Tanggal Antar', o.tanggalAntar),
               const SizedBox(height: 8),
-              _buildRowInfo('Jasa Kurir', o.courier?.nama ?? 'Kurir #${o.kurirId}'),
+              _buildRowInfo(
+                'Jasa Kurir',
+                o.courier?.nama ?? 'Kurir #${o.kurirId}',
+              ),
               const SizedBox(height: 8),
-              _buildRowInfo('Metode Pembayaran', o.paymentMethod?.nama ?? 'Metode #${o.paymentMethodId}'),
+              _buildRowInfo(
+                'Metode Pembayaran',
+                o.paymentMethod?.nama ?? 'Metode #${o.paymentMethodId}',
+              ),
             ],
           ),
         ),
@@ -617,7 +674,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
                           backgroundColor: theme.primaryGreen,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         icon: isPaying
                             ? SizedBox(
@@ -631,9 +690,12 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                             : const Icon(Icons.payment_rounded),
                         label: Text(
                           isPaying
-                              ? 'Mengonfirmasi Pembayaran...'
+                              ? 'Mengirim Konfirmasi...'
                               : 'Konfirmasi Pembayaran',
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         onPressed: isPaying ? null : _processPayment,
                       ),
@@ -649,7 +711,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: theme.primaryGreen,
                         side: BorderSide(color: theme.primaryGreen),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       icon: const Icon(Icons.storefront_outlined),
                       label: const Text('Kembali ke Katalog Utama'),

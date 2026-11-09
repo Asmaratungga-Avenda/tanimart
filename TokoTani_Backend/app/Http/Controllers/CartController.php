@@ -26,11 +26,7 @@ class CartController extends Controller
 
     private function getCustomerId(Request $request): int
     {
-        $id = $request->header('X-Pelanggan-Id')
-            ?: $request->header('X-Customer-Id')
-            ?: $request->input('customer_id');
-
-        return (int) ($id ?: 1);
+        return (int) $request->user()->id;
     }
 
     public function index(Request $request)
@@ -160,7 +156,7 @@ class CartController extends Controller
 
         return $this->jsonResponse(
             'sukses',
-            201,
+            $existing ? 200 : 201,
             'Produk berhasil ditambahkan ke keranjang',
             [
                 'id'        => $cart->id,
@@ -272,4 +268,3 @@ class CartController extends Controller
         );
     }
 }
-

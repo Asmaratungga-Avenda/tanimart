@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../models/cart_item.dart';
 import '../models/courier.dart';
@@ -15,12 +16,12 @@ enum KeadaanMuat { memuat, berhasil, kosong, galat }
 /// Klasifikasi jenis galat wajib sesuai ketentuan Rubrik Kriteria 6.
 enum ApiErrorType {
   connection, // Tidak ada sambungan (server mati / mode pesawat)
-  timeout,    // Batas waktu terlampaui (.timeout terpicu)
+  timeout, // Batas waktu terlampaui (.timeout terpicu)
   validation, // 422 Validasi formulir gagal
-  conflict,   // 409 Bentrok keadaan (stok tidak cukup / produk terpakai pada pesanan)
-  server,     // 500 Galat internal di sisi server
-  notFound,   // 404 Data tidak ditemukan
-  other,      // Galat lainnya
+  conflict, // 409 Bentrok keadaan (stok tidak cukup / produk terpakai pada pesanan)
+  server, // 500 Galat internal di sisi server
+  notFound, // 404 Data tidak ditemukan
+  other, // Galat lainnya
 }
 
 /// Kelas representasi galat API terstruktur.
@@ -61,10 +62,7 @@ class CartResponse {
   final List<CartItem> items;
   final int subtotal;
 
-  const CartResponse({
-    required this.items,
-    required this.subtotal,
-  });
+  const CartResponse({required this.items, required this.subtotal});
 }
 
 class ApiService {
@@ -82,14 +80,35 @@ class ApiService {
     } catch (_) {}
     return 'http://127.0.0.1:8000/api';
   }
+
   static const Duration timeoutDuration = Duration(seconds: 10);
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const String _tokenKey = 'sanctum_token';
   @visibleForTesting
   static http.Client httpClient = http.Client();
+  @visibleForTesting
+  static Future<String?> Function()? authTokenReader;
 
-  static const Map<String, String> headers = {
+  static const Map<String, String> _baseHeaders = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
   };
+
+  static Future<String?> readAuthToken() =>
+      authTokenReader?.call() ?? _secureStorage.read(key: _tokenKey);
+
+  static Future<void> clearAuthToken() => _secureStorage.delete(key: _tokenKey);
+
+  static Future<Map<String, String>> _headers({
+    Map<String, String>? extraHeaders,
+  }) async {
+    final token = await readAuthToken();
+    return {
+      ..._baseHeaders,
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      ...?extraHeaders,
+    };
+  }
 
   // -------------------------------------------------------------
   // HELPER URI & RESPONSE DECODING
@@ -109,18 +128,25 @@ class ApiService {
         message: response.statusCode >= 500
             ? 'Terjadi gangguan pada server internal (500).'
             : 'Format balasan server tidak dapat dibaca.',
-        errorType: response.statusCode >= 500 ? ApiErrorType.server : ApiErrorType.other,
+        errorType: response.statusCode >= 500
+            ? ApiErrorType.server
+            : ApiErrorType.other,
       );
     }
 
-    final body = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    final body = decoded is Map<String, dynamic>
+        ? decoded
+        : <String, dynamic>{};
     final isSuccessStatus = body['status'] == 'sukses';
-    final isHttpSuccess = response.statusCode >= 200 && response.statusCode < 300;
+    final isHttpSuccess =
+        response.statusCode >= 200 && response.statusCode < 300;
 
     if (!isHttpSuccess || !isSuccessStatus) {
       final code = int.tryParse('${body['code']}') ?? response.statusCode;
       final rawErrors = body['errors'];
-      final errorsMap = rawErrors is Map ? Map<String, dynamic>.from(rawErrors) : const <String, dynamic>{};
+      final errorsMap = rawErrors is Map
+          ? Map<String, dynamic>.from(rawErrors)
+          : const <String, dynamic>{};
 
       ApiErrorType type;
       String defaultMsg;
@@ -132,15 +158,18 @@ class ApiService {
           break;
         case 409:
           type = ApiErrorType.conflict;
-          defaultMsg = 'Stok tidak mencukupi atau permintaan bertentangan dengan server.';
+          defaultMsg =
+              'Stok tidak mencukupi atau permintaan bertentangan dengan server.';
           break;
         case 422:
           type = ApiErrorType.validation;
-          defaultMsg = 'Validasi gagal. Periksa kembali kolom formulir yang bertanda merah.';
+          defaultMsg =
+              'Validasi gagal. Periksa kembali kolom formulir yang bertanda merah.';
           break;
         case 500:
           type = ApiErrorType.server;
-          defaultMsg = 'Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.';
+          defaultMsg =
+              'Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.';
           break;
         default:
           type = ApiErrorType.other;
@@ -150,7 +179,9 @@ class ApiService {
       final serverMessage = body['message']?.toString();
       throw ApiException(
         statusCode: code,
-        message: (serverMessage != null && serverMessage.trim().isNotEmpty) ? serverMessage : defaultMsg,
+        message: (serverMessage != null && serverMessage.trim().isNotEmpty)
+            ? serverMessage
+            : defaultMsg,
         errorType: type,
         errors: errorsMap,
       );
@@ -159,13 +190,65 @@ class ApiService {
     return body;
   }
 
-  static dynamic _extractData(Map<String, dynamic> body) => body['data'] ?? body;
+  static dynamic _extractData(Map<String, dynamic> body) =>
+      body['data'] ?? body;
+
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
+    final response = await _send('POST', '/auth/login', {
+      'email': email.trim(),
+      'password': password,
+    });
+    return _storeAuthResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> register(
+    String name,
+    String email,
+    String password,
+  ) async {
+    final response = await _send('POST', '/auth/register', {
+      'name': name.trim(),
+      'email': email.trim(),
+      'password': password,
+      'password_confirmation': password,
+    });
+    return _storeAuthResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> currentUser() async {
+    final response = await httpClient
+        .get(_uri('/auth/me'), headers: await _headers())
+        .timeout(timeoutDuration);
+    final body = _decodeResponse(response);
+    final data = _requireMap(_extractData(body), 'profil pelanggan');
+    return _requireMap(data['user'], 'profil pelanggan');
+  }
+
+  static Future<void> logout() async {
+    await _send('POST', '/auth/logout');
+    await clearAuthToken();
+  }
+
+  static Future<Map<String, dynamic>> _storeAuthResponse(
+    Map<String, dynamic> response,
+  ) async {
+    final data = _requireMap(_extractData(response), 'autentikasi');
+    final token = data['token'];
+    if (token is! String || token.isEmpty) {
+      throw _invalidResponse('autentikasi');
+    }
+    await _secureStorage.write(key: _tokenKey, value: token);
+    return _requireMap(data['user'], 'profil pelanggan');
+  }
 
   static ApiException _invalidResponse(String resource) => ApiException(
-        statusCode: 502,
-        message: 'Format respons $resource dari server tidak valid.',
-        errorType: ApiErrorType.other,
-      );
+    statusCode: 502,
+    message: 'Format respons $resource dari server tidak valid.',
+    errorType: ApiErrorType.other,
+  );
 
   static List<dynamic> _requireList(dynamic data, String resource) {
     if (data is! List) throw _invalidResponse(resource);
@@ -183,7 +266,8 @@ class ApiService {
     if (error is TimeoutException) {
       return const ApiException(
         statusCode: 408,
-        message: 'Server tidak membalas dalam batas waktu (10 detik). Silakan coba lagi.',
+        message:
+            'Server tidak membalas dalam batas waktu (10 detik). Silakan coba lagi.',
         errorType: ApiErrorType.timeout,
       );
     }
@@ -191,7 +275,8 @@ class ApiService {
     if (error is SocketException || error is http.ClientException) {
       return const ApiException(
         statusCode: 0,
-        message: 'Sambungan ke server gagal. Pastikan server Laravel aktif dan periksa jaringan Anda.',
+        message:
+            'Sambungan ke server gagal. Pastikan server Laravel aktif dan periksa jaringan Anda.',
         errorType: ApiErrorType.connection,
       );
     }
@@ -212,7 +297,7 @@ class ApiService {
   static Future<CartResponse> getCart() async {
     try {
       final response = await httpClient
-          .get(_uri('/keranjang'), headers: headers)
+          .get(_uri('/keranjang'), headers: await _headers())
           .timeout(timeoutDuration);
 
       final body = _decodeResponse(response);
@@ -246,7 +331,10 @@ class ApiService {
   /// POST /api/keranjang
   /// Menambah item baru ke keranjang belanja.
   static Future<void> addCart(int produkId, int jumlah) async {
-    await _send('POST', '/keranjang', {'produk_id': produkId, 'jumlah': jumlah});
+    await _send('POST', '/keranjang', {
+      'produk_id': produkId,
+      'jumlah': jumlah,
+    });
   }
 
   /// PUT /api/keranjang/{id}
@@ -275,7 +363,10 @@ class ApiService {
 
   /// GET /api/produk
   /// Mendukung parameter ?kategori= dan ?cari= sesuai spesifikasi Kriteria 2.
-  static Future<List<Product>> getProducts({String? kategori, String? cari}) async {
+  static Future<List<Product>> getProducts({
+    String? kategori,
+    String? cari,
+  }) async {
     try {
       final queryParams = <String, String>{};
       if (kategori != null && kategori.isNotEmpty && kategori != 'Semua') {
@@ -286,7 +377,9 @@ class ApiService {
       }
 
       final uri = _uri('/produk', queryParams.isEmpty ? null : queryParams);
-      final response = await httpClient.get(uri, headers: headers).timeout(timeoutDuration);
+      final response = await httpClient
+          .get(uri, headers: await _headers())
+          .timeout(timeoutDuration);
       final body = _decodeResponse(response);
       final data = _extractData(body);
 
@@ -294,7 +387,9 @@ class ApiService {
           ? _requireList(data['data'], 'produk')
           : _requireList(data, 'produk');
 
-      return list.map((e) => Product.fromJson(_requireMap(e, 'produk'))).toList();
+      return list
+          .map((e) => Product.fromJson(_requireMap(e, 'produk')))
+          .toList();
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -308,7 +403,10 @@ class ApiService {
 
   /// PUT /api/produk/{id}
   /// Memperbarui data produk pertanian. Mengembalikan 404 bila tidak ada, 422 bila validasi gagal.
-  static Future<void> updateProduct(int id, Map<String, dynamic> payload) async {
+  static Future<void> updateProduct(
+    int id,
+    Map<String, dynamic> payload,
+  ) async {
     await _send('PUT', '/produk/$id', payload);
   }
 
@@ -325,11 +423,15 @@ class ApiService {
   /// GET /api/kurir
   static Future<List<Courier>> getCouriers() async {
     try {
-      final response = await httpClient.get(_uri('/kurir'), headers: headers).timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/kurir'), headers: await _headers())
+          .timeout(timeoutDuration);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'kurir');
-      return list.map((e) => Courier.fromJson(_requireMap(e, 'kurir'))).toList();
+      return list
+          .map((e) => Courier.fromJson(_requireMap(e, 'kurir')))
+          .toList();
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -338,11 +440,17 @@ class ApiService {
   /// GET /api/metode-pembayaran
   static Future<List<PaymentMethod>> getPaymentMethods() async {
     try {
-      final response = await httpClient.get(_uri('/metode-pembayaran'), headers: headers).timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/metode-pembayaran'), headers: await _headers())
+          .timeout(timeoutDuration);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'metode pembayaran');
-      return list.map((e) => PaymentMethod.fromJson(_requireMap(e, 'metode pembayaran'))).toList();
+      return list
+          .map(
+            (e) => PaymentMethod.fromJson(_requireMap(e, 'metode pembayaran')),
+          )
+          .toList();
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -351,7 +459,9 @@ class ApiService {
   /// GET /api/produk/{id}
   static Future<Product> getProduct(int id) async {
     try {
-      final response = await httpClient.get(_uri('/produk/$id'), headers: headers).timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/produk/$id'), headers: await _headers())
+          .timeout(timeoutDuration);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       return Product.fromJson(_requireMap(data, 'produk'));
@@ -363,7 +473,9 @@ class ApiService {
   /// GET /api/kategori
   static Future<List<String>> getCategories() async {
     try {
-      final response = await httpClient.get(_uri('/kategori'), headers: headers).timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/kategori'), headers: await _headers())
+          .timeout(timeoutDuration);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'kategori');
@@ -379,7 +491,9 @@ class ApiService {
     Map<String, dynamic> payload, {
     String? idempotencyKey,
   }) async {
-    final extra = idempotencyKey != null ? {'X-Kunci-Idempoten': idempotencyKey} : null;
+    final extra = idempotencyKey != null
+        ? {'X-Kunci-Idempoten': idempotencyKey}
+        : null;
     try {
       final res = await _send('POST', '/checkout', payload, extra);
       return res;
@@ -391,11 +505,15 @@ class ApiService {
   /// GET /api/pesanan (Riwayat Pesanan)
   static Future<List<OrderModel>> getOrders() async {
     try {
-      final response = await httpClient.get(_uri('/pesanan'), headers: headers).timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/pesanan'), headers: await _headers())
+          .timeout(timeoutDuration);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'pesanan');
-      return list.map((e) => OrderModel.fromJson(_requireMap(e, 'pesanan'))).toList();
+      return list
+          .map((e) => OrderModel.fromJson(_requireMap(e, 'pesanan')))
+          .toList();
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -404,7 +522,9 @@ class ApiService {
   /// GET /api/pesanan/{id} (Rincian Pesanan)
   static Future<OrderModel> getOrder(int id) async {
     try {
-      final response = await httpClient.get(_uri('/pesanan/$id'), headers: headers).timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/pesanan/$id'), headers: await _headers())
+          .timeout(timeoutDuration);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       return OrderModel.fromJson(_requireMap(data, 'pesanan'));
@@ -416,7 +536,9 @@ class ApiService {
   /// PATCH /api/pesanan/{id}/status
   static Future<OrderModel> updateOrderStatus(int id, String status) async {
     try {
-      final res = await _send('PATCH', '/pesanan/$id/status', {'status': status});
+      final res = await _send('PATCH', '/pesanan/$id/status', {
+        'status': status,
+      });
       final data = _extractData(res);
       return OrderModel.fromJson(_requireMap(data, 'pesanan'));
     } catch (e) {
@@ -428,11 +550,9 @@ class ApiService {
   /// Meminta backend mengonfirmasi pembayaran pesanan.
   static Future<OrderModel> confirmPayment(int id, int paymentMethodId) async {
     try {
-      final response = await _send(
-        'POST',
-        '/pesanan/$id/pembayaran',
-        {'payment_method_id': paymentMethodId},
-      );
+      final response = await _send('POST', '/pesanan/$id/pembayaran', {
+        'payment_method_id': paymentMethodId,
+      });
       final data = _extractData(response);
       if (data is! Map) {
         throw const ApiException(
@@ -460,21 +580,29 @@ class ApiService {
     try {
       late http.Response response;
       final uri = _uri(path);
-      final reqHeaders = extraHeaders != null ? {...headers, ...extraHeaders} : headers;
+      final reqHeaders = await _headers(extraHeaders: extraHeaders);
       final body = payload != null ? jsonEncode(payload) : null;
 
       switch (method) {
         case 'POST':
-          response = await httpClient.post(uri, headers: reqHeaders, body: body).timeout(timeoutDuration);
+          response = await httpClient
+              .post(uri, headers: reqHeaders, body: body)
+              .timeout(timeoutDuration);
           break;
         case 'PUT':
-          response = await httpClient.put(uri, headers: reqHeaders, body: body).timeout(timeoutDuration);
+          response = await httpClient
+              .put(uri, headers: reqHeaders, body: body)
+              .timeout(timeoutDuration);
           break;
         case 'PATCH':
-          response = await httpClient.patch(uri, headers: reqHeaders, body: body).timeout(timeoutDuration);
+          response = await httpClient
+              .patch(uri, headers: reqHeaders, body: body)
+              .timeout(timeoutDuration);
           break;
         case 'DELETE':
-          response = await httpClient.delete(uri, headers: reqHeaders).timeout(timeoutDuration);
+          response = await httpClient
+              .delete(uri, headers: reqHeaders)
+              .timeout(timeoutDuration);
           break;
         default:
           throw const ApiException(

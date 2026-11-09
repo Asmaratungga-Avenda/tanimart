@@ -9,6 +9,7 @@ import 'package:tokotani/services/api_service.dart';
 
 void configureUnavailableApi() {
   SharedPreferences.setMockInitialValues({});
+  ApiService.authTokenReader = () async => null;
   ApiService.httpClient = MockClient((_) async {
     return http.Response(
       jsonEncode({

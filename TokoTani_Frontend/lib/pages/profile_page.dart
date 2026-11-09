@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_extension.dart';
+import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/notification_service.dart';
 import 'notifications_page.dart';
@@ -29,6 +30,78 @@ class ProfilePage extends StatelessWidget {
           children: [
             _buildHeader(isDark, primaryGreen),
             const SizedBox(height: 20),
+            Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                final user = auth.user;
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.of(context).shadowColor,
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.account_circle_outlined,
+                        color: primaryGreen,
+                        size: 32,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user?['name']?.toString() ?? 'Pelanggan',
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              user?['email']?.toString() ?? '',
+                              style: TextStyle(
+                                color: textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 14),
+            _buildMenuSection(
+              context,
+              'Akun',
+              textPrimary,
+              textSecondary,
+              surfaceColor,
+              primaryGreen,
+              lightGreen,
+              [
+                _MenuItem(
+                  icon: Icons.logout,
+                  title: 'Keluar',
+                  subtitle: 'Akhiri sesi akun ini',
+                  iconColor: Theme.of(context).colorScheme.error,
+                  onTap: () => _confirmSignOut(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             Consumer<ThemeProvider>(
               builder: (context, themeProvider, _) => _buildThemeSection(
                 context,
@@ -63,13 +136,16 @@ class ProfilePage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => const NotificationsPage()),
+                          builder: (_) => const NotificationsPage(),
+                        ),
                       );
                     },
                     trailing: unread > 0
                         ? Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.getErrorRed(isDark),
                               borderRadius: BorderRadius.circular(10),
@@ -106,16 +182,15 @@ class ProfilePage extends StatelessWidget {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          OrderHistoryPage(
-                            showBackButton: true,
-                            onGoToCatalog: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ProductCatalogPage(),
-                              ),
-                            ),
+                      builder: (_) => OrderHistoryPage(
+                        showBackButton: true,
+                        onGoToCatalog: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ProductCatalogPage(),
                           ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -128,9 +203,43 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  Future<void> _confirmSignOut(BuildContext context) async {
+    final shouldSignOut = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Keluar dari akun?'),
+        content: const Text(
+          'Anda perlu masuk kembali untuk melihat keranjang dan pesanan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+    if (shouldSignOut != true || !context.mounted) return;
+
+    final revoked = await context.read<AuthProvider>().signOut();
+    if (!context.mounted || revoked) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Sesi di perangkat ini telah ditutup, tetapi token server belum dapat dicabut.',
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader(bool isDark, Color primaryGreen) {
-    final foreground =
-        isDark ? AppTheme.darkTextPrimary : AppTheme.lightSurface;
+    final foreground = isDark
+        ? AppTheme.darkTextPrimary
+        : AppTheme.lightSurface;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -145,49 +254,50 @@ class ProfilePage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
       child: Column(
         children: [
-      Container(
-        width: 72,
-        height: 72,
-        decoration: BoxDecoration(
-          color: foreground.withValues(alpha: 0.18),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: foreground.withValues(alpha: 0.45),
-            width: 2,
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: foreground.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: foreground.withValues(alpha: 0.45),
+                width: 2,
+              ),
+            ),
+            child: Icon(Icons.eco_rounded, color: foreground, size: 38),
           ),
-        ),
-        child: Icon(Icons.eco_rounded, color: foreground, size: 38),
-      ),
-      const SizedBox(height: 14),
-      Text(
-        'Profil & Pengaturan',
-        style: GoogleFonts.poppins(
-          color: foreground,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        'Preferensi dan aktivitas Tani Mart',
-        style: GoogleFonts.poppins(
-          color: foreground.withValues(alpha: 0.85),
-          fontSize: 13,
-        ),
-      ),
+          const SizedBox(height: 14),
+          Text(
+            'Profil & Pengaturan',
+            style: GoogleFonts.poppins(
+              color: foreground,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Preferensi dan aktivitas Tani Mart',
+            style: GoogleFonts.poppins(
+              color: foreground.withValues(alpha: 0.85),
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildThemeSection(
-      BuildContext context,
-      ThemeProvider themeProvider,
-      Color textPrimary,
-      Color textSecondary,
-      Color surfaceColor,
-      Color primaryGreen,
-      Color lightGreen) {
+    BuildContext context,
+    ThemeProvider themeProvider,
+    Color textPrimary,
+    Color textSecondary,
+    Color surfaceColor,
+    Color primaryGreen,
+    Color lightGreen,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -198,9 +308,10 @@ class ProfilePage extends StatelessWidget {
             child: Text(
               'Pengaturan Tampilan',
               style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: textSecondary),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: textSecondary,
+              ),
             ),
           ),
           Container(
@@ -209,9 +320,10 @@ class ProfilePage extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                    color: AppColors.of(context).shadowColor,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2)),
+                  color: AppColors.of(context).shadowColor,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             child: Material(
@@ -236,16 +348,19 @@ class ProfilePage extends StatelessWidget {
                     title: Text(
                       themeProvider.isDark ? 'Mode Gelap' : 'Mode Terang',
                       style: GoogleFonts.poppins(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          color: textPrimary),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        color: textPrimary,
+                      ),
                     ),
                     subtitle: Text(
                       themeProvider.isDark
                           ? 'Tampilan gelap untuk kenyamanan malam hari'
                           : 'Tampilan terang untuk kenyamanan siang hari',
                       style: GoogleFonts.poppins(
-                          fontSize: 11.5, color: textSecondary),
+                        fontSize: 11.5,
+                        color: textSecondary,
+                      ),
                     ),
                     trailing: Switch(
                       value: themeProvider.isDark,
@@ -253,7 +368,9 @@ class ProfilePage extends StatelessWidget {
                       onChanged: (_) => themeProvider.toggleTheme(),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 4),
+                      horizontal: 14,
+                      vertical: 4,
+                    ),
                   ),
                 ],
               ),
@@ -265,14 +382,15 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _buildMenuSection(
-      BuildContext context,
-      String title,
-      Color textPrimary,
-      Color textSecondary,
-      Color surfaceColor,
-      Color primaryGreen,
-      Color lightGreen,
-      List<_MenuItem> items) {
+    BuildContext context,
+    String title,
+    Color textPrimary,
+    Color textSecondary,
+    Color surfaceColor,
+    Color primaryGreen,
+    Color lightGreen,
+    List<_MenuItem> items,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -283,9 +401,10 @@ class ProfilePage extends StatelessWidget {
             child: Text(
               title,
               style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: textSecondary),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: textSecondary,
+              ),
             ),
           ),
           Container(
@@ -294,9 +413,10 @@ class ProfilePage extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                    color: AppColors.of(context).shadowColor,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2)),
+                  color: AppColors.of(context).shadowColor,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             child: Material(
@@ -321,22 +441,38 @@ class ProfilePage extends StatelessWidget {
                             color: lightGreen,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(item.icon,
-                              color: item.iconColor, size: 18),
+                          child: Icon(
+                            item.icon,
+                            color: item.iconColor,
+                            size: 18,
+                          ),
                         ),
-                        title: Text(item.title,
-                            style: GoogleFonts.poppins(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w500,
-                                color: textPrimary)),
-                        subtitle: Text(item.subtitle,
-                            style: GoogleFonts.poppins(
-                                fontSize: 11.5, color: textSecondary)),
-                        trailing: item.trailing ??
-                            Icon(Icons.chevron_right,
-                                color: textSecondary, size: 20),
+                        title: Text(
+                          item.title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                            color: textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          item.subtitle,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11.5,
+                            color: textSecondary,
+                          ),
+                        ),
+                        trailing:
+                            item.trailing ??
+                            Icon(
+                              Icons.chevron_right,
+                              color: textSecondary,
+                              size: 20,
+                            ),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 4),
+                          horizontal: 14,
+                          vertical: 4,
+                        ),
                       ),
                     ],
                   );
@@ -349,8 +485,8 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
-
+  bool isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
 }
 
 class _MenuItem {

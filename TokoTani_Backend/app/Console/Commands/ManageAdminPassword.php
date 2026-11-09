@@ -59,6 +59,7 @@ class ManageAdminPassword extends Command
         }
 
         $user->password = $password;
+        $user->role = 'admin';
         $user->save();
 
         $this->info($user->wasRecentlyCreated

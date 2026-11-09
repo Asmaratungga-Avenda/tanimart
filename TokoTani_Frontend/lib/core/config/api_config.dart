@@ -53,7 +53,5 @@ class ApiConfig {
   static const Map<String, String> defaultHeaders = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
-    'X-Pelanggan-Id': '1',
   };
 }
-

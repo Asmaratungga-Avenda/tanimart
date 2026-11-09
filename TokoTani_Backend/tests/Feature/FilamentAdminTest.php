@@ -9,11 +9,13 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthenticatedApiRequests;
 use Tests\TestCase;
 
 class FilamentAdminTest extends TestCase
 {
     use RefreshDatabase;
+    use AuthenticatedApiRequests;
 
     public function test_admin_login_page_can_be_rendered(): void
     {
@@ -24,7 +26,7 @@ class FilamentAdminTest extends TestCase
 
     public function test_authenticated_user_can_access_filament_dashboard(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'admin']);
 
         $response = $this->actingAs($user)->get('/admin');
 
@@ -33,7 +35,7 @@ class FilamentAdminTest extends TestCase
 
     public function test_authenticated_user_can_access_filament_resources(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($user)->get('/admin/products')->assertSuccessful();
         $this->actingAs($user)->get('/admin/categories')->assertSuccessful();
@@ -46,7 +48,7 @@ class FilamentAdminTest extends TestCase
 
     public function test_order_view_page_renders_with_items_relation(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'admin']);
         $product = Product::create([
             'nama' => 'Cabai Merah',
             'harga' => 30000,
@@ -197,11 +199,15 @@ class FilamentAdminTest extends TestCase
 
     public function test_customer_can_complete_order_when_status_is_tiba(): void
     {
+        $customer = User::factory()->create(['role' => 'customer']);
+        $this->authenticateAs($customer);
+
         $courier = Courier::create(['nama' => 'JNE Speed', 'tarif' => 10000]);
         $payment = PaymentMethod::create(['nama' => 'QRIS Pay']);
 
         $order = Order::create([
-            'customer_id' => 1,
+            'customer_id' => $customer->id,
+            'pelanggan_id' => $customer->id,
             'nama_penerima' => 'Budi',
             'alamat_penerima' => 'Jl. Delima',
             'kurir_id' => $courier->id,
@@ -214,7 +220,7 @@ class FilamentAdminTest extends TestCase
             'tanggal_antar' => now()->toDateString(),
         ]);
 
-        $response = $this->withHeader('X-Pelanggan-Id', '1')->postJson("/api/pesanan/{$order->id}/selesai");
+        $response = $this->postJson("/api/pesanan/{$order->id}/selesai");
         $response->assertOk();
 
         $this->assertEquals('selesai', $order->fresh()->status);

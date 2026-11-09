@@ -7,6 +7,31 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## TokoTani API authentication
+
+Run database migrations before using the API:
+
+```bash
+php artisan migrate
+```
+
+Customer accounts use Laravel Sanctum. Register at `POST /api/auth/register` or log
+in at `POST /api/auth/login`; the Flutter client stores the returned token in
+secure storage and uses it for cart, checkout, and order requests. Customer
+registration always assigns the `customer` role. It does not create administrator
+accounts.
+
+Create or promote an administrator interactively with:
+
+```bash
+php artisan admin:password
+```
+
+The command sets the account's password and administrator role. Admin-only API
+operations and the Filament panel require that role. Payment confirmation from
+the customer only records a request for review; an administrator must verify it
+before the order can progress to paid.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

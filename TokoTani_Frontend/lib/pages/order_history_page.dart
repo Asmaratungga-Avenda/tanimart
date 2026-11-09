@@ -48,9 +48,11 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
       case 'selesai':
         return theme.primaryGreen;
       case 'menunggu_pembayaran':
+      case 'menunggu_konfirmasi':
         return theme.warning;
       case 'diproses':
       case 'dikirim':
+      case 'tiba':
         return theme.info;
       case 'dibatalkan':
         return theme.errorRed;
@@ -63,12 +65,16 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
     switch (status.toLowerCase()) {
       case 'menunggu_pembayaran':
         return 'Menunggu Pembayaran';
+      case 'menunggu_konfirmasi':
+        return 'Menunggu Verifikasi Pembayaran';
       case 'dibayar':
         return 'Sudah Dibayar';
       case 'diproses':
         return 'Diproses Petani';
       case 'dikirim':
         return 'Dalam Pengiriman';
+      case 'tiba':
+        return 'Pesanan Telah Tiba';
       case 'selesai':
         return 'Selesai';
       case 'dibatalkan':

@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'pages/cart_page.dart';
 import 'pages/home_page.dart';
+import 'pages/login_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/order_history_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/product_catalog_page.dart';
 import 'providers/cart_provider.dart';
+import 'providers/auth_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/product_provider.dart';
 import 'providers/theme_provider.dart';
@@ -28,6 +30,7 @@ class TaniMartApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => OrderProvider()),
@@ -63,9 +66,7 @@ class _TaniMartMaterialApp extends StatelessWidget {
         if (themeProvider.isLoading) {
           return const Directionality(
             textDirection: TextDirection.ltr,
-            child: Center(
-              child: CircularProgressIndicator(),
-            ),
+            child: Center(child: CircularProgressIndicator()),
           );
         }
 
@@ -78,8 +79,66 @@ class _TaniMartMaterialApp extends StatelessWidget {
           theme: themeData,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.mode,
-          home: home ?? const MainNavigationPage(),
+          home: home ?? const AuthGate(),
         );
+      },
+    );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        if (auth.isLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (auth.sessionError != null) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.cloud_off_outlined,
+                        size: 44,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Sesi belum dapat diperiksa',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(auth.sessionError!, textAlign: TextAlign.center),
+                      const SizedBox(height: 18),
+                      FilledButton(
+                        onPressed: auth.retrySession,
+                        child: const Text('Coba lagi'),
+                      ),
+                      TextButton(
+                        onPressed: auth.signOut,
+                        child: const Text('Keluar dari sesi ini'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return auth.isAuthenticated
+            ? const MainNavigationPage()
+            : const LoginPage();
       },
     );
   }
@@ -108,9 +167,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       ),
       const ProductCatalogPage(),
       const CartPage(),
-      OrderHistoryPage(
-        onGoToCatalog: () => setState(() => _currentIndex = 1),
-      ),
+      OrderHistoryPage(onGoToCatalog: () => setState(() => _currentIndex = 1)),
       const ProfilePage(),
     ];
   }
@@ -118,7 +175,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final appBarForeground = Theme.of(context).appBarTheme.foregroundColor ??
+    final appBarForeground =
+        Theme.of(context).appBarTheme.foregroundColor ??
         Theme.of(context).colorScheme.onSurface;
     final lightGreen = AppTheme.getLightGreen(isDark);
 
@@ -174,7 +232,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                           color: Theme.of(context).colorScheme.error,
                           shape: BoxShape.circle,
                         ),
-                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
                         child: Text(
                           count > 99 ? '99+' : '$count',
                           style: TextStyle(
@@ -218,7 +279,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                           color: Theme.of(context).colorScheme.error,
                           shape: BoxShape.circle,
                         ),
-                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
                         child: Text(
                           unread > 99 ? '99+' : '$unread',
                           style: TextStyle(
@@ -236,10 +300,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
@@ -258,11 +319,13 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
               constraints: const BoxConstraints(maxWidth: 640),
               child: NavigationBar(
                 selectedIndex: _currentIndex,
-                onDestinationSelected: (index) => setState(() => _currentIndex = index),
+                onDestinationSelected: (index) =>
+                    setState(() => _currentIndex = index),
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 indicatorColor: lightGreen,
-                labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+                labelBehavior:
+                    NavigationDestinationLabelBehavior.onlyShowSelected,
                 destinations: const [
                   NavigationDestination(
                     icon: Icon(Icons.home_outlined),

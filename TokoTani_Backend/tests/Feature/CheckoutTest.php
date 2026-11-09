@@ -6,11 +6,13 @@ use App\Models\Courier;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthenticatedApiRequests;
 use Tests\TestCase;
 
 class CheckoutTest extends TestCase
 {
     use RefreshDatabase;
+    use AuthenticatedApiRequests;
 
     public function test_checkout_calculates_total_and_decrements_stock(): void
     {
@@ -270,6 +272,7 @@ class CheckoutTest extends TestCase
 
     public function test_database_seeder_does_not_create_dummy_customers_products_or_orders(): void
     {
+        $this->apiUser->delete();
         $this->seed();
         $this->seed();
 

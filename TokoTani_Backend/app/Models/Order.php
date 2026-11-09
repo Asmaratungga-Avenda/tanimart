@@ -10,6 +10,7 @@ class Order extends Model
 {
     protected $fillable = [
         'customer_id',
+        'pelanggan_id',
         'nama_penerima',
         'alamat_penerima',
         'kurir_id',
@@ -19,6 +20,8 @@ class Order extends Model
         'total_harga',
         'status',
         'payment_status',
+        'tanggal_pengantaran',
+        'slot_pengantaran',
         'tanggal_antar',
         'dikirim_at',
         'tiba_at',
@@ -65,12 +68,12 @@ class Order extends Model
 
     public function courier(): BelongsTo
     {
-        return $this->belongsTo(Courier::class, 'kurir_id');
+        return $this->belongsTo(Courier::class, 'kurir_id')->withTrashed();
     }
 
     public function kurir(): BelongsTo
     {
-        return $this->belongsTo(Courier::class, 'kurir_id');
+        return $this->belongsTo(Courier::class, 'kurir_id')->withTrashed();
     }
 
     public function customer(): BelongsTo
@@ -91,6 +94,22 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function canTransitionTo(string $status): bool
+    {
+        $transitions = [
+            'menunggu_pembayaran' => ['menunggu_konfirmasi', 'dibatalkan'],
+            'menunggu_konfirmasi' => ['dibayar', 'dibatalkan'],
+            'dibayar' => ['diproses'],
+            'diproses' => ['dikirim'],
+            'dikirim' => ['tiba', 'selesai'],
+            'tiba' => ['selesai'],
+            'selesai' => [],
+            'dibatalkan' => [],
+        ];
+
+        return in_array($status, $transitions[$this->status] ?? [], true);
     }
 
     public function orderItems(): HasMany
