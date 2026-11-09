@@ -18,6 +18,7 @@ Route::post('/checkout', [CheckoutController::class, 'store']);
 Route::get('/checkout/{id}', [CheckoutController::class, 'show']);
 Route::get('/pesanan', [CheckoutController::class, 'index']);
 Route::get('/pesanan/{id}', [CheckoutController::class, 'show']);
+Route::patch('/pesanan/{id}/status', [CheckoutController::class, 'updateStatus']);
 Route::get('/orders', [CheckoutController::class, 'index']);
 
 // Kurir & Metode Pembayaran

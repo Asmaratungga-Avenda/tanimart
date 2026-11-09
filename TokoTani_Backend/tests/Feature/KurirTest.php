@@ -19,7 +19,9 @@ class KurirTest extends TestCase
 
         $response = $this->getJson('/api/kurir')
             ->assertOk()
-            ->assertJsonPath('status', 'sukses');
+            ->assertJsonPath('status', 'sukses')
+            ->assertJsonPath('data.0.wilayah', '0-5 km')
+            ->assertJsonPath('data.0.tarif', 10000);
 
         $data = collect($response->json('data'));
 

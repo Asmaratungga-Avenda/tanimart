@@ -22,6 +22,19 @@ class Pesanan extends Model
 
     public const STATUS_DIBATALKAN = 'dibatalkan';
 
+    public static function statuses(): array
+    {
+        return [
+            self::STATUS_MENUNGGU_PEMBAYARAN,
+            self::STATUS_MENUNGGU_KONFIRMASI,
+            self::STATUS_DIBAYAR,
+            self::STATUS_DIPROSES,
+            self::STATUS_DIKIRIM,
+            self::STATUS_SELESAI,
+            self::STATUS_DIBATALKAN,
+        ];
+    }
+
     protected $table = 'orders';
 
     protected $fillable = [

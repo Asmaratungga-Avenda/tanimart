@@ -6,6 +6,7 @@ use App\Models\Courier;
 use App\Models\Keranjang;
 use App\Models\Order;
 use App\Models\PaymentMethod;
+use App\Models\Pesanan;
 use App\Models\Product;
 use App\Models\User;
 use Carbon\Carbon;
@@ -65,7 +66,8 @@ class CheckoutController extends Controller
     public function index()
     {
         $orders = Order::with(['items.product', 'courier', 'paymentMethod'])
-            ->latest()
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         return $this->jsonResponse(
@@ -94,6 +96,74 @@ class CheckoutController extends Controller
             'Rincian pesanan berhasil diambil',
             $order
         );
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'status' => ['required', 'string', Rule::in(Pesanan::statuses())],
+        ], [
+            'status.required' => 'Status pesanan wajib diisi.',
+            'status.in' => 'Status pesanan tidak valid.',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->jsonResponse(
+                'gagal',
+                422,
+                'Validasi status pesanan gagal',
+                null,
+                $validator->errors()
+            );
+        }
+
+        $newStatus = $validator->validated()['status'];
+
+        try {
+            $order = DB::transaction(function () use ($id, $newStatus) {
+                $pesanan = Pesanan::whereKey($id)->lockForUpdate()->first();
+
+                if (! $pesanan) {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        404,
+                        'Pesanan tidak ditemukan'
+                    ));
+                }
+
+                if (! $pesanan->canTransitionTo($newStatus)) {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        "Transisi status dari '{$pesanan->status}' ke '{$newStatus}' tidak diizinkan",
+                        null,
+                        ['status' => ['Transisi status pesanan tidak diizinkan.']]
+                    ));
+                }
+
+                $pesanan->status = $newStatus;
+                $pesanan->save();
+
+                return Order::with(['items.product', 'courier', 'paymentMethod'])->find($id);
+            });
+
+            return $this->jsonResponse(
+                'sukses',
+                200,
+                'Status pesanan berhasil diperbarui',
+                $order
+            );
+        } catch (HttpResponseException $e) {
+            return $e->getResponse();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->jsonResponse(
+                'gagal',
+                500,
+                'Terjadi kesalahan pada server'
+            );
+        }
     }
 
     public function store(Request $request)

@@ -294,14 +294,16 @@ Pengujian dijalankan dengan MySQL (`tokotani_testing`):
 
 ```text
 php artisan test --filter=CheckoutTest
-25 tests, 135 assertions, passed
+32 tests, 181 assertions, passed
 
 php artisan test
-40 tests, 208 assertions, passed
+47 tests, 256 assertions, passed
 ```
 
 Skenario yang sudah dicakup antara lain: kunci idempoten wajib, retry dengan
 kunci sama, kunci sama dengan payload berbeda, batas mudah rusak, penolakan
 baris item duplikat, tanggal bukan hari ini, tanggal lampau, slot tidak valid,
 stok tidak cukup, produk tidak tersedia, rollback saat item kedua gagal,
-perhitungan server, alias payload, dan checkout dari keranjang.
+perhitungan server, alias payload, checkout dari keranjang, daftar pesanan
+terbaru lebih dahulu, detail snapshot, dan transisi status pesanan. Detail
+endpoint pesanan dan status dibahas di `docs/PESANAN_DAN_STATUS.md`.

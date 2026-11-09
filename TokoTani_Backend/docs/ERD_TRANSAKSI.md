@@ -484,10 +484,10 @@ dibatalkan hanya boleh dari:
 - menunggu_konfirmasi
 ```
 
-Transisi di luar peta tersebut dianggap ilegal dan nantinya harus ditolak dengan
-HTTP **409 Conflict** pada endpoint `PATCH /api/pesanan/{id}/status`.
-Endpoint tersebut belum termasuk objektif saat ini, tetapi peta transisinya sudah
-disiapkan agar mudah diimplementasikan pada tahap berikutnya.
+Transisi di luar peta tersebut dianggap ilegal dan ditolak dengan HTTP
+**409 Conflict** pada endpoint `PATCH /api/pesanan/{id}/status`. Endpoint ini
+sudah diimplementasikan beserta pengujian transisi legal dan ilegal. Detail
+kontrak, alur, dan contoh respons ada di `docs/PESANAN_DAN_STATUS.md`.
 
 ---
 
@@ -523,6 +523,7 @@ Controller dan route:
 Dokumentasi:
 
 - `docs/CHECKOUT_SPESIFIKASI.md`
+- `docs/PESANAN_DAN_STATUS.md`
 
 Seeder dan pengujian:
 

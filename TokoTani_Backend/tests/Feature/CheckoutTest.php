@@ -8,6 +8,7 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CheckoutTest extends TestCase
@@ -642,6 +643,135 @@ class CheckoutTest extends TestCase
             'nama_produk' => 'Bayam Snapshot',
             'harga_satuan' => 5000,
         ]);
+    }
+
+    public function test_order_list_returns_latest_orders_first(): void
+    {
+        $firstId = $this->createCheckoutOrder('order-list-first');
+        $secondId = $this->createCheckoutOrder('order-list-second');
+
+        DB::table('orders')->where('id', $firstId)->update([
+            'created_at' => now()->subDay(),
+        ]);
+        DB::table('orders')->where('id', $secondId)->update([
+            'created_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/pesanan')
+            ->assertOk()
+            ->assertJsonPath('status', 'sukses');
+
+        $this->assertSame(
+            [(int) $secondId, (int) $firstId],
+            collect($response->json('data'))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all()
+        );
+    }
+
+    public function test_order_detail_returns_404_for_unknown_order(): void
+    {
+        $this->getJson('/api/pesanan/999999')
+            ->assertNotFound()
+            ->assertJsonPath('status', 'gagal')
+            ->assertJsonPath('code', '404');
+    }
+
+    public function test_status_can_follow_allowed_transition_path(): void
+    {
+        $orderId = $this->createCheckoutOrder('status-path');
+
+        foreach ([
+            'menunggu_konfirmasi',
+            'dibayar',
+            'diproses',
+            'dikirim',
+            'selesai',
+        ] as $status) {
+            $this->patchJson("/api/pesanan/{$orderId}/status", ['status' => $status])
+                ->assertOk()
+                ->assertJsonPath('status', 'sukses')
+                ->assertJsonPath('data.status', $status);
+        }
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'status' => 'selesai',
+        ]);
+
+        $this->patchJson("/api/pesanan/{$orderId}/status", ['status' => 'dibatalkan'])
+            ->assertStatus(409)
+            ->assertJsonPath('status', 'gagal')
+            ->assertJsonPath('code', '409');
+    }
+
+    public function test_illegal_status_transition_returns_409_without_changing_status(): void
+    {
+        $orderId = $this->createCheckoutOrder('status-illegal');
+
+        $this->patchJson("/api/pesanan/{$orderId}/status", ['status' => 'dikirim'])
+            ->assertStatus(409)
+            ->assertJsonPath('status', 'gagal')
+            ->assertJsonPath('code', '409');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'status' => 'menunggu_pembayaran',
+        ]);
+    }
+
+    public function test_order_can_be_cancelled_before_payment_confirmation_only(): void
+    {
+        $orderId = $this->createCheckoutOrder('status-cancel');
+
+        $this->patchJson("/api/pesanan/{$orderId}/status", ['status' => 'dibatalkan'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'dibatalkan');
+
+        $this->patchJson("/api/pesanan/{$orderId}/status", ['status' => 'menunggu_konfirmasi'])
+            ->assertStatus(409);
+    }
+
+    public function test_status_update_rejects_unknown_status_with_422(): void
+    {
+        $orderId = $this->createCheckoutOrder('status-invalid');
+
+        $this->patchJson("/api/pesanan/{$orderId}/status", ['status' => 'status-tidak-ada'])
+            ->assertUnprocessable()
+            ->assertJsonPath('status', 'gagal')
+            ->assertJsonPath('code', '422')
+            ->assertJsonValidationErrors(['status']);
+    }
+
+    public function test_status_update_returns_404_for_unknown_order(): void
+    {
+        $this->patchJson('/api/pesanan/999999/status', ['status' => 'dibatalkan'])
+            ->assertNotFound()
+            ->assertJsonPath('status', 'gagal')
+            ->assertJsonPath('code', '404');
+    }
+
+    private function createCheckoutOrder(string $idempotencyKey): int
+    {
+        $product = $this->createProduct();
+        $courier = Courier::create([
+            'nama' => 'Kurir '.$idempotencyKey,
+            'tarif' => 10000,
+        ]);
+        $paymentMethod = PaymentMethod::create([
+            'nama' => 'Transfer '.$idempotencyKey,
+        ]);
+
+        return $this->postJson('/api/checkout', $this->checkoutPayload(
+            $product,
+            $courier,
+            $paymentMethod,
+            now()->toDateString(),
+            1
+        ), ['X-Kunci-Idempoten' => $idempotencyKey])
+            ->assertCreated()
+            ->json('data.id');
     }
 
     private function createProduct(array $overrides = []): Product
