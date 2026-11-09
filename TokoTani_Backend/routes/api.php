@@ -24,6 +24,10 @@ Route::get('/orders', [CheckoutController::class, 'index']);
 // Kurir & Metode Pembayaran
 Route::get('/kurir', [KurirController::class, 'index']);
 Route::get('/couriers', [KurirController::class, 'index']);
+Route::get('/wilayah', [KurirController::class, 'index']);
+Route::delete('/kurir/{id}', [KurirController::class, 'destroy']);
+Route::delete('/couriers/{id}', [KurirController::class, 'destroy']);
+Route::delete('/wilayah/{id}', [KurirController::class, 'destroy']);
 Route::get('/metode-pembayaran', [CheckoutController::class, 'paymentMethods']);
 Route::get('/payment-methods', [CheckoutController::class, 'paymentMethods']);
 

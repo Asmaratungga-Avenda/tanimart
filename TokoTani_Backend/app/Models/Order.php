@@ -48,12 +48,12 @@ class Order extends Model
 
     public function courier(): BelongsTo
     {
-        return $this->belongsTo(Courier::class, 'kurir_id');
+        return $this->belongsTo(Courier::class, 'kurir_id')->withTrashed();
     }
 
     public function kurir(): BelongsTo
     {
-        return $this->belongsTo(Courier::class, 'kurir_id');
+        return $this->belongsTo(Courier::class, 'kurir_id')->withTrashed();
     }
 
     public function paymentMethod(): BelongsTo

@@ -84,12 +84,12 @@ class Pesanan extends Model
 
     public function wilayahAntar(): BelongsTo
     {
-        return $this->belongsTo(WilayahAntar::class, 'kurir_id');
+        return $this->belongsTo(WilayahAntar::class, 'kurir_id')->withTrashed();
     }
 
     public function kurir(): BelongsTo
     {
-        return $this->belongsTo(WilayahAntar::class, 'kurir_id');
+        return $this->belongsTo(WilayahAntar::class, 'kurir_id')->withTrashed();
     }
 
     public function metodePembayaran(): BelongsTo

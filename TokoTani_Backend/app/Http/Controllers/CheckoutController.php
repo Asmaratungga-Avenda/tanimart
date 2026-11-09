@@ -450,7 +450,7 @@ class CheckoutController extends Controller
                     ->whereIn('product_id', $productIds)
                     ->delete();
 
-                return $order->load(['items', 'courier', 'paymentMethod']);
+                return $order->load(['items.product', 'courier', 'paymentMethod']);
             });
 
             return $this->jsonResponse(
@@ -707,7 +707,7 @@ class CheckoutController extends Controller
             'sukses',
             200,
             'Pesanan sudah diproses sebelumnya',
-            $order->loadMissing(['items', 'courier', 'paymentMethod'])
+            $order->loadMissing(['items.product', 'courier', 'paymentMethod'])
         );
     }
 }

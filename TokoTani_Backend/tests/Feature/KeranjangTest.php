@@ -103,6 +103,40 @@ class KeranjangTest extends TestCase
         $this->assertDatabaseCount('keranjang', 0);
     }
 
+    public function test_update_cart_item_revalidates_stock_and_availability_under_lock(): void
+    {
+        $product = $this->createProduct(['harga' => 4000, 'stok' => 5]);
+
+        $cartId = $this->withHeader('X-Pelanggan-Id', '1')
+            ->postJson('/api/keranjang', ['produk_id' => $product->id, 'jumlah' => 2])
+            ->assertCreated()
+            ->json('data.id');
+
+        $product->update(['stok' => 1]);
+
+        $this->withHeader('X-Pelanggan-Id', '1')
+            ->putJson("/api/keranjang/{$cartId}", ['jumlah' => 3])
+            ->assertStatus(409)
+            ->assertJsonPath('status', 'gagal');
+
+        $this->assertDatabaseHas('keranjang', [
+            'id' => $cartId,
+            'jumlah' => 2,
+        ]);
+
+        $product->update(['tersedia' => false]);
+
+        $this->withHeader('X-Pelanggan-Id', '1')
+            ->putJson("/api/keranjang/{$cartId}", ['jumlah' => 1])
+            ->assertStatus(409)
+            ->assertJsonPath('status', 'gagal');
+
+        $this->assertDatabaseHas('keranjang', [
+            'id' => $cartId,
+            'jumlah' => 2,
+        ]);
+    }
+
     public function test_cart_is_isolated_per_pelanggan(): void
     {
         $product = $this->createProduct();

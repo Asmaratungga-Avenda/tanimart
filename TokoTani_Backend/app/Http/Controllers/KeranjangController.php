@@ -231,9 +231,7 @@ class KeranjangController extends Controller
     {
         $pelangganId = $this->pelangganId($request);
 
-        $item = Keranjang::with('product')
-            ->where('pelanggan_id', $pelangganId)
-            ->find($id);
+        $item = Keranjang::where('pelanggan_id', $pelangganId)->find($id);
 
         if (! $item) {
             return $this->jsonResponse('gagal', 404, 'Item keranjang tidak ditemukan');
@@ -255,32 +253,67 @@ class KeranjangController extends Controller
             );
         }
 
-        $product = $item->product;
+        try {
+            $item = DB::transaction(function () use ($pelangganId, $id, $data, $item) {
+                // Kunci produk lalu baris keranjang dengan urutan yang sama
+                // seperti alur tambah dan checkout untuk mencegah deadlock.
+                $product = Product::lockForUpdate()->find($item->product_id);
 
-        if (! $product || ! $product->tersedia) {
+                if (! $product) {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        404,
+                        'Produk pada keranjang tidak ditemukan'
+                    ));
+                }
+
+                $lockedItem = Keranjang::where('pelanggan_id', $pelangganId)
+                    ->whereKey($id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $lockedItem) {
+                    abort($this->jsonResponse('gagal', 404, 'Item keranjang tidak ditemukan'));
+                }
+
+                if (! $product->tersedia || $product->stok <= 0) {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        'Produk pada keranjang sudah tidak tersedia'
+                    ));
+                }
+
+                if ((int) $data['jumlah'] > $product->stok) {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        "Stok produk {$product->nama} tidak mencukupi. Sisa stok: {$product->stok}"
+                    ));
+                }
+
+                $lockedItem->jumlah = (int) $data['jumlah'];
+                $lockedItem->save();
+
+                return $lockedItem->fresh('product');
+            });
+        } catch (HttpResponseException $e) {
+            return $e->getResponse();
+        } catch (QueryException $e) {
+            report($e);
+
             return $this->jsonResponse(
                 'gagal',
                 409,
-                'Produk pada keranjang sudah tidak tersedia'
+                'Keranjang sedang diperbarui oleh permintaan lain. Silakan coba lagi.'
             );
         }
-
-        if ((int) $data['jumlah'] > $product->stok) {
-            return $this->jsonResponse(
-                'gagal',
-                409,
-                "Stok produk {$product->nama} tidak mencukupi. Sisa stok: {$product->stok}"
-            );
-        }
-
-        $item->jumlah = (int) $data['jumlah'];
-        $item->save();
 
         return $this->jsonResponse(
             'sukses',
             200,
             'Jumlah item keranjang berhasil diperbarui',
-            $this->presentItem($item->fresh('product'))
+            $this->presentItem($item)
         );
     }
 

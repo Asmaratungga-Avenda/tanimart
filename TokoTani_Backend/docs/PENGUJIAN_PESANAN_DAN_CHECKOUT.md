@@ -2,10 +2,12 @@
 
 Dokumen ini menjelaskan objektif pengujian:
 
-- Endpoint kurir/wilayah.
+- Endpoint kurir/wilayah dan penghapusan kurir tanpa merusak pesanan lama.
 - Riwayat pesanan.
 - Rincian pesanan.
-- Perubahan status pesanan.
+- Perubahan status pesanan, termasuk matriks seluruh kombinasi status.
+- Revalidasi stok/ketersediaan saat update keranjang.
+- Demonstrasi checkout berhasil, kuantitas, tanggal, dan retry idempoten.
 - Dua metode pembayaran tersimpan.
 - Simulasi status berurutan dan penolakan transisi ilegal.
 - Checkout konkuren pada stok terbatas.
@@ -27,6 +29,10 @@ Dokumen ini melengkapi:
 | File | Peran |
 |------|-------|
 | `tests/Feature/PesananAcceptanceTest.php` | Pengujian acceptance endpoint, status, pembayaran, dan checkout sekuensial |
+| `tests/Feature/PesananStatusTransitionTest.php` | Pengujian matriks seluruh kombinasi transisi status |
+| `tests/Feature/CheckoutDemoTest.php` | Demonstrasi empat skenario checkout |
+| `tests/Feature/KeranjangTest.php` | Pengujian keranjang dan revalidasi stok/ketersediaan |
+| `tests/Feature/KurirTest.php` | Pengujian kurir/wilayah, tarif, dan penghapusan |
 | `tests/Feature/CheckoutConcurrencyTest.php` | Pengujian dua checkout hampir bersamaan |
 | `tests/Support/CheckoutFixtures.php` | Fixture bersama untuk produk, kurir, pembayaran, pelanggan, dan payload |
 | `tests/Support/checkout_request.php` | Proses anak untuk mengirim request checkout secara paralel |
@@ -49,6 +55,11 @@ Dokumen ini melengkapi:
 - Data terurut berdasarkan `tarif` naik.
 - Setiap data memuat `nama`, `wilayah`, `tarif`, dan `aktif`.
 - Kurir nonaktif tidak muncul.
+- Tiga tarif berbeda tampil dan terurut naik.
+- Kurir yang dihapus hilang dari daftar, tetapi detail pesanan lama tetap
+  memuat nama, wilayah, dan tarifnya.
+- Checkout baru dengan kurir yang sudah dihapus ditolak `422`.
+- Alias `GET /api/wilayah` dan `DELETE /api/wilayah/{id}` berfungsi sama.
 
 ### Alur
 
@@ -351,10 +362,14 @@ vendor/bin/pint --test
 Hasil terakhir:
 
 ```text
-PesananAcceptanceTest : 12 tests, 141 assertions, passed
-CheckoutConcurrencyTest : 2 tests, 24 assertions, passed
-Semua test : 61 tests, 421 assertions, passed
-Pint : passed
+PesananAcceptanceTest       : 12 tests, 141 assertions, passed
+PesananStatusTransitionTest : 1 test, 251 assertions, passed
+CheckoutDemoTest            : 4 tests, 35 assertions, passed
+KeranjangTest               : 7 tests, 43 assertions, passed
+KurirTest                   : 3 tests, 38 assertions, passed
+CheckoutConcurrencyTest     : 2 tests, 24 assertions, passed
+Semua test                  : 69 tests, 745 assertions, passed
+Pint                        : passed
 ```
 
 ---
@@ -364,17 +379,24 @@ Pint : passed
 | Kasus | Hasil yang diharapkan |
 |-------|------------------------|
 | GET kurir/wilayah | Hanya aktif, urut tarif, memuat wilayah dan tarif |
+| DELETE kurir | Soft delete, hilang dari daftar, riwayat pesanan tetap utuh |
+| Checkout dengan kurir terhapus | `422`, tidak ada pesanan baru |
 | GET metode pembayaran | Dua metode tersimpan dan tampil |
 | GET riwayat | Terbaru lebih dahulu |
 | GET rincian | Snapshot nama/harga/subtotal |
 | GET rincian tidak ada | `404` |
 | Simulasi status legal | `200` setiap tahap |
+| Matriks seluruh transisi | Legal `200`, ilegal `409`, status tidak berubah |
 | Lompat tahap | `409`, status tidak berubah |
 | Status sama | `409` |
 | Hidupkan pesanan selesai | `409`, status tetap `selesai` |
 | Hidupkan pesanan dibatalkan | `409`, status tetap `dibatalkan` |
+| Update keranjang stok habis | `409`, jumlah keranjang tidak berubah |
 | Checkout kunci sama | Satu pesanan, stok berkurang sekali |
 | Checkout kunci berbeda | Dua pesanan, stok berkurang dua kali |
+| Checkout kuantitas melebihi batas | `422`, tanpa pesanan, stok tetap |
+| Checkout mudah rusak beda hari | `422`, tanpa pesanan, stok tetap |
+| Retry kunci sama | `200`, id pesanan sama, tanpa pesanan ganda |
 | Stok tidak cukup | `422`, stok/keranjang tidak berubah |
 | Gagal di tengah transaksi | Rollback penuh |
 | Dua checkout stok terbatas | Satu pesanan, tanpa oversell |

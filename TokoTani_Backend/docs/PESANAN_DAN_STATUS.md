@@ -8,8 +8,8 @@ Dokumen ini menjelaskan objektif:
 - `GET /api/kurir` (kurir/wilayah + tarif)
 - Penyelesaian `POST /api/checkout`
 
-Dokumen ini melengkapi `docs/CHECKOUT_SPESIFIKASI.md` dan
-`docs/ERD_TRANSAKSI.md`.
+Dokumen ini melengkapi `docs/CHECKOUT_SPESIFIKASI.md`,
+`docs/ERD_TRANSAKSI.md`, dan `docs/PERBAIKAN_TEMUAN_DAN_DEMO_CHECKOUT.md`.
 
 ---
 
@@ -22,6 +22,10 @@ Dokumen ini melengkapi `docs/CHECKOUT_SPESIFIKASI.md` dan
 | `PATCH` | `/api/pesanan/{id}/status` | Mengubah status dengan aturan transisi |
 | `GET` | `/api/kurir` | Daftar kurir/wilayah aktif beserta tarif |
 | `GET` | `/api/couriers` | Alias `/api/kurir` |
+| `GET` | `/api/wilayah` | Alias `/api/kurir` |
+| `DELETE` | `/api/kurir/{id}` | Soft delete kurir tanpa merusak pesanan lama |
+| `DELETE` | `/api/couriers/{id}` | Alias `/api/kurir/{id}` |
+| `DELETE` | `/api/wilayah/{id}` | Soft delete wilayah tanpa merusak pesanan lama |
 | `POST` | `/api/checkout` | Membuat pesanan secara transaksional |
 
 Semua respons memakai format konsisten:
@@ -302,6 +306,20 @@ DB::transaction
 
 Tarif inilah yang dipakai server saat menghitung `ongkir` pada checkout.
 
+### Penghapusan kurir/wilayah
+
+`DELETE /api/kurir/{id}`, `DELETE /api/couriers/{id}`, dan
+`DELETE /api/wilayah/{id}` melakukan soft delete dengan mengisi
+`couriers.deleted_at`.
+
+- Kurir yang tidak ditemukan menghasilkan `404`.
+- Respons `200` memuat `id` dan `dipakai_pada_pesanan`.
+- Kurir yang sudah dihapus tidak muncul pada `GET /api/kurir`.
+- Checkout baru dengan kurir yang sudah dihapus ditolak `422`.
+- Pesanan lama tetap menampilkan nama, wilayah, dan tarif kurir karena relasi
+  `courier` memakai `withTrashed()`.
+- Nilai `orders.ongkir` tetap menjadi snapshot tarif saat checkout.
+
 ---
 
 ## 6. Penyelesaian `POST /api/checkout`
@@ -369,18 +387,26 @@ Nilai `subtotal`, `ongkir`, atau `total` dari klien diabaikan.
 
 | File | Perubahan |
 |------|-----------|
-| `routes/api.php` | Route daftar, detail, dan `PATCH` status pesanan |
-| `app/Http/Controllers/CheckoutController.php` | Urutan riwayat, detail, update status, checkout transaksional, idempotensi paralel |
-| `app/Models/Pesanan.php` | Daftar status dan peta transisi |
-| `app/Models/Order.php` | Fillable/hidden hash idempotensi |
+| `routes/api.php` | Route daftar, detail, `PATCH` status, dan hapus kurir/wilayah |
+| `app/Http/Controllers/CheckoutController.php` | Urutan riwayat, detail, update status, checkout transaksional, idempotensi paralel, eager load snapshot produk |
+| `app/Http/Controllers/KeranjangController.php` | Update jumlah keranjang transaksional dengan `lockForUpdate` |
+| `app/Http/Controllers/KurirController.php` | Respons kurir/wilayah + tarif dan soft delete kurir |
+| `app/Models/Pesanan.php` | Daftar status, peta transisi, relasi kurir `withTrashed()` |
+| `app/Models/Order.php` | Fillable/hidden hash idempotensi, relasi kurir `withTrashed()` |
+| `app/Models/Courier.php` | `SoftDeletes` |
+| `app/Models/WilayahAntar.php` | `SoftDeletes` |
 | `app/Models/OrderItem.php` | Snapshot item |
-| `app/Http/Controllers/KurirController.php` | Respons kurir/wilayah + tarif |
+| `database/migrations/2026_11_09_000001_add_soft_deletes_to_couriers_table.php` | Kolom `deleted_at` untuk kurir/wilayah |
 | `tests/Feature/CheckoutTest.php` | Pengujian riwayat, detail, status, checkout |
-| `tests/Feature/KurirTest.php` | Pengujian wilayah dan tarif |
+| `tests/Feature/KeranjangTest.php` | Pengujian keranjang, termasuk revalidasi stok/ketersediaan |
+| `tests/Feature/KurirTest.php` | Pengujian wilayah, tarif, dan penghapusan kurir |
 | `tests/Feature/PesananAcceptanceTest.php` | Pengujian acceptance endpoint, status, pembayaran, dan checkout sekuensial |
+| `tests/Feature/PesananStatusTransitionTest.php` | Pengujian matriks seluruh transisi status |
+| `tests/Feature/CheckoutDemoTest.php` | Demonstrasi empat skenario checkout |
 | `tests/Feature/CheckoutConcurrencyTest.php` | Pengujian dua checkout hampir bersamaan |
 | `tests/Support/CheckoutFixtures.php` | Fixture bersama data checkout |
 | `tests/Support/checkout_request.php` | Proses anak untuk request checkout paralel |
+| `docs/PERBAIKAN_TEMUAN_DAN_DEMO_CHECKOUT.md` | Dokumen perbaikan temuan dan demo |
 | `docs/PENGUJIAN_PESANAN_DAN_CHECKOUT.md` | Penjelasan pengujian dan konkurensi |
 | `docs/PESANAN_DAN_STATUS.md` | Dokumen ini |
 | `docs/CHECKOUT_SPESIFIKASI.md` | Rujukan checkout transaksional |
@@ -394,8 +420,11 @@ Perintah:
 
 ```shell
 php artisan test --filter=CheckoutTest
+php artisan test --filter=KeranjangTest
 php artisan test --filter=KurirTest
 php artisan test --filter=PesananAcceptanceTest
+php artisan test --filter=PesananStatusTransitionTest
+php artisan test --filter=CheckoutDemoTest
 php artisan test --filter=CheckoutConcurrencyTest
 php artisan test
 ```
@@ -403,11 +432,14 @@ php artisan test
 Hasil terakhir:
 
 ```text
-CheckoutTest           : 32 tests, 181 assertions, passed
-KurirTest              : 1 test, 7 assertions, passed
-PesananAcceptanceTest  : 12 tests, 141 assertions, passed
-CheckoutConcurrencyTest: 2 tests, 24 assertions, passed
-Semua test             : 61 tests, 421 assertions, passed
+CheckoutTest               : 32 tests, 181 assertions, passed
+KeranjangTest              : 7 tests, 43 assertions, passed
+KurirTest                  : 3 tests, 38 assertions, passed
+PesananAcceptanceTest      : 12 tests, 141 assertions, passed
+PesananStatusTransitionTest: 1 test, 251 assertions, passed
+CheckoutDemoTest           : 4 tests, 35 assertions, passed
+CheckoutConcurrencyTest    : 2 tests, 24 assertions, passed
+Semua test                 : 69 tests, 745 assertions, passed
 ```
 
 Skenario penting yang diuji:
@@ -422,8 +454,15 @@ Skenario penting yang diuji:
 - Status tidak dikenal menghasilkan `422`.
 - Update status untuk pesanan yang tidak ada menghasilkan `404`.
 - Respons kurir memuat `wilayah` dan `tarif`.
+- Tiga tarif berbeda tampil dan terurut naik.
+- Kurir yang dihapus hilang dari daftar, tetapi detail pesanan lama tetap utuh.
+- Checkout baru dengan kurir yang sudah dihapus ditolak `422`.
+- Update keranjang memvalidasi ulang stok dan ketersediaan secara transaksional.
+- Matriks seluruh kombinasi status awal dan tujuan diuji, legal maupun ilegal.
 - Checkout: stok, batas mudah rusak, same-day, total server, idempotensi,
   rollback, dan pembersihan keranjang.
+- Demonstrasi checkout sukses, kuantitas ditolak, tanggal ditolak, dan retry
+  idempoten tersedia di `docs/PERBAIKAN_TEMUAN_DAN_DEMO_CHECKOUT.md`.
 - Dua metode pembayaran tersimpan dan tampil pada endpoint.
 - Status tidak dapat melompati tahap atau menghidupkan pesanan
   `selesai`/`dibatalkan`.
