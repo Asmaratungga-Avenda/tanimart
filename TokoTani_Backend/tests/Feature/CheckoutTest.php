@@ -604,11 +604,12 @@ class CheckoutTest extends TestCase
             ->assertJsonPath('status', 'sukses');
     }
 
-    public function test_database_seeder_creates_checkout_data_and_is_repeatable(): void
+    public function test_database_seeder_creates_checkout_data_without_a_default_admin(): void
     {
         $this->seed();
         $this->seed();
 
+        $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('categories', 2);
         $this->assertDatabaseCount('products', 12);
         $this->assertDatabaseCount('couriers', 3);

@@ -1,33 +1,36 @@
 <?php
 
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
-use App\Http\Controllers\KeranjangController;
-use App\Http\Controllers\KurirController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 
-// Keranjang Belanja
-Route::delete('/keranjang', [KeranjangController::class, 'clear']);
-Route::get('/keranjang', [KeranjangController::class, 'index']);
-Route::post('/keranjang', [KeranjangController::class, 'store']);
-Route::put('/keranjang/{id}', [KeranjangController::class, 'update']);
-Route::delete('/keranjang/{id}', [KeranjangController::class, 'destroy']);
+// Keranjang Belanja (Cart)
+Route::get('/keranjang', [CartController::class, 'index']);
+Route::post('/keranjang', [CartController::class, 'store']);
+Route::put('/keranjang/{id}', [CartController::class, 'update']);
+Route::delete('/keranjang/{id}', [CartController::class, 'destroy']);
+Route::delete('/keranjang', [CartController::class, 'clear']);
+
+Route::get('/cart', [CartController::class, 'index']);
+Route::post('/cart', [CartController::class, 'store']);
+Route::put('/cart/{id}', [CartController::class, 'update']);
+Route::delete('/cart/{id}', [CartController::class, 'destroy']);
 
 // Checkout & Orders
 Route::post('/checkout', [CheckoutController::class, 'store']);
 Route::get('/checkout/{id}', [CheckoutController::class, 'show']);
+Route::patch('/checkout/{id}/status', [CheckoutController::class, 'updateStatus']);
 Route::get('/pesanan', [CheckoutController::class, 'index']);
 Route::get('/pesanan/{id}', [CheckoutController::class, 'show']);
 Route::patch('/pesanan/{id}/status', [CheckoutController::class, 'updateStatus']);
 Route::get('/orders', [CheckoutController::class, 'index']);
+Route::get('/orders/{id}', [CheckoutController::class, 'show']);
+Route::patch('/orders/{id}/status', [CheckoutController::class, 'updateStatus']);
 
 // Kurir & Metode Pembayaran
-Route::get('/kurir', [KurirController::class, 'index']);
-Route::get('/couriers', [KurirController::class, 'index']);
-Route::get('/wilayah', [KurirController::class, 'index']);
-Route::delete('/kurir/{id}', [KurirController::class, 'destroy']);
-Route::delete('/couriers/{id}', [KurirController::class, 'destroy']);
-Route::delete('/wilayah/{id}', [KurirController::class, 'destroy']);
+Route::get('/kurir', [CheckoutController::class, 'couriers']);
+Route::get('/couriers', [CheckoutController::class, 'couriers']);
 Route::get('/metode-pembayaran', [CheckoutController::class, 'paymentMethods']);
 Route::get('/payment-methods', [CheckoutController::class, 'paymentMethods']);
 

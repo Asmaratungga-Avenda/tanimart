@@ -23,7 +23,7 @@ void main() {
       await tester.pumpWidget(const TokoTaniApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('AgriMart'), findsWidgets);
+      expect(find.text('TokoTani'), findsWidgets);
       expect(find.text('Keranjang Belanja'), findsWidgets);
       expect(find.text('Kelola Produk'), findsWidgets);
     });
@@ -39,7 +39,7 @@ void main() {
       await tester.pumpWidget(const TokoTaniApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('AgriMart'), findsWidgets);
+      expect(find.text('TokoTani'), findsWidgets);
       expect(find.text('Keranjang Belanja'), findsWidgets);
       expect(find.text('Kelola Produk'), findsWidgets);
     });

@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Order extends Model
 {
     protected $fillable = [
-        'pelanggan_id',
         'nama_penerima',
         'alamat_penerima',
         'kurir_id',
@@ -19,41 +18,50 @@ class Order extends Model
         'total_harga',
         'status',
         'tanggal_antar',
-        'tanggal_pengantaran',
-        'slot_pengantaran',
         'idempotency_key',
-        'idempotency_request_hash',
-    ];
-
-    protected $hidden = [
-        'idempotency_request_hash',
     ];
 
     protected function casts(): array
     {
         return [
-            'pelanggan_id' => 'integer',
             'subtotal' => 'integer',
             'ongkir' => 'integer',
             'total_harga' => 'integer',
             'tanggal_antar' => 'date:Y-m-d',
-            'tanggal_pengantaran' => 'date:Y-m-d',
         ];
     }
 
-    public function pelanggan(): BelongsTo
+    protected static function booted(): void
     {
-        return $this->belongsTo(User::class, 'pelanggan_id');
+        static::updating(function (Order $order) {
+            if ($order->isDirty('status')) {
+                $oldStatus = $order->getOriginal('status');
+                $newStatus = $order->status;
+
+                if ($newStatus === 'dibatalkan' && $oldStatus !== 'dibatalkan') {
+                    foreach ($order->items as $item) {
+                        $product = $item->product;
+                        if ($product) {
+                            $product->increment('stok', $item->quantity);
+                            if ($product->stok > 0 && ! $product->tersedia) {
+                                $product->tersedia = true;
+                                $product->save();
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 
     public function courier(): BelongsTo
     {
-        return $this->belongsTo(Courier::class, 'kurir_id')->withTrashed();
+        return $this->belongsTo(Courier::class, 'kurir_id');
     }
 
     public function kurir(): BelongsTo
     {
-        return $this->belongsTo(Courier::class, 'kurir_id')->withTrashed();
+        return $this->belongsTo(Courier::class, 'kurir_id');
     }
 
     public function paymentMethod(): BelongsTo

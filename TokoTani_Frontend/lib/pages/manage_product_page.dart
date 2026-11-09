@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
 import '../widgets/responsive_wrapper.dart';
@@ -248,7 +249,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
             onSubmitted: (_) => loadProducts(),
           ),
           const SizedBox(height: 10),
-          // Pilihan Kategori (Filter Chip) Sesuai Desain UI AgriMart
+          // Pilihan Kategori (Filter Chip) Sesuai Desain UI TokoTani
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -439,24 +440,18 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar Ikon Produk dengan Gradien Segar
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isStokHabis
-                          ? [Colors.grey.shade100, Colors.grey.shade200]
-                          : [const Color(0xFFE8F5E9), const Color(0xFFC8E6C9)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                // Foto Produk Nyata
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    width: 58,
+                    height: 58,
+                    child: ProductImage(
+                      imageUrl: p.foto,
+                      productName: p.nama,
+                      category: p.kategori,
+                      fit: BoxFit.cover,
                     ),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    Icons.eco,
-                    color: isStokHabis ? Colors.grey : const Color(0xFF2E7D32),
-                    size: 32,
                   ),
                 ),
                 const SizedBox(width: 14),

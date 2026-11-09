@@ -25,6 +25,15 @@ class Product extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saving(function (Product $product) {
+            if ($product->stok <= 0) {
+                $product->tersedia = false;
+            }
+        });
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
@@ -40,13 +49,8 @@ class Product extends Model
         return $this->hasMany(OrderItem::class);
     }
 
-    public function keranjang(): HasMany
+    public function carts(): HasMany
     {
-        return $this->hasMany(Keranjang::class);
-    }
-
-    public function detailPesanan(): HasMany
-    {
-        return $this->hasMany(DetailPesanan::class, 'product_id');
+        return $this->hasMany(Cart::class);
     }
 }
