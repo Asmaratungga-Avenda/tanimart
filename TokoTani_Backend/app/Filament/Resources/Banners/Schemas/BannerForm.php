@@ -19,8 +19,11 @@ class BannerForm
                     ->disk('public')
                     ->directory('banners')
                     ->visibility('public')
-                    ->imagePreviewHeight('180')
-                    ->maxSize(5120)
+                    ->imagePreviewHeight(200)
+                    ->imageResizeTargetWidth(1600)
+                    ->imageResizeTargetHeight(900)
+                    ->imageResizeMode('contain')
+                    ->maxSize(10240)
                     ->required()
                     ->columnSpanFull(),
                 TextInput::make('judul')
@@ -42,4 +45,3 @@ class BannerForm
             ]);
     }
 }
-

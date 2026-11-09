@@ -6,7 +6,6 @@ use App\Models\Order;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -18,20 +17,34 @@ class OrderInfolist
         return $schema
             ->components([
                 Section::make('Informasi Pesanan')
-                    ->icon('heroicon-o-shopping-bag')
                     ->columns(3)
                     ->components([
                         TextEntry::make('id')
                             ->label('Nomor Pesanan')
                             ->formatStateUsing(fn ($state) => "#{$state}"),
                         TextEntry::make('created_at')
-                            ->label('Waktu Pemesanan')
-                            ->dateTime('d F Y, H:i:s'),
+                            ->label('Tanggal Pesanan')
+                            ->dateTime('d F Y, H:i'),
+                        TextEntry::make('payment_status')
+                            ->label('Status Pembayaran')
+                            ->badge()
+                            ->formatStateUsing(fn (?string $state): string => match ($state) {
+                                'lunas', 'paid' => 'Lunas',
+                                'belum_bayar', 'unpaid', null => 'Belum Bayar',
+                                default => ucfirst((string) $state),
+                            })
+                            ->color(fn (?string $state): string => match ($state) {
+                                'lunas', 'paid' => 'success',
+                                'belum_bayar', 'unpaid', null => 'warning',
+                                default => 'gray',
+                            }),
                         TextEntry::make('status')
                             ->label('Status Pesanan')
                             ->badge()
                             ->formatStateUsing(fn (?string $state): string => match ($state) {
                                 'menunggu_pembayaran' => 'Menunggu Pembayaran',
+                                'menunggu_konfirmasi' => 'Menunggu Konfirmasi',
+                                'dibayar' => 'Dibayar',
                                 'diproses' => 'Diproses',
                                 'dikirim' => 'Dikirim',
                                 'tiba' => 'Tiba',
@@ -40,7 +53,8 @@ class OrderInfolist
                                 default => ucfirst((string) $state),
                             })
                             ->color(fn (?string $state): string => match ($state) {
-                                'menunggu_pembayaran' => 'warning',
+                                'menunggu_pembayaran', 'menunggu_konfirmasi' => 'warning',
+                                'dibayar' => 'info',
                                 'diproses' => 'info',
                                 'dikirim' => 'primary',
                                 'tiba' => 'warning',
@@ -48,80 +62,27 @@ class OrderInfolist
                                 'dibatalkan' => 'danger',
                                 default => 'gray',
                             }),
-                        TextEntry::make('subtotal')
-                            ->label('Subtotal Produk')
-                            ->money('IDR', locale: 'id'),
-                        TextEntry::make('ongkir')
-                            ->label('Ongkos Kirim')
-                            ->money('IDR', locale: 'id'),
-                        TextEntry::make('total_harga')
-                            ->label('Total Pembayaran')
-                            ->money('IDR', locale: 'id')
-                            ->weight('bold'),
                     ]),
 
-                Section::make('Informasi Pelanggan & Pengiriman')
-                    ->icon('heroicon-o-user')
+                Section::make('Informasi Customer')
                     ->columns(2)
                     ->components([
                         Group::make([
                             TextEntry::make('nama_penerima')
-                                ->label('Nama Penerima / Pelanggan'),
-                            TextEntry::make('customer.email')
-                                ->label('Email Pelanggan')
-                                ->default('-'),
+                                ->label('Nama'),
                             TextEntry::make('customer.phone')
                                 ->label('Nomor Telepon')
                                 ->default('-'),
                         ]),
                         Group::make([
                             TextEntry::make('alamat_penerima')
-                                ->label('Alamat Lengkap Pengiriman'),
-                            TextEntry::make('courier.nama')
-                                ->label('Kurir Pengiriman'),
-                            TextEntry::make('tanggal_antar')
-                                ->label('Slot / Tanggal Pengantaran')
-                                ->date('d F Y'),
-                            TextEntry::make('dikirim_at')
-                                ->label('Waktu Dikirim')
-                                ->dateTime('d F Y, H:i:s')
-                                ->placeholder('-'),
-                            TextEntry::make('tiba_at')
-                                ->label('Waktu Tiba (Estimasi / Realisasi)')
-                                ->dateTime('d F Y, H:i:s')
-                                ->placeholder('-'),
+                                ->label('Alamat Pengiriman')
+                                ->columnSpanFull(),
                         ]),
                     ]),
 
-                Section::make('Rincian Pembayaran')
-                    ->icon('heroicon-o-credit-card')
-                    ->columns(3)
-                    ->components([
-                        TextEntry::make('paymentMethod.nama')
-                            ->label('Metode Pembayaran'),
-                        TextEntry::make('payment_status')
-                            ->label('Status Pembayaran')
-                            ->badge()
-                            ->formatStateUsing(fn (?string $state): string => match ($state) {
-                                'lunas', 'paid' => 'Lunas / Paid',
-                                'belum_bayar', 'unpaid', null => 'Belum Bayar / Unpaid',
-                                default => ucfirst((string) $state),
-                            })
-                            ->color(fn (?string $state): string => match ($state) {
-                                'lunas', 'paid' => 'success',
-                                'belum_bayar', 'unpaid', null => 'warning',
-                                default => 'gray',
-                            }),
-                        TextEntry::make('idempotency_key')
-                            ->label('Referensi / Idempotency Key')
-                            ->default('-'),
-                        TextEntry::make('updated_at')
-                            ->label('Waktu Pembaharuan Terakhir')
-                            ->dateTime('d F Y, H:i:s'),
-                    ]),
-
-                Section::make('Daftar Produk yang Dipesan')
-                    ->icon('heroicon-o-shopping-cart')
+                Section::make('Produk Pesanan')
+                    ->columns(6)
                     ->components([
                         RepeatableEntry::make('items')
                             ->label('')
@@ -130,26 +91,41 @@ class OrderInfolist
                                 ImageEntry::make('product.gambar')
                                     ->label('Foto Produk')
                                     ->disk('public')
-                                    ->circular()
-                                    ->defaultImageUrl(url('/storage/products/default.jpg')),
+                                    ->height(48)
+                                    ->defaultImageUrl(null),
                                 TextEntry::make('product.nama')
                                     ->label('Nama Produk')
                                     ->weight('bold'),
-                                TextEntry::make('product.satuan_jual')
-                                    ->label('Satuan')
-                                    ->default('item'),
-                                TextEntry::make('quantity')
-                                    ->label('Kuantitas'),
                                 TextEntry::make('harga_satuan')
                                     ->label('Harga Satuan')
                                     ->money('IDR', locale: 'id'),
+                                TextEntry::make('quantity')
+                                    ->label('Jumlah'),
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
                                     ->money('IDR', locale: 'id')
                                     ->weight('bold'),
                             ]),
                     ]),
+
+                Section::make('Ringkasan Pembayaran')
+                    ->columns(3)
+                    ->components([
+                        TextEntry::make('total_harga')
+                            ->label('Total Pembayaran')
+                            ->money('IDR', locale: 'id')
+                            ->weight('bold'),
+                        TextEntry::make('paymentMethod.nama')
+                            ->label('Metode Pembayaran'),
+                        TextEntry::make('payment_status')
+                            ->label('Informasi Pembayaran')
+                            ->formatStateUsing(fn (?string $state): string => match ($state) {
+                                'lunas', 'paid' => 'Lunas / Sudah Dibayar',
+                                'menunggu_verifikasi' => 'Menunggu Verifikasi',
+                                'belum_bayar', 'unpaid', null => 'Belum Bayar',
+                                default => ucfirst((string) $state),
+                            }),
+                    ]),
             ]);
     }
 }
-

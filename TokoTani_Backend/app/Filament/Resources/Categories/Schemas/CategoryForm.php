@@ -18,8 +18,11 @@ class CategoryForm
                     ->disk('public')
                     ->directory('categories')
                     ->visibility('public')
-                    ->imagePreviewHeight('150')
-                    ->maxSize(3072)
+                    ->imagePreviewHeight(200)
+                    ->imageResizeTargetWidth(800)
+                    ->imageResizeTargetHeight(800)
+                    ->imageResizeMode('contain')
+                    ->maxSize(5120)
                     ->columnSpanFull(),
                 TextInput::make('nama_kategori')
                     ->label('Nama Kategori')

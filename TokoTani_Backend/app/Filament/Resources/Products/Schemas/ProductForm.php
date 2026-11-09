@@ -22,8 +22,11 @@ class ProductForm
                     ->disk('public')
                     ->directory('products')
                     ->visibility('public')
-                    ->imagePreviewHeight('200')
-                    ->maxSize(5120)
+                    ->imagePreviewHeight(250)
+                    ->imageResizeTargetWidth(1200)
+                    ->imageResizeTargetHeight(1200)
+                    ->imageResizeMode('contain')
+                    ->maxSize(10240)
                     ->columnSpanFull(),
                 TextInput::make('nama')
                     ->label('Nama Produk')
@@ -35,11 +38,7 @@ class ProductForm
                     ->options(function () {
                         return Category::pluck('nama_kategori', 'nama_kategori')->toArray();
                     })
-                    ->searchable()
-                    ->createOptionUsing(function (string $value): string {
-                        Category::firstOrCreate(['nama_kategori' => $value]);
-                        return $value;
-                    }),
+                    ->searchable(),
                 TextInput::make('harga')
                     ->label('Harga')
                     ->required()

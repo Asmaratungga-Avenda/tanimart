@@ -20,8 +20,7 @@ class BannersTable
                 ImageColumn::make('gambar')
                     ->label('Banner')
                     ->disk('public')
-                    ->height(60)
-                    ->width(120),
+                    ->height(44),
                 TextColumn::make('judul')
                     ->label('Judul Promo')
                     ->searchable()

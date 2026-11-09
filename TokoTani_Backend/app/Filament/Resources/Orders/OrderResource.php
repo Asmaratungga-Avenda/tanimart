@@ -22,7 +22,7 @@ class OrderResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingCart;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Pesanan';
+    protected static string|UnitEnum|null $navigationGroup = 'Manajemen Pesanan';
 
     protected static ?int $navigationSort = 1;
 

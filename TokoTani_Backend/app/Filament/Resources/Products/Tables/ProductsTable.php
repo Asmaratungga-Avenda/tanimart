@@ -23,8 +23,8 @@ class ProductsTable
                 ImageColumn::make('gambar')
                     ->label('Thumbnail')
                     ->disk('public')
-                    ->circular()
-                    ->defaultImageUrl(url('/storage/products/default.jpg')),
+                    ->height(44)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('id')->sortable(),
                 TextColumn::make('nama')
                     ->label('Nama Produk')

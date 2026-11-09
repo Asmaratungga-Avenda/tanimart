@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use Filament\Widgets\StatsOverviewWidget;
@@ -14,23 +15,34 @@ class TokoTaniStatsOverview extends StatsOverviewWidget
     protected function getStats(): array
     {
         $totalProduk = Product::count();
-        $produkAktif = Product::where('tersedia', true)->count();
-        $pesananMenunggu = Order::where('status', 'menunggu_pembayaran')->count();
-        $pesananSelesai = Order::where('status', 'selesai')->count();
-        $totalPenjualan = Order::where('status', '!=', 'dibatalkan')->sum('total_harga');
+        $totalKategori = Category::count();
+        $totalPesanan = Order::count();
+        $menungguPembayaran = Order::where('status', 'menunggu_pembayaran')->count();
+        $diproses = Order::where('status', 'diproses')->count();
+        $dikirim = Order::where('status', 'dikirim')->count();
+        $selesai = Order::where('status', 'selesai')->count();
 
         return [
-            Stat::make('Total Produk Aktif', $produkAktif . ' / ' . $totalProduk)
-                ->description('Produk siap dipesan')
-                ->color('success'),
-            Stat::make('Pesanan Menunggu', $pesananMenunggu)
-                ->description('Menunggu pembayaran')
-                ->color('warning'),
-            Stat::make('Pesanan Selesai', $pesananSelesai)
-                ->description('Transaksi berhasil')
+            Stat::make('Total Produk', $totalProduk)
+                ->description('Semua produk dalam katalog')
+                ->color('primary'),
+            Stat::make('Total Kategori', $totalKategori)
+                ->description('Kategori produk tersedia')
                 ->color('info'),
-            Stat::make('Total Penjualan', 'Rp ' . number_format($totalPenjualan, 0, ',', '.'))
-                ->description('Pendapatan pesanan aktif')
+            Stat::make('Total Pesanan', $totalPesanan)
+                ->description('Seluruh pesanan masuk')
+                ->color('primary'),
+            Stat::make('Menunggu Pembayaran', $menungguPembayaran)
+                ->description('Belum dibayar pelanggan')
+                ->color('warning'),
+            Stat::make('Diproses', $diproses)
+                ->description('Siap untuk dikirim')
+                ->color('info'),
+            Stat::make('Dikirim', $dikirim)
+                ->description('Sedang dalam pengiriman')
+                ->color('primary'),
+            Stat::make('Selesai', $selesai)
+                ->description('Transaksi berhasil')
                 ->color('success'),
         ];
     }

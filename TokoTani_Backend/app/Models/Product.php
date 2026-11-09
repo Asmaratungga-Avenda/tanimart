@@ -36,6 +36,13 @@ class Product extends Model
             if ($product->stok <= 0) {
                 $product->tersedia = false;
             }
+
+            if (empty($product->category_id) && ! empty($product->kategori)) {
+                $category = Category::where('nama_kategori', $product->kategori)->first();
+                if ($category) {
+                    $product->category_id = $category->id;
+                }
+            }
         });
     }
 
