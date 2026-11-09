@@ -43,44 +43,17 @@ class _HomePageState extends State<HomePage> {
     },
   ];
 
-  final List<Map<String, String>> _categories = [
-    {
-      'image': ProductImages.catSayuran,
-      'label': 'Sayuran',
-      'filter': 'Sayuran',
-    },
-    {
-      'image': ProductImages.catBuah,
-      'label': 'Buah Segar',
-      'filter': 'Buah',
-    },
-    {
-      'image': ProductImages.catBibit,
-      'label': 'Bibit & Benih',
-      'filter': 'Bibit',
-    },
-    {
-      'image': ProductImages.catPupuk,
-      'label': 'Pupuk',
-      'filter': 'Pupuk',
-    },
-    {
-      'image': ProductImages.catAlatPertanian,
-      'label': 'Alat Tani',
-      'filter': 'Alat',
-    },
-    {
-      'image': ProductImages.catKebutuhanHarian,
-      'label': 'Kebutuhan Harian',
-      'filter': 'Sembako',
-    },
-  ];
+
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<ProductProvider>().loadProducts();
+      if (mounted) {
+        final provider = context.read<ProductProvider>();
+        provider.loadCategories();
+        provider.loadProducts();
+      }
     });
     _startBannerTimer();
   }
@@ -109,6 +82,14 @@ class _HomePageState extends State<HomePage> {
     _bannerController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  String? _findCategory(ProductProvider provider, List<String> keywords) {
+    for (final category in provider.categories) {
+      final normalized = category.toLowerCase();
+      if (keywords.any(normalized.contains)) return category;
+    }
+    return null;
   }
 
   void _navigateToCatalog({String? category, String? query}) {
@@ -206,8 +187,9 @@ class _HomePageState extends State<HomePage> {
                     'Produk Pertanian Segar',
                     Icons.eco_rounded,
                     theme,
-                    onSeeAll: () =>
-                        _navigateToCatalog(category: 'Sayuran dan Buah Segar'),
+                    onSeeAll: () => _navigateToCatalog(
+                      category: _findCategory(provider, ['sayur', 'buah']),
+                    ),
                   ),
                 ),
                 SliverToBoxAdapter(
@@ -221,7 +203,8 @@ class _HomePageState extends State<HomePage> {
                     Icons.shopping_basket_rounded,
                     theme,
                     onSeeAll: () => _navigateToCatalog(
-                        category: 'Sembako dan Kebutuhan Harian'),
+                      category: _findCategory(provider, ['sembako', 'harian']),
+                    ),
                   ),
                 ),
                 SliverToBoxAdapter(
@@ -537,12 +520,12 @@ class _HomePageState extends State<HomePage> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _categories.length,
+            itemCount: context.watch<ProductProvider>().categories.length,
             separatorBuilder: (_, _) => const SizedBox(width: 14),
             itemBuilder: (ctx, i) {
-              final cat = _categories[i];
+              final cat = context.read<ProductProvider>().categories[i];
               return InkWell(
-                onTap: () => _navigateToCatalog(category: cat['filter']),
+                onTap: () => _navigateToCatalog(category: cat),
                 borderRadius: BorderRadius.circular(14),
                 child: Column(
                   children: [
@@ -559,7 +542,7 @@ class _HomePageState extends State<HomePage> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: Image.asset(
-                          cat['image']!,
+                          ProductImages.getCategoryAsset(cat),
                           fit: BoxFit.contain,
                           errorBuilder: (_, _, _) => Icon(
                             Icons.category_rounded,
@@ -573,7 +556,7 @@ class _HomePageState extends State<HomePage> {
                     SizedBox(
                       width: 66,
                       child: Text(
-                        cat['label']!,
+                        cat,
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

@@ -182,7 +182,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: appBarForeground,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -350,7 +350,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                   NavigationDestination(
                     icon: Icon(Icons.person_outlined),
                     selectedIcon: Icon(Icons.person),
-                    label: 'Profil',
+                    label: 'Akun',
                   ),
                 ],
               ),

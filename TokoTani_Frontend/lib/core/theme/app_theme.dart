@@ -6,10 +6,10 @@ import 'package:flutter/services.dart';
 /// Standar tema, palet warna, dan tipografi Tani Mart (Light & Dark).
 class AppTheme {
   // ============ Light Palette ============
-  static const Color lightPrimaryGreen = Color(0xFF2E7D32);
-  static const Color lightSecondaryGreen = Color(0xFF4CAF50);
-  static const Color lightLightGreen = Color(0xFFE8F5E9);
-  static const Color lightBackground = Color(0xFFF7F9F6);
+  static const Color lightPrimaryGreen = Color(0xFF27843D);
+  static const Color lightSecondaryGreen = Color(0xFF39A84A);
+  static const Color lightLightGreen = Color(0xFFE8F7E9);
+  static const Color lightBackground = Color(0xFFF7F8F6);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightTextPrimary = Color(0xFF1F2937);
   static const Color lightTextSecondary = Color(0xFF6B7280);
@@ -18,16 +18,16 @@ class AppTheme {
   static const Color lightBorderColor = Color(0xFFE5E7EB);
 
   // ============ Dark Palette ============
-  static const Color darkPrimaryGreen = Color(0xFF6EE7B7);
-  static const Color darkSecondaryGreen = Color(0xFF34D399);
-  static const Color darkLightGreen = Color(0xFF064E3B);
-  static const Color darkBackground = Color(0xFF0F172A);
-  static const Color darkSurface = Color(0xFF1E293B);
-  static const Color darkTextPrimary = Color(0xFFF8FAFC);
-  static const Color darkTextSecondary = Color(0xFF94A3B8);
+  static const Color darkPrimaryGreen = Color(0xFF39A84A);
+  static const Color darkSecondaryGreen = Color(0xFF6BCB78);
+  static const Color darkLightGreen = Color(0xFF173D25);
+  static const Color darkBackground = Color(0xFF121212);
+  static const Color darkSurface = Color(0xFF1E1E1E);
+  static const Color darkTextPrimary = Color(0xFFF5F5F5);
+  static const Color darkTextSecondary = Color(0xFFB0B0B0);
   static const Color darkAccentOrange = Color(0xFFFB923C);
   static const Color darkErrorRed = Color(0xFFF87171);
-  static const Color darkBorderColor = Color(0xFF334155);
+  static const Color darkBorderColor = Color(0xFF383838);
 
   // Shadows
   static List<BoxShadow> get softShadow => [
@@ -67,14 +67,14 @@ class AppTheme {
         displayColor: lightTextPrimary,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: lightPrimaryGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: lightSurface,
+        foregroundColor: lightTextPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
+          statusBarIconBrightness: Brightness.dark,
         ),
       ),
       cardTheme: const CardThemeData(
