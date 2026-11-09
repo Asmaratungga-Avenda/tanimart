@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/order.dart';
-import '../services/api_service.dart';
+import '../providers/order_provider.dart';
+import '../core/theme/theme_extension.dart';
 import '../widgets/responsive_wrapper.dart';
+import 'product_catalog_page.dart';
 import 'order_detail_page.dart';
 
 class OrderHistoryPage extends StatefulWidget {
@@ -19,67 +22,40 @@ class OrderHistoryPage extends StatefulWidget {
 }
 
 class _OrderHistoryPageState extends State<OrderHistoryPage> {
-  // 4 Keadaan Layar wajib
-  KeadaanMuat state = KeadaanMuat.memuat;
-  List<OrderModel> orders = [];
-  ApiException? lastError;
-
   @override
   void initState() {
     super.initState();
-    loadOrders();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<OrderProvider>().loadOrders();
+    });
   }
 
   String formatRupiah(int value) {
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-  }
-
-  Future<void> loadOrders() async {
-    setState(() {
-      state = KeadaanMuat.memuat;
-      lastError = null;
-    });
-
-    try {
-      final res = await ApiService.getOrders();
-      if (!mounted) return;
-      setState(() {
-        orders = res;
-        state = res.isEmpty ? KeadaanMuat.kosong : KeadaanMuat.berhasil;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        lastError = e;
-        state = KeadaanMuat.galat;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        lastError = const ApiException(
-          statusCode: 500,
-          message: 'Gagal memuat riwayat pesanan dari server.',
-          errorType: ApiErrorType.other,
-        );
-        state = KeadaanMuat.galat;
-      });
+    final s = value.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(s[i]);
     }
+    return 'Rp $buffer';
   }
 
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(String status, AppColors theme) {
     switch (status.toLowerCase()) {
       case 'dibayar':
       case 'selesai':
-        return const Color(0xFF2E7D32);
+        return theme.primaryGreen;
       case 'menunggu_pembayaran':
-        return Colors.orange.shade800;
+        return theme.warning;
       case 'diproses':
       case 'dikirim':
-        return Colors.blue.shade700;
+        return theme.info;
       case 'dibatalkan':
-        return Colors.red.shade700;
+        return theme.errorRed;
       default:
-        return const Color(0xFF64748B);
+        return theme.textSecondary;
     }
   }
 
@@ -104,11 +80,14 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = AppColors.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF5),
+      backgroundColor: theme.backgroundColor,
       appBar: AppBar(
         title: const Text('Riwayat Pesanan'),
         centerTitle: true,
+        backgroundColor: theme.surfaceColor,
+        foregroundColor: theme.textPrimary,
         leading: widget.showBackButton
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
@@ -119,7 +98,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Segarkan Riwayat',
-            onPressed: loadOrders,
+            onPressed: () => context.read<OrderProvider>().loadOrders(),
           ),
         ],
       ),
@@ -128,84 +107,35 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
   }
 
   Widget _buildBody() {
-    switch (state) {
-      case KeadaanMuat.memuat:
-        return const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: Color(0xFF2E7D32)),
-              SizedBox(height: 16),
-              Text('Memuat riwayat pesanan...'),
-            ],
-          ),
-        );
+    final provider = context.watch<OrderProvider>();
+    final orders = provider.orders;
 
-      case KeadaanMuat.kosong:
+    if (provider.isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Memuat riwayat pesanan...'),
+          ],
+        ),
+      );
+    }
+
+    if (provider.isEmpty) {
+      if (provider.errorMessage != null) {
         return Center(
           child: Padding(
             padding: const EdgeInsets.all(28),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE8F5E9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long_outlined,
-                    size: 56,
-                    color: Color(0xFF2E7D32),
-                  ),
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: AppColors.of(context).errorRed,
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Belum Ada Pesanan',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Anda belum memiliki riwayat transaksi produk pertanian segar.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: const Icon(Icons.shopping_bag_outlined),
-                  label: const Text('Mulai Belanja Sekarang'),
-                  onPressed: () {
-                    if (widget.onGoToCatalog != null) {
-                      widget.onGoToCatalog!();
-                    } else if (Navigator.canPop(context)) {
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-
-      case KeadaanMuat.galat:
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
                 const SizedBox(height: 16),
                 const Text(
                   'Gagal Memuat Pesanan',
@@ -213,61 +143,126 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  lastError?.message ?? 'Terjadi kesalahan sistem.',
+                  provider.errorMessage ?? 'Terjadi kesalahan sistem.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
+                    backgroundColor: AppColors.of(context).primaryGreen,
                   ),
                   icon: const Icon(Icons.refresh),
                   label: const Text('Coba Lagi'),
-                  onPressed: loadOrders,
+                  onPressed: () => provider.loadOrders(),
                 ),
               ],
             ),
           ),
         );
+      }
 
-      case KeadaanMuat.berhasil:
-        return RefreshIndicator(
-          onRefresh: loadOrders,
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            itemCount: orders.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final order = orders[index];
-              return _buildOrderCard(order);
-            },
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.of(context).lightGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.receipt_long_outlined,
+                  size: 56,
+                  color: AppColors.of(context).primaryGreen,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Belum Ada Pesanan',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.of(context).textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Anda belum memiliki riwayat transaksi produk pertanian segar.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.of(context).textSecondary),
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.of(context).primaryGreen,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.shopping_bag_outlined),
+                label: const Text('Mulai Belanja Sekarang'),
+                onPressed: () {
+                  if (widget.onGoToCatalog != null) {
+                    widget.onGoToCatalog!();
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ProductCatalogPage(),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
           ),
-        );
+        ),
+      );
     }
+
+    return RefreshIndicator(
+      onRefresh: () => provider.loadOrders(),
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        itemCount: orders.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final order = orders[index];
+          return _buildOrderCard(order);
+        },
+      ),
+    );
   }
 
   Widget _buildOrderCard(OrderModel order) {
-    final statusColor = _getStatusColor(order.status);
+    final theme = AppColors.of(context);
+    final statusColor = _getStatusColor(order.status, theme);
     final statusLabel = _getStatusLabel(order.status);
 
     return InkWell(
       onTap: () async {
+        final orderId = order.id;
         await Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => OrderDetailPage(orderId: order.id)),
+          MaterialPageRoute(builder: (_) => OrderDetailPage(orderId: orderId)),
         );
-        loadOrders();
+        if (mounted) {
+          context.read<OrderProvider>().loadOrders();
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.surfaceColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: theme.borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
+              color: theme.shadowColor,
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -282,18 +277,18 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
               children: [
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.receipt_outlined,
                       size: 16,
-                      color: Color(0xFF64748B),
+                      color: theme.textSecondary,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       '#TRX-${order.id}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
-                        color: Color(0xFF1E293B),
+                        color: theme.textPrimary,
                       ),
                     ),
                   ],
@@ -321,7 +316,10 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                 ),
               ],
             ),
-            const Divider(height: 20, color: Color(0xFFF1F5F9)),
+            Divider(
+              height: 20,
+              color: theme.borderColor.withValues(alpha: 0.5),
+            ),
 
             // Ringkasan Isi Pesanan
             Row(
@@ -330,12 +328,12 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
+                    color: theme.lightGreen,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.shopping_bag_outlined,
-                    color: Color(0xFF2E7D32),
+                    color: theme.primaryGreen,
                     size: 24,
                   ),
                 ),
@@ -348,7 +346,7 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                         order.items.isNotEmpty
                             ? order.items.first.namaProduk
                             : 'Pesanan Produk Tani',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -362,18 +360,18 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                             : (order.items.isNotEmpty
                                   ? '${order.items.first.quantity} item'
                                   : 'Penerima: ${order.namaPenerima}'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF64748B),
+                          color: theme.textSecondary,
                         ),
                       ),
                       if (order.tanggalAntar.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
                           'Jadwal antar: ${order.tanggalAntar}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF94A3B8),
+                            color: theme.textSecondary,
                           ),
                         ),
                       ],
@@ -391,36 +389,39 @@ class _OrderHistoryPageState extends State<OrderHistoryPage> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Total Pembayaran',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.textSecondary,
+                      ),
                     ),
                     Text(
                       formatRupiah(order.totalHarga),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E7D32),
+                        color: theme.primaryGreen,
                       ),
                     ),
                   ],
                 ),
                 Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
+                  children: [
                     Text(
                       'Rincian',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E7D32),
+                        color: theme.primaryGreen,
                       ),
                     ),
                     SizedBox(width: 4),
                     Icon(
                       Icons.arrow_forward_ios_rounded,
                       size: 12,
-                      color: Color(0xFF2E7D32),
+                      color: theme.primaryGreen,
                     ),
                   ],
                 ),

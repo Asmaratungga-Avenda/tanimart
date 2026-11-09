@@ -1,4 +1,4 @@
-/// Pemetaan aset gambar terpusat untuk aplikasi AgriMart.
+/// Pemetaan aset gambar terpusat untuk aplikasi Tani Mart.
 /// Memastikan setiap foto produk dapat diganti secara independen oleh pengguna di assets/images/products/.
 class ProductImages {
   // Logo

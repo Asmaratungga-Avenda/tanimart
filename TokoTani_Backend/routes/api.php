@@ -24,6 +24,9 @@ Route::patch('/checkout/{id}/status', [CheckoutController::class, 'updateStatus'
 Route::get('/pesanan', [CheckoutController::class, 'index']);
 Route::get('/pesanan/{id}', [CheckoutController::class, 'show']);
 Route::patch('/pesanan/{id}/status', [CheckoutController::class, 'updateStatus']);
+Route::post('/pesanan/{id}/pembayaran', [CheckoutController::class, 'pembayaran']);
+Route::post('/pesanan/{id}/kirim', [CheckoutController::class, 'kirim']);
+Route::post('/pesanan/{id}/selesai', [CheckoutController::class, 'selesai']);
 Route::get('/orders', [CheckoutController::class, 'index']);
 Route::get('/orders/{id}', [CheckoutController::class, 'show']);
 Route::patch('/orders/{id}/status', [CheckoutController::class, 'updateStatus']);
@@ -33,6 +36,10 @@ Route::get('/kurir', [CheckoutController::class, 'couriers']);
 Route::get('/couriers', [CheckoutController::class, 'couriers']);
 Route::get('/metode-pembayaran', [CheckoutController::class, 'paymentMethods']);
 Route::get('/payment-methods', [CheckoutController::class, 'paymentMethods']);
+
+// Banner Promo
+Route::get('/banners', [ProductController::class, 'banners']);
+Route::get('/banner', [ProductController::class, 'banners']);
 
 // Kategori & Produk
 Route::get('/kategori', [ProductController::class, 'categories']);

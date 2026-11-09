@@ -1,69 +1,51 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tokotani/pages/cart_page.dart';
-import 'package:tokotani/pages/manage_product_page.dart';
-import 'package:tokotani/pages/product_form_page.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:tokotani/services/api_service.dart';
 
 void main() {
-  setUp(() {
-    // Aktifkan mode mock untuk pengujian widget terisolasi
-    ApiService.useMock = true;
+  tearDown(() {
+    ApiService.httpClient.close();
+    ApiService.httpClient = http.Client();
   });
 
-  testWidgets('CartPage menampilkan judul dan tombol muat ulang', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: CartPage(),
+  test('404 keranjang tetap menjadi error API, bukan keranjang kosong palsu', () async {
+    ApiService.httpClient = MockClient((_) async {
+      return http.Response(
+        jsonEncode({'status': 'gagal', 'code': 404, 'message': 'Keranjang tidak ditemukan.'}),
+        404,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    await expectLater(
+      ApiService.getCart(),
+      throwsA(
+        isA<ApiException>()
+            .having((error) => error.statusCode, 'statusCode', 404)
+            .having((error) => error.message, 'message', 'Keranjang tidak ditemukan.'),
       ),
     );
-
-    expect(find.text('Keranjang Belanja'), findsOneWidget);
-    // Tunggu transisi asynchronous dari loadCart
-    await tester.pumpAndSettle();
-
-    // Verifikasi apakah subtotal dari server atau pesan kosong muncul
-    expect(find.byType(CartPage), findsOneWidget);
   });
 
-  testWidgets('ManageProductsPage menampilkan filter kategori dan FAB Tambah Produk', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: ManageProductsPage(),
-      ),
+  test('Konfirmasi pembayaran menggunakan endpoint Laravel dan menampilkan kegagalan', () async {
+    late http.Request capturedRequest;
+    ApiService.httpClient = MockClient((request) async {
+      capturedRequest = request;
+      return http.Response(
+        jsonEncode({'status': 'gagal', 'code': 403, 'message': 'Bukan pemilik pesanan.'}),
+        403,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    await expectLater(
+      ApiService.confirmPayment(42, 3),
+      throwsA(isA<ApiException>().having((error) => error.statusCode, 'statusCode', 403)),
     );
-
-    expect(find.text('Kelola Produk'), findsOneWidget);
-    expect(find.text('Tambah Produk'), findsOneWidget);
-    expect(find.text('Semua'), findsOneWidget);
-
-    await tester.pumpAndSettle();
-  });
-
-  testWidgets('ProductFormPage menampilkan kolom input wajib dan tombol simpan', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: ProductFormPage(),
-      ),
-    );
-
-    expect(find.text('Tambah Produk Pertanian'), findsOneWidget);
-    expect(find.text('Nama Produk Pertanian *'), findsOneWidget);
-
-    // Scroll ke bawah agar tombol simpan terlihat
-    await tester.drag(find.byType(ListView), const Offset(0, -600));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Simpan Produk'), findsOneWidget);
-
-    // Verifikasi validasi klien jika tombol simpan ditekan tanpa mengisi form
-    await tester.tap(find.text('Simpan Produk'));
-    await tester.pumpAndSettle();
-
-    // Scroll kembali ke atas untuk melihat pesan validasi pada kolom nama
-    await tester.drag(find.byType(ListView), const Offset(0, 600));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Nama produk wajib diisi.'), findsOneWidget);
+    expect(capturedRequest.method, 'POST');
+    expect(capturedRequest.url.path, endsWith('/api/pesanan/42/pembayaran'));
   });
 }

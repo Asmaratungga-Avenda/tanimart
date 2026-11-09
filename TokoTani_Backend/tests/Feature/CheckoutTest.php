@@ -268,18 +268,18 @@ class CheckoutTest extends TestCase
             ->assertJsonPath('status', 'sukses');
     }
 
-    public function test_database_seeder_creates_checkout_data_without_a_default_admin(): void
+    public function test_database_seeder_does_not_create_dummy_customers_products_or_orders(): void
     {
         $this->seed();
         $this->seed();
 
         $this->assertDatabaseCount('users', 0);
-        $this->assertDatabaseCount('categories', 2);
-        $this->assertDatabaseCount('products', 12);
+        $this->assertDatabaseCount('categories', 6);
+        $this->assertDatabaseCount('products', 0);
         $this->assertDatabaseCount('couriers', 2);
         $this->assertDatabaseCount('payment_methods', 2);
-        $this->assertDatabaseCount('orders', 1);
-        $this->assertDatabaseCount('order_items', 1);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
     }
 
     private function createProduct(array $overrides = []): Product

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ProductImage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
@@ -40,6 +43,22 @@ class ProductController extends Controller
             200,
             'Daftar kategori berhasil diambil',
             $categories
+        );
+    }
+
+    public function banners()
+    {
+        if (Schema::hasTable('banners')) {
+            $banners = \App\Models\Banner::aktif()->get();
+        } else {
+            $banners = [];
+        }
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Daftar banner promo berhasil diambil',
+            $banners
         );
     }
 
@@ -97,6 +116,7 @@ class ProductController extends Controller
             'deskripsi'   => 'nullable|string',
             'satuan_jual' => 'required|string',
             'mudah_rusak' => 'required|boolean',
+            'gambar'      => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
         ]);
 
         if ($validator->fails()) {
@@ -112,6 +132,14 @@ class ProductController extends Controller
         $validated = $validator->validated();
         if (isset($validated['stok']) && $validated['stok'] <= 0 && !isset($validated['tersedia'])) {
             $validated['tersedia'] = false;
+        }
+
+        if ($request->hasFile('gambar')) {
+            $file = $request->file('gambar');
+            $extension = $file->getClientOriginalExtension() ?? 'jpg';
+            $filename = 'products/' . time() . '_' . Str::random(8) . '.' . $extension;
+            $stored = $file->storeAs('public', $filename);
+            $validated['gambar'] = $stored;
         }
 
         if (empty($validated['kategori']) && !empty($validated['category_id'])) {
@@ -150,9 +178,10 @@ class ProductController extends Controller
             'category_id' => 'sometimes|nullable|integer|exists:categories,id',
             'stok'        => 'sometimes|required|integer|min:0',
             'tersedia'    => 'sometimes|required|boolean',
-            'deskripsi'   => 'nullable|string',
+            'deskripsi'   => 'sometimes|nullable|string',
             'satuan_jual' => 'sometimes|required|string',
             'mudah_rusak' => 'sometimes|required|boolean',
+            'gambar'      => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
         ]);
 
         if ($validator->fails()) {
@@ -168,6 +197,19 @@ class ProductController extends Controller
         $validated = $validator->validated();
         if (isset($validated['stok']) && $validated['stok'] <= 0 && !isset($validated['tersedia'])) {
             $validated['tersedia'] = false;
+        }
+
+        if ($request->hasFile('gambar')) {
+            // Hapus gambar lama saat diganti
+            if ($product->gambar && Storage::disk('public')->exists($product->gambar)) {
+                Storage::disk('public')->delete($product->gambar);
+            }
+
+            $file = $request->file('gambar');
+            $extension = $file->getClientOriginalExtension() ?? 'jpg';
+            $filename = 'products/' . time() . '_' . Str::random(8) . '.' . $extension;
+            $stored = $file->storeAs('public', $filename);
+            $validated['gambar'] = $stored;
         }
 
         if (array_key_exists('category_id', $validated) && empty($validated['kategori']) && !empty($validated['category_id'])) {

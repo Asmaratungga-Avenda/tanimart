@@ -1,28 +1,24 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tokotani/main.dart';
 
+import 'test_support.dart';
+
 void main() {
-  testWidgets('Memverifikasi judul dan navigasi utama TokoTani', (WidgetTester tester) async {
-    // Membangun aplikasi TokoTani
-    await tester.pumpWidget(const TokoTaniApp());
+  setUp(configureUnavailableApi);
 
-    // Memverifikasi teks judul 'TokoTani' muncul di AppBar
-    expect(find.text('TokoTani'), findsWidgets);
+  testWidgets('Aplikasi utama menampilkan navigasi customer', (tester) async {
+    await tester.pumpWidget(testApp(const MainNavigationPage()));
+    await tester.pumpAndSettle();
 
-    // Memverifikasi dua tab navigasi utama tugas Anggota 5
-    expect(find.text('Keranjang Belanja'), findsWidgets);
-    expect(find.text('Kelola Produk'), findsWidgets);
+    expect(find.text('Tani Mart'), findsOneWidget);
+    expect(find.byType(MainNavigationPage), findsOneWidget);
   });
 
-  testWidgets('Memverifikasi menu navigasi evaluasi TokoTani', (WidgetTester tester) async {
-    // Membangun menu ringkasan tugas
-    await tester.pumpWidget(const TokoTaniApp(home: MenuPage()));
+  testWidgets('Menu CRUD tetap dapat dibuka melalui entry point kompatibilitas', (tester) async {
+    await tester.pumpWidget(testApp(const MenuPage()));
+    await tester.pumpAndSettle();
 
-    // Memverifikasi teks judul 'TokoTani' muncul
-    expect(find.textContaining('TokoTani'), findsWidgets);
-
-    // Memverifikasi kartu navigasi bagian Anggota 5 muncul
-    expect(find.text('Keranjang Belanja'), findsOneWidget);
     expect(find.text('Kelola Produk (CRUD)'), findsOneWidget);
+    expect(find.text('Tambah Produk'), findsOneWidget);
   });
 }

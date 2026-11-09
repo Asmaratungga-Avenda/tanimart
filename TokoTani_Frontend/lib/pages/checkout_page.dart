@@ -1,22 +1,18 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/cart_item.dart';
 import '../models/courier.dart';
 import '../models/order.dart';
 import '../models/payment_method.dart';
+import '../core/theme/theme_extension.dart';
+import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/responsive_wrapper.dart';
 import 'order_detail_page.dart';
 
 class CheckoutPage extends StatefulWidget {
-  final List<CartItem>? items;
-  final int? subtotal;
-
-  const CheckoutPage({
-    super.key,
-    this.items,
-    this.subtotal,
-  });
+  const CheckoutPage({super.key});
 
   @override
   State<CheckoutPage> createState() => _CheckoutPageState();
@@ -27,8 +23,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _namaCtrl;
   late final TextEditingController _alamatCtrl;
-  String _namaPenerima = 'Budi Santoso';
-  String _alamatPenerima = 'Jl. Melati No. 123, Lowokwaru, Kota Malang';
+  String _namaPenerima = '';
+  String _alamatPenerima = '';
   DateTime _tanggalAntar = DateTime.now();
 
   // Kunci Idempoten (Kriteria 4 Checkout: dibuat sekali per percobaan, dipakai ulang saat coba lagi)
@@ -39,37 +35,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
   String? _conflictError;
   ApiException? _generalError;
 
-  // Data barang — langsung dari widget.items bila ada, bukan async
-  List<CartItem> _items = [];
-  // Loading hanya berlaku jika items belum ada (harus ambil dari server)
-  bool _isLoading = false;
+  // Data barang — langsung dari CartProvider (Single Source of Truth)
   bool _isSubmitting = false;
+  bool _isLoadingOptions = true;
+  String? _optionsError;
 
   // Sorting barang berdasarkan jumlah: default descending (terbanyak di paling atas)
   bool _sortAscending = false;
 
   // Kurir & Pembayaran dengan data default langsung (tidak async di initState)
-  List<Courier> _couriers = [
-    const Courier(id: 1, nama: 'JNE Regular', tarif: 15000, aktif: true),
-    const Courier(id: 2, nama: 'SiCepat HALU', tarif: 12000, aktif: true),
-    const Courier(id: 3, nama: 'Gojek Instant', tarif: 25000, aktif: true),
-  ];
+  List<Courier> _couriers = [];
   Courier? _selectedCourier;
 
-  List<PaymentMethod> _paymentMethods = [
-    const PaymentMethod(
-      id: 1,
-      nama: 'COD (Bayar di Tempat)',
-      deskripsi: 'Bayar saat pesanan tiba di tujuan',
-      aktif: true,
-    ),
-    const PaymentMethod(
-      id: 2,
-      nama: 'Transfer Bank',
-      deskripsi: 'Transfer melalui rekening BCA / BRI / Mandiri',
-      aktif: true,
-    ),
-  ];
+  List<PaymentMethod> _paymentMethods = [];
   PaymentMethod? _selectedPayment;
 
   @override
@@ -79,20 +57,11 @@ class _CheckoutPageState extends State<CheckoutPage> {
     _namaCtrl = TextEditingController(text: _namaPenerima);
     _alamatCtrl = TextEditingController(text: _alamatPenerima);
 
-    // Jika items sudah dikirim dari halaman sebelumnya (CartPage), langsung pakai
-    if (widget.items != null && widget.items!.isNotEmpty) {
-      _items = List<CartItem>.from(widget.items!);
-    }
-
-    // Kurir & payment method default sudah diinisialisasi di field declaration
-    _selectedCourier = _couriers.first;
-    _selectedPayment = _paymentMethods.first;
-
-    // Fetch kurir & pembayaran dari server jika tidak dalam mode pengujian terisolasi
-    if (widget.items == null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<CartProvider>().loadCart();
       _loadCouriersAndPayments();
-      _fetchCartFromServer();
-    }
+    });
   }
 
   @override
@@ -103,44 +72,40 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _loadCouriersAndPayments() async {
+    setState(() {
+      _isLoadingOptions = true;
+      _optionsError = null;
+    });
     try {
       final couriers = await ApiService.getCouriers();
-      if (mounted && couriers.isNotEmpty) {
-        setState(() {
-          _couriers = couriers;
-          _selectedCourier = couriers.first;
-        });
-      }
-    } catch (_) {}
-
-    try {
       final payments = await ApiService.getPaymentMethods();
-      if (mounted && payments.isNotEmpty) {
-        setState(() {
-          _paymentMethods = payments;
-          _selectedPayment = payments.first;
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _fetchCartFromServer() async {
-    setState(() => _isLoading = true);
-    try {
-      final cartResp = await ApiService.getCart();
       if (!mounted) return;
       setState(() {
-        _items = cartResp.items;
-        _isLoading = false;
+        _couriers = couriers;
+        _selectedCourier = couriers.isEmpty ? null : couriers.first;
+        _paymentMethods = payments;
+        _selectedPayment = payments.isEmpty ? null : payments.first;
+        if (couriers.isEmpty || payments.isEmpty) {
+          _optionsError = 'Kurir atau metode pembayaran belum tersedia.';
+        }
       });
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _optionsError = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _optionsError = 'Gagal memuat pilihan checkout: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingOptions = false);
+      }
     }
   }
 
   /// Urutan barang dari atas sampai bawah sesuai dengan jumlah barangnya
   List<CartItem> get _sortedItems {
-    final list = List<CartItem>.from(_items);
+    final cart = context.read<CartProvider>();
+    final list = List<CartItem>.from(cart.items);
     if (_sortAscending) {
       // Ascending: jumlah sedikit ke banyak
       list.sort((a, b) => a.jumlah.compareTo(b.jumlah));
@@ -151,12 +116,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return list;
   }
 
-  int get _calculatedSubtotal {
-    if (widget.subtotal != null && widget.subtotal! > 0) {
-      return widget.subtotal!;
-    }
-    return _items.fold<int>(0, (sum, item) => sum + (item.harga * item.jumlah));
-  }
+  int get _calculatedSubtotal => context.read<CartProvider>().subtotal;
 
   int get _ongkir => _selectedCourier?.tarif ?? 0;
   int get _totalBayar => _calculatedSubtotal + _ongkir;
@@ -172,18 +132,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
       initialDate: _tanggalAntar.isBefore(now) ? now : _tanggalAntar,
       firstDate: now,
       lastDate: now.add(const Duration(days: 30)),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF2E7D32),
-              onPrimary: Colors.white,
-              onSurface: Color(0xFF1E293B),
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
 
     if (picked != null) {
@@ -192,21 +140,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Future<void> _processCheckout() async {
+    final theme = AppColors.of(context);
     setState(() {
       _serverErrors.clear();
       _conflictError = null;
       _generalError = null;
     });
-
-    if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Keranjang belanja kosong!'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
 
     if (!_formKey.currentState!.validate()) {
       return;
@@ -214,15 +153,28 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     if (_selectedCourier == null || _selectedPayment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Pilih kurir dan metode pembayaran terlebih dahulu.'),
-          backgroundColor: Colors.orange,
+          backgroundColor: theme.warning,
         ),
       );
       return;
     }
 
     setState(() => _isSubmitting = true);
+
+    final cart = context.read<CartProvider>();
+    if (cart.items.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Keranjang belanja kosong!'),
+          backgroundColor: theme.errorRed,
+        ),
+      );
+      setState(() => _isSubmitting = false);
+      return;
+    }
 
     // Kunci Idempoten: dibuat sekali per percobaan, dipakai ulang ketika menekan coba lagi
     _idempotencyKey ??= 'IDEMP-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(999999)}';
@@ -233,7 +185,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'kurir_id': _selectedCourier!.id,
       'payment_method_id': _selectedPayment!.id,
       'tanggal_antar': '${_tanggalAntar.year}-${_tanggalAntar.month.toString().padLeft(2, '0')}-${_tanggalAntar.day.toString().padLeft(2, '0')}',
-      'items': _items.map((i) => {'product_id': i.produkId, 'quantity': i.jumlah}).toList(),
+      'items': cart.items.map((i) => {'product_id': i.produkId, 'quantity': i.jumlah}).toList(),
     };
 
     try {
@@ -242,16 +194,19 @@ class _CheckoutPageState extends State<CheckoutPage> {
       setState(() => _isSubmitting = false);
       _idempotencyKey = null; // Berhasil, bersihkan kunci idempoten
 
-      final orderData = res['data'] ?? res;
-      final rawId = (orderData is Map ? orderData['id'] : null) ?? 1;
-      final orderId = rawId is int ? rawId : int.tryParse('$rawId') ?? 1;
-
-      OrderModel? orderModel;
-      if (orderData is Map) {
-        try {
-          orderModel = OrderModel.fromJson(Map<String, dynamic>.from(orderData));
-        } catch (_) {}
+      final orderData = res['data'];
+      if (orderData is! Map) {
+        throw const FormatException('Checkout response is missing order data.');
       }
+      final orderId = int.tryParse(
+        '${orderData['id'] ?? orderData['order_id'] ?? ''}',
+      );
+      if (orderId == null || orderId <= 0) {
+        throw const FormatException('Checkout response is missing a valid order ID.');
+      }
+      final orderModel = OrderModel.fromJson(
+        Map<String, dynamic>.from(orderData),
+      );
 
       // Menuju rincian pesanan setelah 201 (Kriteria Perpindahan)
       Navigator.pushReplacement(
@@ -274,8 +229,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         });
         _formKey.currentState?.validate();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.orange,
+          SnackBar(
+            backgroundColor: theme.warning,
             behavior: SnackBarBehavior.floating,
             content: Text('Validasi formulir gagal. Periksa kolom yang bertanda merah.'),
           ),
@@ -291,32 +246,34 @@ class _CheckoutPageState extends State<CheckoutPage> {
           _generalError = e;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _isSubmitting = false;
         _generalError = const ApiException(
           statusCode: 500,
-          message: 'Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.',
+          message: 'Respons checkout tidak lengkap atau tidak dapat dibaca. Pesanan belum dikonfirmasi.',
           errorType: ApiErrorType.server,
         );
       });
+      debugPrint('Checkout response could not be processed: $e');
     }
   }
 
   Widget _buildConflictErrorBanner() {
+    final theme = AppColors.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: theme.errorContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade300),
+        border: Border.all(color: theme.errorRed.withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 26),
+          Icon(Icons.warning_amber_rounded, color: theme.errorRed, size: 26),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -324,12 +281,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
               children: [
                 Text(
                   'Bentrok Keadaan (409)',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade900),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: theme.errorRed),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   _conflictError!,
-                  style: TextStyle(color: Colors.red.shade800, fontSize: 13, height: 1.3),
+                  style: TextStyle(color: theme.errorRed, fontSize: 13, height: 1.3),
                 ),
               ],
             ),
@@ -344,6 +301,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildGeneralErrorBanner() {
+    final theme = AppColors.of(context);
     final err = _generalError!;
     final isConn = err.errorType == ApiErrorType.connection;
     final isTimeout = err.errorType == ApiErrorType.timeout;
@@ -367,21 +325,21 @@ class _CheckoutPageState extends State<CheckoutPage> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: theme.warningContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade300),
+        border: Border.all(color: theme.warning.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: Colors.orange.shade800, size: 24),
+              Icon(icon, color: theme.warning, size: 24),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: theme.warning),
                 ),
               ),
             ],
@@ -389,14 +347,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
           const SizedBox(height: 6),
           Text(
             err.message,
-            style: TextStyle(fontSize: 13, color: Colors.brown.shade900),
+            style: TextStyle(fontSize: 13, color: theme.textPrimary),
           ),
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF2E7D32),
+                backgroundColor: theme.primaryGreen,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
               icon: const Icon(Icons.refresh, size: 16),
@@ -409,38 +367,65 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  Widget _buildOptionsErrorBanner() {
+    final theme = AppColors.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.errorRed.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.errorRed.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: theme.errorRed),
+          const SizedBox(width: 10),
+          Expanded(child: Text(_optionsError!)),
+          TextButton(
+            onPressed: _isLoadingOptions ? null : _loadCouriersAndPayments,
+            child: const Text('Coba lagi'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final sortedItems = _sortedItems;
+    final cart = context.watch<CartProvider>();
+    final theme = AppColors.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF5),
+      backgroundColor: theme.backgroundColor,
       appBar: AppBar(
         title: const Text(
           'Checkout Pesanan',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1E293B),
+        backgroundColor: theme.surfaceColor,
+        foregroundColor: theme.textPrimary,
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading
-          ? const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: Color(0xFF2E7D32)),
-                  SizedBox(height: 12),
-                  Text('Menyiapkan data checkout...'),
-                ],
-              ),
-            )
-          : ResponsiveScrollWrapper(
+      body: cart.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : cart.errorMessage != null
+              ? _buildCartUnavailable(
+                  cart.errorMessage!,
+                  () => cart.loadCart(),
+                )
+              : cart.items.isEmpty
+                  ? _buildCartUnavailable(
+                      'Keranjang belanja kosong. Tambahkan produk sebelum checkout.',
+                      null,
+                    )
+                  : ResponsiveScrollWrapper(
               child: Form(
                 key: _formKey,
                 child: ListView(
@@ -448,29 +433,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   children: [
                     if (_conflictError != null) _buildConflictErrorBanner(),
                     if (_generalError != null) _buildGeneralErrorBanner(),
+                    if (_optionsError != null) _buildOptionsErrorBanner(),
 
-                    // ==========================================
-                    // 1. DAFTAR BARANG CHECKOUT (MODEL LIST KE BAWAH)
-                    // ==========================================
-                    _buildSectionHeader(
-                      title: 'Daftar Barang',
-                      subtitle: 'Barang diurutkan ke bawah sesuai dengan jumlahnya',
-                      actionWidget: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFC8E6C9)),
-                        ),
+                  // ==========================================
+                  // 1. DAFTAR BARANG CHECKOUT (MODEL LIST KE BAWAH)
+                  // ==========================================
+                  _buildSectionHeader(
+                    title: 'Daftar Barang',
+                    subtitle: 'Barang diurutkan ke bawah sesuai dengan jumlahnya',
+                    actionWidget: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.lightGreen,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: theme.borderColor),
+                      ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               '${sortedItems.length} Produk',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF2E7D32),
+                                color: theme.primaryGreen,
                               ),
                             ),
                           ],
@@ -562,7 +548,34 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
               ),
             ),
-      bottomNavigationBar: _buildBottomBar(),
+      bottomNavigationBar: cart.isLoading || cart.errorMessage != null || cart.isEmpty
+          ? null
+          : _buildBottomBar(),
+    );
+  }
+
+  Widget _buildCartUnavailable(String message, VoidCallback? onRetry) {
+    final theme = AppColors.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.shopping_cart_outlined, size: 56, color: theme.textSecondary),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center),
+            if (onRetry != null) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Coba lagi'),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -575,6 +588,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     String? subtitle,
     Widget? actionWidget,
   }) {
+    final theme = AppColors.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -585,17 +599,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: theme.textPrimary,
                 ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 12, color: theme.textSecondary),
                 ),
               ],
             ],
@@ -608,12 +622,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   /// Chip penanda urutan barang sesuai dengan jumlahnya
   Widget _buildSortControlBadge() {
+    final theme = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -621,7 +636,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           Expanded(
             child: Row(
               children: [
-                const Icon(Icons.sort_rounded, size: 18, color: Color(0xFF2E7D32)),
+                Icon(Icons.sort_rounded, size: 18, color: theme.primaryGreen),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -629,10 +644,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         ? 'Urutan: Jumlah Tersedikit (Naik ↑)'
                         : 'Urutan: Jumlah Terbanyak (Turun ↓)',
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+                      color: theme.textPrimary,
                     ),
                   ),
                 ),
@@ -650,7 +665,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: theme.mutedContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -659,15 +674,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   Icon(
                     _sortAscending ? Icons.arrow_downward : Icons.arrow_upward,
                     size: 14,
-                    color: const Color(0xFF2E7D32),
+                    color: theme.primaryGreen,
                   ),
                   const SizedBox(width: 4),
-                  const Text(
+                  Text(
                     'Ubah Urutan',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2E7D32),
+                      color: theme.primaryGreen,
                     ),
                   ),
                 ],
@@ -684,17 +699,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
   /// 2. Harga (harga satuan dan total per barang)
   /// 3. Jumlah Barang (jumlah & satuan jual)
   Widget _buildCheckoutItemCard(CartItem item, int rank) {
+    final theme = AppColors.of(context);
     final totalPerItem = item.harga * item.jumlah;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: theme.shadowColor,
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -709,7 +725,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             height: 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: rank == 1 ? const Color(0xFF2E7D32) : const Color(0xFFF1F5F9),
+              color: rank == 1 ? theme.primaryGreen : theme.mutedContainer,
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -717,7 +733,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: rank == 1 ? Colors.white : const Color(0xFF475569),
+                color: rank == 1 ? theme.onPrimary : theme.textSecondary,
               ),
             ),
           ),
@@ -728,14 +744,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
+              gradient: LinearGradient(
+                colors: [theme.lightGreen, theme.mutedContainer],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.eco, size: 26, color: Color(0xFF2E7D32)),
+            child: Icon(Icons.eco, size: 26, color: theme.primaryGreen),
           ),
           const SizedBox(width: 12),
 
@@ -747,10 +763,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 // KOMPONEN 1: NAMA BARANG
                 Text(
                   item.nama,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: Color(0xFF1E293B),
+                    color: theme.textPrimary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -760,9 +776,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 // KOMPONEN 2: HARGA SATUAN
                 Text(
                   '${_formatRupiah(item.harga)} / ${item.satuanJual}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF64748B),
+                    color: theme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -770,10 +786,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 // Subtotal harga item
                 Text(
                   _formatRupiah(totalPerItem),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2E7D32),
+                    color: theme.primaryGreen,
                   ),
                 ),
               ],
@@ -784,28 +800,28 @@ class _CheckoutPageState extends State<CheckoutPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: theme.mutedContainer,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
+              border: Border.all(color: theme.borderColor),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Jumlah',
                   style: TextStyle(
                     fontSize: 10,
-                    color: Color(0xFF64748B),
+                    color: theme.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '${item.jumlah} ${item.satuanJual}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: theme.textPrimary,
                   ),
                 ),
               ],
@@ -817,21 +833,26 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildEmptyItemState() {
+    final theme = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
       ),
-      child: const Center(
+      child: Center(
         child: Column(
           children: [
-            Icon(Icons.remove_shopping_cart_outlined, size: 40, color: Color(0xFF94A3B8)),
-            SizedBox(height: 8),
+            Icon(
+              Icons.remove_shopping_cart_outlined,
+              size: 40,
+              color: theme.textSecondary,
+            ),
+            const SizedBox(height: 8),
             Text(
               'Tidak ada barang untuk di-checkout.',
-              style: TextStyle(color: Color(0xFF64748B)),
+              style: TextStyle(color: theme.textSecondary),
             ),
           ],
         ),
@@ -840,12 +861,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildAddressCard() {
+    final theme = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -855,15 +877,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
+                  color: theme.lightGreen,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.location_on, color: Color(0xFF2E7D32), size: 20),
+                child: Icon(
+                  Icons.location_on,
+                  color: theme.primaryGreen,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'Data Penerima & Alamat',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: theme.textPrimary,
+                ),
               ),
             ],
           ),
@@ -922,14 +952,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildDeliveryDateCard() {
+    final theme = AppColors.of(context);
     final dateStr = '${_tanggalAntar.day.toString().padLeft(2, '0')}/${_tanggalAntar.month.toString().padLeft(2, '0')}/${_tanggalAntar.year}';
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -939,20 +970,31 @@ class _CheckoutPageState extends State<CheckoutPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
+                  color: theme.lightGreen,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.calendar_today_rounded, color: Color(0xFF2E7D32), size: 20),
+                child: Icon(
+                  Icons.calendar_today_rounded,
+                  color: theme.primaryGreen,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Tanggal Antar', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  Text(
+                    'Tanggal Antar',
+                    style: TextStyle(fontSize: 12, color: theme.textSecondary),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     dateStr,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: theme.textPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -960,8 +1002,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF2E7D32),
-              side: const BorderSide(color: Color(0xFF2E7D32)),
+              foregroundColor: theme.primaryGreen,
+              side: BorderSide(color: theme.primaryGreen),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
@@ -975,11 +1017,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildCourierSelectionCard() {
+    final theme = AppColors.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
       ),
       child: Column(
         children: _couriers.map((courier) {
@@ -992,7 +1035,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               decoration: BoxDecoration(
                 border: Border(
                   bottom: courier != _couriers.last
-                      ? const BorderSide(color: Color(0xFFF1F5F9))
+                      ? BorderSide(color: theme.borderColor.withValues(alpha: 0.5))
                       : BorderSide.none,
                 ),
               ),
@@ -1000,7 +1043,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 children: [
                   Icon(
                     isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                    color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFF94A3B8),
+                    color: isSelected ? theme.primaryGreen : theme.textSecondary,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1009,7 +1052,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: const Color(0xFF1E293B),
+                        color: theme.textPrimary,
                       ),
                     ),
                   ),
@@ -1018,7 +1061,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFF64748B),
+                      color: isSelected ? theme.primaryGreen : theme.textSecondary,
                     ),
                   ),
                 ],
@@ -1031,11 +1074,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildPaymentMethodCard() {
+    final theme = AppColors.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
       ),
       child: Column(
         children: _paymentMethods.map((pm) {
@@ -1048,7 +1092,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               decoration: BoxDecoration(
                 border: Border(
                   bottom: pm != _paymentMethods.last
-                      ? const BorderSide(color: Color(0xFFF1F5F9))
+                      ? BorderSide(color: theme.borderColor.withValues(alpha: 0.5))
                       : BorderSide.none,
                 ),
               ),
@@ -1056,7 +1100,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 children: [
                   Icon(
                     isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                    color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFF94A3B8),
+                    color: isSelected ? theme.primaryGreen : theme.textSecondary,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1068,14 +1112,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: const Color(0xFF1E293B),
+                            color: theme.textPrimary,
                           ),
                         ),
                         if (pm.deskripsi != null) ...[
                           const SizedBox(height: 2),
                           Text(
                             pm.deskripsi!,
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.textSecondary,
+                            ),
                           ),
                         ],
                       ],
@@ -1091,32 +1138,37 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildPriceSummaryCard() {
+    final theme = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
       ),
       child: Column(
         children: [
           _buildSummaryRow('Subtotal Produk', _formatRupiah(_calculatedSubtotal)),
           const SizedBox(height: 8),
           _buildSummaryRow('Ongkos Kirim (${_selectedCourier?.nama ?? '-'})', _formatRupiah(_ongkir)),
-          const Divider(height: 20, color: Color(0xFFF1F5F9)),
+          Divider(height: 20, color: theme.borderColor.withValues(alpha: 0.5)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Total Pembayaran',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textPrimary,
+                ),
               ),
               Text(
                 _formatRupiah(_totalBayar),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2E7D32),
+                  color: theme.primaryGreen,
                 ),
               ),
             ],
@@ -1127,27 +1179,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildSummaryRow(String label, String value) {
+    final theme = AppColors.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+        Text(label, style: TextStyle(fontSize: 13, color: theme.textSecondary)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: theme.textPrimary,
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildBottomBar() {
+    final theme = AppColors.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.07),
-            offset: const Offset(0, -4),
-            blurRadius: 14,
-          ),
-        ],
+        boxShadow: theme.softShadow,
       ),
       child: SafeArea(
         top: false,
@@ -1164,17 +1219,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Total Pembayaran',
-                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.textSecondary,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           _formatRupiah(_totalBayar),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E293B),
+                            color: theme.textPrimary,
                           ),
                         ),
                       ],
@@ -1183,26 +1241,42 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   const SizedBox(width: 14),
                   FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
+                      backgroundColor: theme.primaryGreen,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                     ),
-                    onPressed: _isSubmitting ? null : _processCheckout,
+                    onPressed: _isSubmitting ||
+                            _isLoadingOptions ||
+                            _selectedCourier == null ||
+                            _selectedPayment == null
+                        ? null
+                        : _processCheckout,
                     child: _isSubmitting
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.onPrimary,
+                            ),
                           )
-                        : const Row(
+                        : Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 'Buat Pesanan',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.onPrimary,
+                                ),
                               ),
                               SizedBox(width: 6),
-                              Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 18,
+                                color: theme.onPrimary,
+                              ),
                             ],
                           ),
                   ),

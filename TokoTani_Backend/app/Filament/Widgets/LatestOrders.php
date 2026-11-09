@@ -15,7 +15,7 @@ class LatestOrders extends TableWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected static ?string $heading = 'Pesanan Terbaru (TokoTani)';
+    protected static ?string $heading = 'Pesanan Terbaru (Tani Mart)';
 
     public function table(Table $table): Table
     {
@@ -54,7 +54,7 @@ class LatestOrders extends TableWidget
             ->recordActions([
                 Action::make('detail')
                     ->label('Detail')
-                    ->url(fn (Order $record): string => OrderResource::getUrl('edit', ['record' => $record])),
+                    ->url(fn (Order $record): string => OrderResource::getUrl('view', ['record' => $record])),
             ]);
     }
 }

@@ -44,7 +44,7 @@ class AppNotificationItem {
       );
 }
 
-/// Service notifikasi reaktif terpusat untuk AgriMart.
+/// Service notifikasi reaktif terpusat untuk Tani Mart.
 /// Menggunakan ValueNotifier agar badge bertambah secara instan
 /// di seluruh layar tanpa memerlukan reload atau refresh halaman.
 class NotificationService {

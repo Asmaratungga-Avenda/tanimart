@@ -95,10 +95,12 @@ class OrderModel {
       namaPenerima: '${json['nama_penerima'] ?? ''}',
       alamatPenerima: '${json['alamat_penerima'] ?? ''}',
       kurirId: int.tryParse('${json['kurir_id'] ?? 0}') ?? 0,
-      courier: courierData is Map ? Courier.fromJson(courierData) : null,
+      courier: courierData is Map
+          ? Courier.fromJson(Map<String, dynamic>.from(courierData))
+          : null,
       paymentMethodId: int.tryParse('${json['payment_method_id'] ?? 0}') ?? 0,
       paymentMethod: paymentData is Map
-          ? PaymentMethod.fromJson(paymentData)
+          ? PaymentMethod.fromJson(Map<String, dynamic>.from(paymentData))
           : null,
       subtotal: int.tryParse('${json['subtotal'] ?? 0}') ?? 0,
       ongkir: int.tryParse('${json['ongkir'] ?? 0}') ?? 0,
@@ -162,7 +164,9 @@ class OrderItemModel {
       hargaSatuan: int.tryParse('${json['harga_satuan'] ?? 0}') ?? 0,
       subtotal: int.tryParse('${json['subtotal'] ?? 0}') ?? 0,
       fotoProduk: foto,
-      product: produk is Map ? Product.fromJson(produk) : null,
+      product: produk is Map
+          ? Product.fromJson(Map<String, dynamic>.from(produk))
+          : null,
     );
   }
 }

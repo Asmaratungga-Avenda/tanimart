@@ -8,6 +8,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -19,11 +20,17 @@ class ProductsTable
     {
         return $table
             ->columns([
+                ImageColumn::make('gambar')
+                    ->label('Thumbnail')
+                    ->disk('public')
+                    ->circular()
+                    ->defaultImageUrl(url('/storage/products/default.jpg')),
                 TextColumn::make('id')->sortable(),
                 TextColumn::make('nama')
-                    ->label('Nama')
+                    ->label('Nama Produk')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->weight('bold'),
                 TextColumn::make('kategori')
                     ->label('Kategori')
                     ->searchable()

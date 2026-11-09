@@ -1,8 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../theme/theme_extension.dart';
 import '../constants/product_images.dart';
 
-/// Widget gambar produk terpadu AgriMart.
+/// Widget gambar produk terpadu Tani Mart.
 /// Mendukung foto lokal (assets/images/products/) dan foto remote dari Laravel API.
 /// Dilengkapi sistem fallback dan placeholder bertema pertanian yang anggun tanpa layout shift.
 class ProductImage extends StatelessWidget {
@@ -41,11 +42,11 @@ class ProductImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
-        placeholder: (context, url) => _buildPlaceholderShimmer(),
-        errorWidget: (context, url, error) => _buildLocalOrPlaceholder(),
+        placeholder: (context, url) => _buildPlaceholderShimmer(context),
+        errorWidget: (context, url, error) => _buildLocalOrPlaceholder(context),
       );
     } else {
-      imageWidget = _buildLocalOrPlaceholder();
+      imageWidget = _buildLocalOrPlaceholder(context);
     }
 
     if (borderRadius != null) {
@@ -58,7 +59,7 @@ class ProductImage extends StatelessWidget {
     return imageWidget;
   }
 
-  Widget _buildLocalOrPlaceholder() {
+  Widget _buildLocalOrPlaceholder(BuildContext context) {
     final assetPath = fallbackAsset ??
         ProductImages.getProductAsset(productName, category: category);
 
@@ -68,34 +69,36 @@ class ProductImage extends StatelessWidget {
       height: height,
       fit: fit,
       errorBuilder: (context, error, stackTrace) {
-        return _buildAgriculturalPlaceholder();
+        return _buildAgriculturalPlaceholder(context);
       },
     );
   }
 
-  Widget _buildPlaceholderShimmer() {
+  Widget _buildPlaceholderShimmer(BuildContext context) {
+    final theme = AppColors.of(context);
     return Container(
       width: width,
       height: height,
-      color: const Color(0xFFF1F5F0),
-      child: const Center(
+      color: theme.mutedContainer,
+      child: Center(
         child: SizedBox(
           width: 22,
           height: 22,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: Color(0xFF2E7D32),
+            color: theme.primaryGreen,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildAgriculturalPlaceholder() {
+  Widget _buildAgriculturalPlaceholder(BuildContext context) {
+    final theme = AppColors.of(context);
     return Container(
       width: width,
       height: height,
-      color: const Color(0xFFE8F5E9),
+      color: theme.lightGreen,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -103,12 +106,12 @@ class ProductImage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                color: theme.primaryGreen.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.eco_rounded,
-                color: Color(0xFF2E7D32),
+                color: theme.primaryGreen,
                 size: 28,
               ),
             ),
@@ -121,10 +124,10 @@ class ProductImage extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2E7D32),
+                    color: theme.primaryGreen,
                   ),
                 ),
               ),
@@ -135,4 +138,3 @@ class ProductImage extends StatelessWidget {
     );
   }
 }
-

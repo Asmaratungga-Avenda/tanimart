@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/theme_extension.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
 import '../widgets/responsive_wrapper.dart';
@@ -56,10 +57,10 @@ class _ProductFormPageState extends State<ProductFormPage> {
     final p = widget.product;
     namaCtrl = TextEditingController(text: p?.nama ?? '');
     hargaCtrl = TextEditingController(text: p != null ? p.harga.toString() : '');
-    kategoriCtrl = TextEditingController(text: p?.kategori ?? 'Sayuran');
-    stokCtrl = TextEditingController(text: p != null ? p.stok.toString() : '10');
+    kategoriCtrl = TextEditingController(text: p?.kategori ?? '');
+    stokCtrl = TextEditingController(text: p?.stok.toString() ?? '');
     deskripsiCtrl = TextEditingController(text: p?.deskripsi ?? '');
-    satuanCtrl = TextEditingController(text: p?.satuanJual ?? 'kg');
+    satuanCtrl = TextEditingController(text: p?.satuanJual ?? '');
     fotoCtrl = TextEditingController(text: p?.foto ?? '');
     tersedia = p?.tersedia ?? true;
     mudahRusak = p?.mudahRusak ?? false;
@@ -86,6 +87,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
   }
 
   Future<void> save() async {
+    final theme = AppColors.of(context);
     // Validasi form sisi klien terlebih dahulu
     if (!formKey.currentState!.validate()) return;
 
@@ -117,7 +119,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: Colors.green.shade700,
+          backgroundColor: theme.primaryGreen,
           content: Text(
             isEdit
                 ? 'Produk "${payload['nama']}" berhasil diperbarui.'
@@ -139,10 +141,10 @@ class _ProductFormPageState extends State<ProductFormPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: Colors.red.shade800,
+            backgroundColor: theme.errorRed,
             content: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                Icon(Icons.warning_amber_rounded, color: theme.onError),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -159,7 +161,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
         // Tampilkan pesan galat lainnya (koneksi, timeout, 500)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: Colors.red.shade800,
+            backgroundColor: theme.errorRed,
             content: Text(e.message),
           ),
         );
@@ -167,9 +169,9 @@ class _ProductFormPageState extends State<ProductFormPage> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.red,
-          content: Text('Terjadi kesalahan jaringan atau server.'),
+        SnackBar(
+          backgroundColor: theme.errorRed,
+          content: const Text('Terjadi kesalahan jaringan atau server.'),
         ),
       );
     } finally {
@@ -179,6 +181,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = AppColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(isEdit ? 'Ubah Produk Pertanian' : 'Tambah Produk Pertanian'),
@@ -195,7 +198,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
               decoration: InputDecoration(
                 labelText: 'Nama Produk Pertanian *',
                 hintText: 'Contoh: Cabai Merah Keriting',
-                prefixIcon: const Icon(Icons.eco, color: Color(0xFF2E7D32)),
+                prefixIcon: Icon(Icons.eco, color: theme.primaryGreen),
                 errorText: fieldErrors['nama'],
               ),
               onChanged: (_) => _clearFieldError('nama'),
@@ -213,10 +216,10 @@ class _ProductFormPageState extends State<ProductFormPage> {
               decoration: InputDecoration(
                 labelText: 'Kategori Produk *',
                 hintText: 'Sayuran / Buah / Beras',
-                prefixIcon: const Icon(Icons.category, color: Color(0xFF2E7D32)),
+                prefixIcon: Icon(Icons.category, color: theme.primaryGreen),
                 errorText: fieldErrors['kategori'],
                 suffixIcon: PopupMenuButton<String>(
-                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                  icon: Icon(Icons.arrow_drop_down, color: theme.textSecondary),
                   tooltip: 'Pilih saran kategori',
                   onSelected: (val) {
                     setState(() {
@@ -242,8 +245,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     padding: const EdgeInsets.only(right: 6),
                     child: ActionChip(
                       label: Text(cat, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: Colors.white,
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      backgroundColor: theme.surfaceColor,
+                      side: BorderSide(color: theme.borderColor),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       onPressed: () {
                         setState(() {
@@ -292,7 +295,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                       hintText: 'kg / ikat / pak',
                       errorText: fieldErrors['satuan_jual'],
                       suffixIcon: PopupMenuButton<String>(
-                        icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF64748B)),
+                        icon: Icon(Icons.arrow_drop_down, color: theme.textSecondary),
                         tooltip: 'Pilih saran satuan',
                         onSelected: (val) {
                           setState(() {
@@ -322,8 +325,8 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     padding: const EdgeInsets.only(right: 6),
                     child: ActionChip(
                       label: Text(sat, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: Colors.white,
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      backgroundColor: theme.surfaceColor,
+                      side: BorderSide(color: theme.borderColor),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       onPressed: () {
                         setState(() {
@@ -345,7 +348,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
               decoration: InputDecoration(
                 labelText: 'Jumlah Stok Tersedia *',
                 hintText: '0 untuk stok habis',
-                prefixIcon: const Icon(Icons.inventory_2_outlined, color: Color(0xFF2E7D32)),
+                prefixIcon: Icon(Icons.inventory_2_outlined, color: theme.primaryGreen),
                 errorText: fieldErrors['stok'],
               ),
               onChanged: (_) => _clearFieldError('stok'),
@@ -365,7 +368,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
               decoration: InputDecoration(
                 labelText: 'Deskripsi Produk (Opsional)',
                 hintText: 'Keterangan mutu panen, cara simpan, dll.',
-                prefixIcon: const Icon(Icons.description_outlined, color: Color(0xFF64748B)),
+                prefixIcon: Icon(Icons.description_outlined, color: theme.textSecondary),
                 errorText: fieldErrors['deskripsi'],
               ),
               onChanged: (_) => _clearFieldError('deskripsi'),
@@ -375,11 +378,11 @@ class _ProductFormPageState extends State<ProductFormPage> {
             // Foto Produk (Opsional / fallback ke aset lokal)
             TextFormField(
               controller: fotoCtrl,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'URL Foto Produk (Opsional)',
                 hintText: 'https://domain.com/foto_produk.jpg',
-                prefixIcon: Icon(Icons.image_outlined, color: Color(0xFF64748B)),
-                helperText: 'Kosongkan untuk otomatis menggunakan aset foto lokal AgriMart',
+                prefixIcon: Icon(Icons.image_outlined, color: theme.textSecondary),
+                helperText: 'Kosongkan untuk otomatis menggunakan aset foto lokal Tani Mart',
                 helperStyle: TextStyle(fontSize: 11),
               ),
             ),
@@ -387,19 +390,19 @@ class _ProductFormPageState extends State<ProductFormPage> {
 
             // Atribut Khas Domain Pertanian: Mudah Rusak
             Material(
-              color: Colors.orange.shade50.withValues(alpha: 0.5),
+              color: theme.warningContainer.withValues(alpha: 0.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: Colors.orange.shade200),
+                side: BorderSide(color: theme.warning),
               ),
               child: SwitchListTile(
                 secondary: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
+                    color: theme.warningContainer,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.access_time_rounded, color: Colors.orange.shade900, size: 20),
+                  child: Icon(Icons.access_time_rounded, color: theme.warning, size: 20),
                 ),
                 title: const Text(
                   'Produk Mudah Rusak (Perishable)',
@@ -410,7 +413,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   style: TextStyle(fontSize: 12),
                 ),
                 value: mudahRusak,
-                activeThumbColor: const Color(0xFF2E7D32),
+                activeThumbColor: theme.primaryGreen,
                 onChanged: (v) => setState(() => mudahRusak = v),
               ),
             ),
@@ -418,21 +421,21 @@ class _ProductFormPageState extends State<ProductFormPage> {
 
             // Status Ketersediaan
             Material(
-              color: Colors.white,
+              color: theme.surfaceColor,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                side: BorderSide(color: theme.borderColor),
               ),
               child: SwitchListTile(
                 secondary: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: tersedia ? const Color(0xFFE8F5E9) : Colors.grey.shade100,
+                    color: tersedia ? theme.lightGreen : theme.mutedContainer,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     tersedia ? Icons.check_circle_rounded : Icons.cancel_outlined,
-                    color: tersedia ? const Color(0xFF2E7D32) : Colors.grey,
+                    color: tersedia ? theme.primaryGreen : theme.textSecondary,
                     size: 20,
                   ),
                 ),
@@ -447,7 +450,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
                   style: const TextStyle(fontSize: 12),
                 ),
                 value: tersedia,
-                activeThumbColor: const Color(0xFF2E7D32),
+                activeThumbColor: theme.primaryGreen,
                 onChanged: (v) => setState(() => tersedia = v),
               ),
             ),
@@ -458,10 +461,10 @@ class _ProductFormPageState extends State<ProductFormPage> {
               height: 50,
               child: FilledButton.icon(
                 icon: saving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: theme.onPrimary),
                       )
                     : const Icon(Icons.save),
                 label: Text(

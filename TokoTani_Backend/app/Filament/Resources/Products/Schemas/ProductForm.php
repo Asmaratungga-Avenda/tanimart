@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Models\Category;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -15,6 +16,15 @@ class ProductForm
     {
         return $schema
             ->components([
+                FileUpload::make('gambar')
+                    ->label('Foto Produk')
+                    ->image()
+                    ->disk('public')
+                    ->directory('products')
+                    ->visibility('public')
+                    ->imagePreviewHeight('200')
+                    ->maxSize(5120)
+                    ->columnSpanFull(),
                 TextInput::make('nama')
                     ->label('Nama Produk')
                     ->required()

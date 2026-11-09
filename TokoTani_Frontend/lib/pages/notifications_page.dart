@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../core/theme/app_theme.dart';
+import '../core/theme/theme_extension.dart';
 import '../services/notification_service.dart';
 import 'order_detail_page.dart';
 
@@ -13,11 +13,6 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  static const _primaryGreen = AppTheme.primaryGreen;
-  static const _lightGreen = AppTheme.lightGreen;
-  static const _textPrimary = AppTheme.textPrimary;
-  static const _textSecondary = AppTheme.textSecondary;
-
   String _formatTime(DateTime time) {
     final now = DateTime.now();
     final diff = now.difference(time);
@@ -30,84 +25,63 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = AppColors.of(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: theme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: _primaryGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: theme.primaryGreen,
+        foregroundColor: theme.onPrimary,
         elevation: 0,
         centerTitle: false,
         title: Text(
           'Notifikasi',
           style: GoogleFonts.poppins(
-            color: Colors.white,
+            color: theme.onPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
         ),
-        actions: [
-          ValueListenableBuilder<int>(
-            valueListenable: NotificationService.unreadCountNotifier,
-            builder: (context, unread, _) {
-              if (unread == 0) return const SizedBox.shrink();
-              return TextButton.icon(
-                onPressed: () {
-                  setState(() {
-                    NotificationService.markAllAsRead();
-                  });
-                },
-                icon: const Icon(Icons.done_all_rounded,
-                    color: Colors.white, size: 18),
-                label: Text(
-                  'Tandai Dibaca',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              );
-            },
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (val) {
-              if (val == 'clear') {
-                setState(() {
-                  NotificationService.clearAll();
-                });
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'clear',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                    SizedBox(width: 8),
-                    Text('Hapus Semua Notifikasi'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
-      body: ValueListenableBuilder<int>(
-        valueListenable: NotificationService.unreadCountNotifier,
-        builder: (context, _, __) {
-          final items = NotificationService.notifications;
-          if (items.isEmpty) {
-            return _buildEmptyState();
+      body: ValueListenableBuilder<List<AppNotificationItem>>(
+        valueListenable: _notificationsListenable,
+        builder: (context, notifications, _) {
+          if (notifications.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.notifications_none, size: 64, color: theme.textSecondary),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tidak Ada Notifikasi',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tidak ada notifikasi terbaru untuk ditampilkan.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
 
           return ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (ctx, i) {
-              final notif = items[i];
-              return _buildNotificationCard(notif);
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            itemCount: notifications.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final notif = notifications[index];
+              return _buildNotificationCard(notif, theme);
             },
           );
         },
@@ -115,181 +89,91 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: _lightGreen,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.notifications_none_rounded,
-                color: _primaryGreen,
-                size: 56,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'Belum Ada Notifikasi',
-              style: GoogleFonts.poppins(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: _textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Pemberitahuan status pesanan dan penawaran terbaik akan muncul di sini secara langsung.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 12.5,
-                color: _textSecondary,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  static ValueNotifier<List<AppNotificationItem>> get _notificationsListenable {
+    return _listenable;
   }
 
-  Widget _buildNotificationCard(AppNotificationItem notif) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          NotificationService.markAsRead(notif.id);
-        });
+  static final _listenable = ValueNotifier<List<AppNotificationItem>>(
+    NotificationService.notifications,
+  );
 
-        if (notif.orderId != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OrderDetailPage(orderId: notif.orderId!),
-            ),
-          );
-        }
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: notif.isRead ? Colors.white : const Color(0xFFF0FDF4),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: notif.isRead
-                ? const Color(0xFFE5E7EB)
-                : _primaryGreen.withValues(alpha: 0.35),
-            width: notif.isRead ? 0.8 : 1.2,
+  Widget _buildNotificationCard(AppNotificationItem notif, AppColors theme) {
+    final isUnread = !notif.isRead;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.surfaceColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.borderColor),
+        boxShadow: theme.softShadow,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(14),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isUnread ? theme.primaryGreen.withValues(alpha: 0.15) : theme.lightGreen,
+            borderRadius: BorderRadius.circular(12),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          child: Icon(
+            notif.type == 'order' ? Icons.receipt_rounded : Icons.info_rounded,
+            color: isUnread ? theme.primaryGreen : theme.textSecondary,
+            size: 24,
+          ),
         ),
-        child: Row(
+        title: Text(
+          notif.title,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: theme.textPrimary,
+          ),
+        ),
+        subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: notif.isRead
-                    ? Colors.grey.shade100
-                    : _primaryGreen.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+            const SizedBox(height: 6),
+            Text(
+              notif.message,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: theme.textSecondary,
+                height: 1.4,
               ),
-              child: Icon(
-                notif.type == 'order'
-                    ? Icons.shopping_bag_rounded
-                    : Icons.notifications_active_rounded,
-                color: notif.isRead ? Colors.grey.shade600 : _primaryGreen,
-                size: 22,
-              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          notif.title,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13.5,
-                            fontWeight: notif.isRead
-                                ? FontWeight.w600
-                                : FontWeight.bold,
-                            color: _textPrimary,
-                          ),
-                        ),
-                      ),
-                      if (!notif.isRead) ...[
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFDC2626),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    notif.message,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: _textSecondary,
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _formatTime(notif.time),
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      if (notif.orderId != null)
-                        Row(
-                          children: [
-                            Text(
-                              'Lihat Detail',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: _primaryGreen,
-                              ),
-                            ),
-                            const Icon(Icons.chevron_right,
-                                size: 14, color: _primaryGreen),
-                          ],
-                        ),
-                    ],
-                  ),
-                ],
+            const SizedBox(height: 8),
+            Text(
+              _formatTime(notif.time),
+              style: GoogleFonts.poppins(
+                fontSize: 10,
+                color: theme.textSecondary.withValues(alpha: 0.7),
               ),
             ),
           ],
         ),
+        trailing: isUnread
+            ? Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: theme.primaryGreen,
+                  shape: BoxShape.circle,
+                ),
+              )
+            : null,
+        onTap: () {
+          if (notif.orderId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OrderDetailPage(orderId: notif.orderId!),
+              ),
+            );
+          }
+          NotificationService.markAsRead(notif.id);
+        },
       ),
     );
   }
 }
-

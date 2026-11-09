@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../core/constants/product_images.dart';
-import '../core/theme/app_theme.dart';
+import '../core/theme/theme_extension.dart';
 import '../core/widgets/product_image.dart';
 import '../models/product.dart';
-import '../services/api_service.dart';
+import '../providers/cart_provider.dart';
+import '../providers/product_provider.dart';
 import '../services/notification_service.dart';
 import 'product_detail_page.dart';
 import 'product_catalog_page.dart';
 
-/// Halaman Beranda AgriMart
+/// Halaman Beranda Tani Mart
 /// Konsep Desain: FRESH MARKET — MODERN AGRICULTURE
 class HomePage extends StatefulWidget {
   final VoidCallback? onGoToCart;
@@ -23,19 +25,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Product> _products = [];
-  bool _isLoading = true;
-  String? _errorMsg;
   int _bannerIndex = 0;
   final PageController _bannerController = PageController();
   Timer? _bannerTimer;
   final TextEditingController _searchController = TextEditingController();
-
-  static const _primaryGreen = AppTheme.primaryGreen;
-  static const _lightGreen = AppTheme.lightGreen;
-  static const _bgColor = AppTheme.background;
-  static const _textPrimary = AppTheme.textPrimary;
-  static const _textSecondary = AppTheme.textSecondary;
 
   final List<Map<String, String>> _banners = [
     {
@@ -86,7 +79,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _fetchProducts();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<ProductProvider>().loadProducts();
+    });
     _startBannerTimer();
   }
 
@@ -106,33 +101,6 @@ class _HomePageState extends State<HomePage> {
         );
       }
     });
-  }
-
-  Future<void> _fetchProducts() async {
-    setState(() {
-      _isLoading = true;
-      _errorMsg = null;
-    });
-    try {
-      final result = await ApiService.getProducts();
-      if (!mounted) return;
-      setState(() {
-        _products = result;
-        _isLoading = false;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMsg = e.message;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _errorMsg = 'Gagal memuat data produk dari server.';
-        _isLoading = false;
-      });
-    }
   }
 
   @override
@@ -157,11 +125,14 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter produk untuk seksi-seksi beranda
+    final theme = AppColors.of(context);
+    final provider = context.watch<ProductProvider>();
+    final products = provider.products;
+
     final featuredProducts =
-        _products.where((p) => p.tersedia && p.stok > 0).take(6).toList();
-    final bestSellingProducts = _products.reversed.take(6).toList();
-    final agriculturalProducts = _products.where((p) {
+        products.where((p) => p.tersedia && p.stok > 0).take(6).toList();
+    final bestSellingProducts = products.reversed.take(6).toList();
+    final agriculturalProducts = products.where((p) {
       final k = p.kategori.toLowerCase();
       final n = p.nama.toLowerCase();
       return k.contains('sayur') ||
@@ -173,7 +144,7 @@ class _HomePageState extends State<HomePage> {
           n.contains('cabai') ||
           n.contains('kangkung');
     }).toList();
-    final dailyNecessities = _products.where((p) {
+    final dailyNecessities = products.where((p) {
       final k = p.kategori.toLowerCase();
       final n = p.nama.toLowerCase();
       return k.contains('sembako') ||
@@ -186,93 +157,82 @@ class _HomePageState extends State<HomePage> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: _bgColor,
+      backgroundColor: theme.backgroundColor,
       body: RefreshIndicator(
-        color: _primaryGreen,
-        onRefresh: _fetchProducts,
+        color: theme.primaryGreen,
+        onRefresh: () => provider.refresh(),
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // 1. Header Greeting & Branding
-            SliverToBoxAdapter(child: _buildGreetingHeader()),
+            SliverToBoxAdapter(child: _buildGreetingHeader(theme)),
+            SliverToBoxAdapter(child: _buildSearchBar(theme)),
+            SliverToBoxAdapter(child: _buildBannerCarousel(theme)),
+            SliverToBoxAdapter(child: _buildCategorySection(theme)),
 
-            // 2. Search Bar
-            SliverToBoxAdapter(child: _buildSearchBar()),
-
-            // 3. Promotional Banners Carousel
-            SliverToBoxAdapter(child: _buildBannerCarousel()),
-
-            // 4. Product Categories
-            SliverToBoxAdapter(child: _buildCategorySection()),
-
-            if (_isLoading)
+            if (provider.isLoading)
               const SliverToBoxAdapter(child: _LoadingSkeleton())
-            else if (_errorMsg != null)
-              SliverToBoxAdapter(child: _buildError())
+            else if (provider.errorMessage != null)
+              SliverToBoxAdapter(child: _buildError(provider.errorMessage!, theme))
             else ...[
-              // 5. Featured Products (Produk Rekomendasi)
               if (featuredProducts.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _buildSectionHeader(
                     'Produk Rekomendasi',
                     Icons.star_rounded,
+                    theme,
                     onSeeAll: widget.onGoToProducts,
                   ),
                 ),
                 SliverToBoxAdapter(
-                  child: _buildProductHorizontalList(featuredProducts),
+                  child: _buildProductHorizontalList(featuredProducts, theme),
                 ),
               ],
-
-              // 6. Best-Selling Products (Produk Terlaris)
               if (bestSellingProducts.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _buildSectionHeader(
                     'Produk Terlaris',
                     Icons.local_fire_department_rounded,
+                    theme,
                     onSeeAll: widget.onGoToProducts,
                   ),
                 ),
                 SliverToBoxAdapter(
-                  child: _buildProductHorizontalList(bestSellingProducts),
+                  child: _buildProductHorizontalList(bestSellingProducts, theme),
                 ),
               ],
-
-              // 7. Agricultural Products (Produk Pertanian & Segar)
               if (agriculturalProducts.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _buildSectionHeader(
                     'Produk Pertanian Segar',
                     Icons.eco_rounded,
+                    theme,
                     onSeeAll: () =>
                         _navigateToCatalog(category: 'Sayuran dan Buah Segar'),
                   ),
                 ),
                 SliverToBoxAdapter(
-                  child: _buildProductHorizontalList(agriculturalProducts),
+                  child: _buildProductHorizontalList(agriculturalProducts, theme),
                 ),
               ],
-
-              // 8. Daily Necessities (Sembako & Kebutuhan Harian)
               if (dailyNecessities.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: _buildSectionHeader(
                     'Kebutuhan Harian & Sembako',
                     Icons.shopping_basket_rounded,
+                    theme,
                     onSeeAll: () => _navigateToCatalog(
                         category: 'Sembako dan Kebutuhan Harian'),
                   ),
                 ),
                 SliverToBoxAdapter(
-                  child: _buildProductHorizontalList(dailyNecessities),
+                  child: _buildProductHorizontalList(dailyNecessities, theme),
                 ),
               ],
-
-              // 9. All Products Grid (Semua Produk)
               SliverToBoxAdapter(
                 child: _buildSectionHeader(
                   'Katalog Lengkap',
                   Icons.grid_view_rounded,
+                  theme,
                   onSeeAll: widget.onGoToProducts,
                 ),
               ),
@@ -287,11 +247,12 @@ class _HomePageState extends State<HomePage> {
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (ctx, i) => _ProductCard(
-                      product: _products[i],
-                      onTap: () => _openDetail(_products[i]),
-                      onAddToCart: () => _addToCart(_products[i]),
+                      product: products[i],
+                      theme: theme,
+                      onTap: () => _openDetail(products[i]),
+                      onAddToCart: () => _addToCart(products[i]),
                     ),
-                    childCount: _products.length,
+                    childCount: products.length,
                   ),
                 ),
               ),
@@ -302,11 +263,17 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildGreetingHeader() {
+  Widget _buildGreetingHeader(AppColors theme) {
+    final foreground = theme.isDark ? theme.textPrimary : theme.onPrimary;
     return Container(
-      decoration: const BoxDecoration(
-        color: _primaryGreen,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: theme.isDark
+              ? [theme.backgroundColor, theme.surfaceColor]
+              : [theme.primaryGreen, theme.scheme.secondary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       child: Column(
@@ -319,9 +286,9 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Selamat Datang di AgriMart 👋',
+                      'Selamat Datang di Tani Mart 👋',
                       style: GoogleFonts.poppins(
-                        color: Colors.white,
+                        color: foreground,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -330,7 +297,7 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       'Kebutuhan Pertanian dan Harian dalam Satu Genggaman',
                       style: GoogleFonts.poppins(
-                        color: Colors.white.withValues(alpha: 0.88),
+                        color: foreground.withValues(alpha: 0.88),
                         fontSize: 11.5,
                       ),
                     ),
@@ -343,12 +310,12 @@ class _HomePageState extends State<HomePage> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: foreground.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.shopping_cart_outlined,
-                    color: Colors.white,
+                    color: foreground,
                     size: 22,
                   ),
                 ),
@@ -360,21 +327,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(AppColors theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.surfaceColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          border: Border.all(color: theme.borderColor),
+          boxShadow: theme.softShadow,
         ),
         child: TextField(
           controller: _searchController,
@@ -384,15 +345,16 @@ class _HomePageState extends State<HomePage> {
               _navigateToCatalog(query: query.trim());
             }
           },
+          style: GoogleFonts.poppins(color: theme.textPrimary),
           decoration: InputDecoration(
             hintText: 'Cari produk pertanian atau kebutuhan harian...',
             hintStyle: GoogleFonts.poppins(
-              color: _textSecondary,
+              color: theme.textSecondary,
               fontSize: 12.5,
             ),
-            prefixIcon: const Icon(Icons.search, color: _primaryGreen, size: 22),
+            prefixIcon: Icon(Icons.search, color: theme.primaryGreen, size: 22),
             suffixIcon: IconButton(
-              icon: const Icon(Icons.tune_rounded, color: _primaryGreen, size: 20),
+              icon: Icon(Icons.tune_rounded, color: theme.primaryGreen, size: 20),
               tooltip: 'Buka Katalog & Filter',
               onPressed: () => _navigateToCatalog(
                 query: _searchController.text.trim().isEmpty
@@ -401,7 +363,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: theme.surfaceColor,
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
@@ -412,7 +374,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildBannerCarousel() {
+  Widget _buildBannerCarousel(AppColors theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       child: Column(
@@ -431,13 +393,7 @@ class _HomePageState extends State<HomePage> {
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      boxShadow: theme.softShadow,
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(18),
@@ -448,22 +404,24 @@ class _HomePageState extends State<HomePage> {
                             b['image']!,
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => Container(
-                              color: _primaryGreen,
-                              child: const Center(
-                                child: Icon(Icons.agriculture_rounded,
-                                    color: Colors.white, size: 40),
+                              color: theme.primaryGreen,
+                              child: Center(
+                                child: Icon(
+                                  Icons.agriculture_rounded,
+                                  color: theme.onImage,
+                                  size: 40,
+                                ),
                               ),
                             ),
                           ),
-                          // Subtle dark overlay for text contrast
                           Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.centerLeft,
                                 end: Alignment.centerRight,
                                 colors: [
-                                  Colors.black.withValues(alpha: 0.65),
-                                  Colors.black.withValues(alpha: 0.15),
+                                  theme.imageOverlayStrong,
+                                  theme.imageOverlay.withValues(alpha: 0.15),
                                 ],
                               ),
                             ),
@@ -478,13 +436,13 @@ class _HomePageState extends State<HomePage> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF59E0B),
+                                    color: theme.accentOrange,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    'AGRIMART PROMO',
+                                    'TANI MART PROMO',
                                     style: GoogleFonts.poppins(
-                                      color: Colors.white,
+                                      color: theme.onPrimary,
                                       fontSize: 9.5,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -494,7 +452,7 @@ class _HomePageState extends State<HomePage> {
                                 Text(
                                   b['title']!,
                                   style: GoogleFonts.poppins(
-                                    color: Colors.white,
+                                    color: theme.onImage,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     height: 1.25,
@@ -504,7 +462,7 @@ class _HomePageState extends State<HomePage> {
                                 Text(
                                   b['subtitle']!,
                                   style: GoogleFonts.poppins(
-                                    color: Colors.white.withValues(alpha: 0.9),
+                                    color: theme.onImage.withValues(alpha: 0.9),
                                     fontSize: 11,
                                   ),
                                   maxLines: 1,
@@ -532,7 +490,7 @@ class _HomePageState extends State<HomePage> {
                 width: _bannerIndex == i ? 18 : 6,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: _bannerIndex == i ? _primaryGreen : Colors.grey.shade300,
+                  color: _bannerIndex == i ? theme.primaryGreen : theme.borderColor,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -543,7 +501,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildCategorySection() {
+  Widget _buildCategorySection(AppColors theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -557,7 +515,7 @@ class _HomePageState extends State<HomePage> {
                 style: GoogleFonts.poppins(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: _textPrimary,
+                  color: theme.textPrimary,
                 ),
               ),
               InkWell(
@@ -567,7 +525,7 @@ class _HomePageState extends State<HomePage> {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: _primaryGreen,
+                    color: theme.primaryGreen,
                   ),
                 ),
               ),
@@ -593,25 +551,19 @@ class _HomePageState extends State<HomePage> {
                       height: 58,
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: theme.surfaceColor,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        border: Border.all(color: theme.borderColor),
+                        boxShadow: theme.softShadow,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: Image.asset(
                           cat['image']!,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, _, _) => const Icon(
+                          errorBuilder: (_, _, _) => Icon(
                             Icons.category_rounded,
-                            color: _primaryGreen,
+                            color: theme.primaryGreen,
                             size: 26,
                           ),
                         ),
@@ -628,7 +580,7 @@ class _HomePageState extends State<HomePage> {
                         style: GoogleFonts.poppins(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w500,
-                          color: _textPrimary,
+                          color: theme.textPrimary,
                           height: 1.15,
                         ),
                       ),
@@ -643,26 +595,32 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon,
+  Widget _buildSectionHeader(String title, IconData icon, AppColors theme,
       {VoidCallback? onSeeAll}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: _primaryGreen, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: _textPrimary,
+          Expanded(
+            child: Row(
+              children: [
+                Icon(icon, color: theme.primaryGreen, size: 20),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: theme.textPrimary,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           if (onSeeAll != null)
             InkWell(
@@ -672,7 +630,7 @@ class _HomePageState extends State<HomePage> {
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: _primaryGreen,
+                  color: theme.primaryGreen,
                 ),
               ),
             ),
@@ -681,13 +639,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildProductHorizontalList(List<Product> products) {
+  Widget _buildProductHorizontalList(List<Product> products, AppColors theme) {
     if (products.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 50,
         child: Center(
           child: Text('Belum ada produk untuk kategori ini.',
-              style: TextStyle(color: Colors.grey, fontSize: 12)),
+              style: TextStyle(color: theme.textSecondary, fontSize: 12)),
         ),
       );
     }
@@ -703,6 +661,7 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: _ProductCard(
               product: products[i],
+              theme: theme,
               onTap: () => _openDetail(products[i]),
               onAddToCart: () => _addToCart(products[i]),
               compact: true,
@@ -713,21 +672,25 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildError() {
+  Widget _buildError(String message, AppColors theme) {
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          const Icon(Icons.wifi_off_rounded, size: 52, color: Colors.grey),
+          Icon(
+            Icons.wifi_off_rounded,
+            size: 52,
+            color: theme.textSecondary,
+          ),
           const SizedBox(height: 12),
           Text(
-            _errorMsg ?? 'Gagal memuat produk dari server.',
+            message,
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(color: Colors.grey, fontSize: 13),
+            style: GoogleFonts.poppins(color: theme.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: _fetchProducts,
+            onPressed: () => context.read<ProductProvider>().refresh(),
             icon: const Icon(Icons.refresh, size: 18),
             label: const Text('Coba Lagi'),
           ),
@@ -740,40 +703,55 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ProductDetailPage(product: product),
+        builder: (_) => ProductDetailPage(
+          productId: product.id,
+          initialProduct: product,
+        ),
       ),
     );
   }
 
   void _addToCart(Product product) async {
+    final theme = AppColors.of(context);
     if (!product.tersedia || product.stok <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Produk tidak tersedia atau stok telah habis.'),
-          backgroundColor: Colors.red,
+          backgroundColor: theme.errorRed,
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
     try {
-      await ApiService.addCart(product.id, 1);
-      NotificationService.cartCountNotifier.value++;
+      final success = await context.read<CartProvider>().addItem(product.id, 1);
+      if (!mounted) return;
+      if (success) {
+        NotificationService.cartCountNotifier.value++;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.nama} berhasil masuk ke keranjang! 🛒'),
+            backgroundColor: theme.primaryGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      } else {
+        final error = context.read<CartProvider>().errorMessage;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error ?? 'Gagal menambahkan ke keranjang.'),
+            backgroundColor: theme.errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${product.nama} berhasil masuk ke keranjang! 🛒'),
-          backgroundColor: _primaryGreen,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: Colors.red,
+          content: Text('Terjadi kesalahan jaringan: $error'),
+          backgroundColor: theme.errorRed,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -781,23 +759,19 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// ───────── Product Card Widget ─────────
-
 class _ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback onTap;
   final VoidCallback onAddToCart;
   final bool compact;
-
-  static const _primaryGreen = AppTheme.primaryGreen;
-  static const _textPrimary = AppTheme.textPrimary;
-  static const _textSecondary = AppTheme.textSecondary;
+  final AppColors theme;
 
   const _ProductCard({
     required this.product,
     required this.onTap,
     required this.onAddToCart,
     this.compact = false,
+    required this.theme,
   });
 
   String _formatRupiah(int value) {
@@ -812,21 +786,14 @@ class _ProductCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.surfaceColor,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          border: Border.all(color: theme.borderColor, width: 0.8),
+          boxShadow: theme.softShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image area with 1:1 Aspect Ratio per Section 8
             AspectRatio(
               aspectRatio: 1.0,
               child: ClipRRect(
@@ -843,12 +810,12 @@ class _ProductCard extends StatelessWidget {
                     ),
                     if (!isAvailable)
                       Container(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        child: const Center(
+                        color: theme.imageOverlay,
+                        child: Center(
                           child: Text(
                             'Stok Habis',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: theme.onImage,
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -863,13 +830,13 @@ class _ProductCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF59E0B),
+                            color: theme.accentOrange,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Segar',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: theme.onPrimary,
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
                             ),
@@ -880,8 +847,6 @@ class _ProductCard extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Info details
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -892,7 +857,7 @@ class _ProductCard extends StatelessWidget {
                       product.kategori,
                       style: GoogleFonts.poppins(
                         fontSize: 9.5,
-                        color: _primaryGreen,
+                        color: theme.primaryGreen,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -904,7 +869,7 @@ class _ProductCard extends StatelessWidget {
                       style: GoogleFonts.poppins(
                         fontSize: compact ? 12 : 13,
                         fontWeight: FontWeight.w600,
-                        color: _textPrimary,
+                        color: theme.textPrimary,
                         height: 1.2,
                       ),
                       maxLines: 2,
@@ -920,7 +885,7 @@ class _ProductCard extends StatelessWidget {
                           style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: _primaryGreen,
+                            color: theme.primaryGreen,
                           ),
                         ),
                         const SizedBox(width: 3),
@@ -928,7 +893,7 @@ class _ProductCard extends StatelessWidget {
                           '/${product.satuanJual}',
                           style: GoogleFonts.poppins(
                             fontSize: 9.5,
-                            color: _textSecondary,
+                            color: theme.textSecondary,
                           ),
                         ),
                       ],
@@ -940,8 +905,8 @@ class _ProductCard extends StatelessWidget {
                       child: FilledButton(
                         onPressed: isAvailable ? onAddToCart : null,
                         style: FilledButton.styleFrom(
-                          backgroundColor: _primaryGreen,
-                          disabledBackgroundColor: Colors.grey.shade200,
+            backgroundColor: AppColors.of(context).primaryGreen,
+                          disabledBackgroundColor: theme.borderColor,
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -956,8 +921,8 @@ class _ProductCard extends StatelessWidget {
                                   : Icons.remove_shopping_cart_outlined,
                               size: 13,
                               color: isAvailable
-                                  ? Colors.white
-                                  : Colors.grey.shade500,
+                                  ? theme.onPrimary
+                                  : theme.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -966,8 +931,8 @@ class _ProductCard extends StatelessWidget {
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: isAvailable
-                                    ? Colors.white
-                                    : Colors.grey.shade500,
+                                    ? theme.onPrimary
+                                    : theme.textSecondary,
                               ),
                             ),
                           ],
@@ -990,16 +955,17 @@ class _LoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = AppColors.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           const SizedBox(height: 20),
-          const CircularProgressIndicator(color: AppTheme.primaryGreen),
+          CircularProgressIndicator(color: theme.primaryGreen),
           const SizedBox(height: 12),
           Text(
-            'Memuat produk segar AgriMart...',
-            style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+            'Memuat produk segar Tani Mart...',
+            style: GoogleFonts.poppins(color: theme.textSecondary, fontSize: 12),
           ),
           const SizedBox(height: 40),
         ],

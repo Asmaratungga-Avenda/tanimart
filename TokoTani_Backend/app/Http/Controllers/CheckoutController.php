@@ -7,11 +7,13 @@ use App\Models\Courier;
 use App\Models\Order;
 use App\Models\PaymentMethod;
 use App\Models\Product;
+use App\Jobs\DeliverOrderSimulation;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
@@ -117,7 +119,7 @@ class CheckoutController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'status' => 'required|string|in:menunggu_pembayaran,dibayar,diproses,dikirim,selesai,dibatalkan',
+            'status' => 'required|string|in:menunggu_pembayaran,diproses,dikirim,tiba,selesai,dibatalkan',
         ]);
 
         if ($validator->fails()) {
@@ -137,6 +139,153 @@ class CheckoutController extends Controller
             'sukses',
             200,
             'Status pesanan berhasil diperbarui',
+            $order->load(['items.product', 'courier', 'paymentMethod'])
+        );
+    }
+
+    /**
+     * POST /api/pesanan/{id}/pembayaran
+     * Pelanggan Konfirmasi pembayaran. Hanya boleh dilakukan oleh pemilik pesanan
+     * dan hanya ketika status masih menunggu_pembayaran.
+     * Setelah diverifikasi server, status berubah menjadi diproses.
+     */
+    public function pembayaran(Request $request, $id)
+    {
+        $customerId = $this->getCustomerId($request);
+
+        $order = Order::find($id);
+
+        if (! $order) {
+            return $this->jsonResponse('gagal', 404, 'Pesanan tidak ditemukan');
+        }
+
+        // Hanya pemilik pesanan yang boleh konfirmasi pembayaran.
+        if ((int) $order->customer_id !== $customerId) {
+            return $this->jsonResponse('gagal', 403, 'Anda bukan pemilik pesanan ini.');
+        }
+
+        if ($order->status !== 'menunggu_pembayaran') {
+            return $this->jsonResponse(
+                'gagal',
+                409,
+                'Pembayaran hanya dapat dikonfirmasi pada pesanan yang masih menunggu pembayaran.'
+            );
+        }
+
+        $validator = Validator::make($request->all(), [
+            'payment_method_id' => 'sometimes|required|integer|exists:payment_methods,id',
+            'payment_reference' => 'sometimes|nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->jsonResponse('gagal', 422, 'Validasi gagal', null, $validator->errors());
+        }
+
+        $order->update([
+            'status' => 'diproses',
+            'payment_status' => 'lunas',
+            'payment_method_id' => $validator->validated()['payment_method_id'] ?? $order->payment_method_id,
+        ]);
+
+        if (filled($validator->validated()['payment_reference'] ?? null)) {
+            $order->update(['payment_reference' => $validator->validated()['payment_reference']]);
+        }
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Pembayaran berhasil diverifikasi. Pesanan sekarang diproses.',
+            $order->load(['items.product', 'courier', 'paymentMethod'])
+        );
+    }
+
+    /**
+     * POST /api/pesanan/{id}/kirim
+     * Admin kirim pesanan. Hanya boleh dilakukan admin dan hanya ketika status diproses.
+     * Setelah dikirim, simulasi pengiriman berjalan di backend (Laravel Queue).
+     */
+    public function kirim(Request $request, $id)
+    {
+        // Autorisasi admin melalui header X-Role atau X-Pelanggan-Role.
+        $role = $request->header('X-Role')
+            ?: $request->header('X-Pelanggan-Role')
+            ?: $request->input('role');
+
+        if (strtolower((string) $role) !== 'admin') {
+            return $this->jsonResponse('gagal', 403, 'Hanya admin yang boleh mengirim pesanan.');
+        }
+
+        $order = Order::find($id);
+
+        if (! $order) {
+            return $this->jsonResponse('gagal', 404, 'Pesanan tidak ditemukan');
+        }
+
+        if ($order->status !== 'diproses') {
+            return $this->jsonResponse(
+                'gagal',
+                409,
+                'Pesanan hanya dapat dikirim ketika statusnya diproses.'
+            );
+        }
+
+        $seconds = Config::get('delivery.seconds', 5);
+        $enabled = Config::get('delivery.enabled', true);
+
+        $order->update([
+            'status' => 'dikirim',
+            'dikirim_at' => now(),
+        ]);
+
+        if ($enabled) {
+            DeliverOrderSimulation::dispatch($order->id)->delay(now()->addSeconds($seconds));
+        }
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Pesanan berhasil dikirim. Pengiruman akan tiba dalam simulasi.',
+            $order->load(['items.product', 'courier', 'paymentMethod'])
+        );
+    }
+
+    /**
+     * POST /api/pesanan/{id}/selesai
+     * Pelanggan menyelesaikan pesanan. Hanya boleh dilakukan oleh pemilik pesanan
+     * dan hanya ketika status sudah tiba.
+     */
+    public function selesai(Request $request, $id)
+    {
+        $customerId = $this->getCustomerId($request);
+
+        $order = Order::find($id);
+
+        if (! $order) {
+            return $this->jsonResponse('gagal', 404, 'Pesanan tidak ditemukan');
+        }
+
+        // Hanya pemilik pesanan yang boleh menyelesaikan pesanan miliknya sendiri.
+        if ((int) $order->customer_id !== $customerId) {
+            return $this->jsonResponse('gagal', 403, 'Anda bukan pemilik pesanan ini.');
+        }
+
+        if ($order->status !== 'tiba') {
+            return $this->jsonResponse(
+                'gagal',
+                409,
+                'Pesanan hanya dapat diselesaikan setelah status pesanan tiba.'
+            );
+        }
+
+        $order->update([
+            'status' => 'selesai',
+            'selesai_at' => now(),
+        ]);
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Pesanan selesai. Terima kasih telah berbelanja di TaniMart.',
             $order->load(['items.product', 'courier', 'paymentMethod'])
         );
     }
@@ -265,16 +414,18 @@ class CheckoutController extends Controller
                 $ongkir = $kurir->tarif;
 
                 $order = Order::create([
-                    'nama_penerima' => $validated['nama_penerima'],
-                    'alamat_penerima' => $validated['alamat_penerima'],
-                    'kurir_id' => $validated['kurir_id'],
+                    'customer_id'       => $customerId,
+                    'nama_penerima'     => $validated['nama_penerima'],
+                    'alamat_penerima'   => $validated['alamat_penerima'],
+                    'kurir_id'          => $validated['kurir_id'],
                     'payment_method_id' => $validated['payment_method_id'],
-                    'subtotal' => $subtotal,
-                    'ongkir' => $ongkir,
-                    'total_harga' => $subtotal + $ongkir,
-                    'status' => 'menunggu_pembayaran',
-                    'idempotency_key' => $idempotencyKey,
-                    'tanggal_antar' => $validated['tanggal_antar'],
+                    'subtotal'          => $subtotal,
+                    'ongkir'            => $ongkir,
+                    'total_harga'       => $subtotal + $ongkir,
+                    'status'            => 'menunggu_pembayaran',
+                    'payment_status'    => 'belum_bayar',
+                    'idempotency_key'   => $idempotencyKey,
+                    'tanggal_antar'     => $validated['tanggal_antar'],
                 ]);
 
                 $order->items()->createMany($orderItems);

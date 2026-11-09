@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Order extends Model
 {
     protected $fillable = [
+        'customer_id',
         'nama_penerima',
         'alamat_penerima',
         'kurir_id',
@@ -17,7 +18,11 @@ class Order extends Model
         'ongkir',
         'total_harga',
         'status',
+        'payment_status',
         'tanggal_antar',
+        'dikirim_at',
+        'tiba_at',
+        'selesai_at',
         'idempotency_key',
     ];
 
@@ -28,6 +33,10 @@ class Order extends Model
             'ongkir' => 'integer',
             'total_harga' => 'integer',
             'tanggal_antar' => 'date:Y-m-d',
+            'dikirim_at' => 'datetime',
+            'tiba_at' => 'datetime',
+            'selesai_at' => 'datetime',
+            'payment_status' => 'string',
         ];
     }
 
@@ -62,6 +71,11 @@ class Order extends Model
     public function kurir(): BelongsTo
     {
         return $this->belongsTo(Courier::class, 'kurir_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'customer_id');
     }
 
     public function paymentMethod(): BelongsTo

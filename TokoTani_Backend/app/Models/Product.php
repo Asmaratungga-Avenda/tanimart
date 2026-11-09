@@ -6,10 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
     use HasFactory;
+
+    protected $appends = ['gambar_url'];
 
     // Melindungi kolom id agar tidak bisa diisi sembarang, sisanya mass-assignable
     protected $guarded = ['id'];
@@ -22,6 +26,7 @@ class Product extends Model
             'category_id' => 'integer',
             'tersedia' => 'boolean',
             'mudah_rusak' => 'boolean',
+            'gambar' => 'string',
         ];
     }
 
@@ -34,9 +39,27 @@ class Product extends Model
         });
     }
 
+    public function getGambarUrlAttribute(): ?string
+    {
+        if (! $this->gambar) {
+            return null;
+        }
+
+        if (Str::startsWith($this->gambar, ['http://', 'https://'])) {
+            return $this->gambar;
+        }
+
+        return Storage::disk('public')->url($this->gambar);
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function productImages(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order', 'asc');
     }
 
     public function orderItems(): HasMany

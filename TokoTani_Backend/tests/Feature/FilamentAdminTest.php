@@ -38,12 +38,13 @@ class FilamentAdminTest extends TestCase
         $this->actingAs($user)->get('/admin/products')->assertSuccessful();
         $this->actingAs($user)->get('/admin/categories')->assertSuccessful();
         $this->actingAs($user)->get('/admin/orders')->assertSuccessful();
+        $this->actingAs($user)->get('/admin/banners')->assertSuccessful();
         $this->actingAs($user)->get('/admin/couriers')->assertSuccessful();
         $this->actingAs($user)->get('/admin/payment-methods')->assertSuccessful();
         $this->actingAs($user)->get('/admin/users')->assertSuccessful();
     }
 
-    public function test_order_edit_page_renders_with_items_relation(): void
+    public function test_order_view_page_renders_with_items_relation(): void
     {
         $user = User::factory()->create();
         $product = Product::create([
@@ -78,7 +79,7 @@ class FilamentAdminTest extends TestCase
             'subtotal' => 60000,
         ]);
 
-        $response = $this->actingAs($user)->get("/admin/orders/{$order->id}/edit");
+        $response = $this->actingAs($user)->get("/admin/orders/{$order->id}");
 
         $response->assertSuccessful();
     }
@@ -139,5 +140,84 @@ class FilamentAdminTest extends TestCase
 
         // Karena stok 0, hook booted saving harus otomatis memaksa tersedia = false
         $this->assertFalse($product->fresh()->tersedia);
+    }
+
+    public function test_unpaid_order_cannot_be_shipped(): void
+    {
+        $courier = Courier::create(['nama' => 'JNE', 'tarif' => 10000]);
+        $payment = PaymentMethod::create(['nama' => 'Transfer']);
+
+        $order = Order::create([
+            'nama_penerima' => 'Ahmad',
+            'alamat_penerima' => 'Jl. Mawar 1',
+            'kurir_id' => $courier->id,
+            'payment_method_id' => $payment->id,
+            'subtotal' => 20000,
+            'ongkir' => 10000,
+            'total_harga' => 30000,
+            'status' => 'menunggu_pembayaran',
+            'payment_status' => 'belum_bayar',
+            'tanggal_antar' => now()->toDateString(),
+        ]);
+
+        $response = $this->withHeader('X-Role', 'admin')->postJson("/api/pesanan/{$order->id}/kirim");
+
+        $response->assertStatus(409);
+    }
+
+    public function test_shipping_order_workflow_with_delivery_simulation(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $courier = Courier::create(['nama' => 'JNE Express', 'tarif' => 10000]);
+        $payment = PaymentMethod::create(['nama' => 'QRIS']);
+
+        $order = Order::create([
+            'customer_id' => 1,
+            'nama_penerima' => 'Budi',
+            'alamat_penerima' => 'Jl. Delima',
+            'kurir_id' => $courier->id,
+            'payment_method_id' => $payment->id,
+            'subtotal' => 25000,
+            'ongkir' => 10000,
+            'total_harga' => 35000,
+            'status' => 'diproses',
+            'payment_status' => 'lunas',
+            'tanggal_antar' => now()->toDateString(),
+        ]);
+
+        $response = $this->withHeader('X-Role', 'admin')->postJson("/api/pesanan/{$order->id}/kirim");
+        $response->assertOk();
+
+        $this->assertEquals('dikirim', $order->fresh()->status);
+        $this->assertNotNull($order->fresh()->dikirim_at);
+
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\DeliverOrderSimulation::class);
+    }
+
+    public function test_customer_can_complete_order_when_status_is_tiba(): void
+    {
+        $courier = Courier::create(['nama' => 'JNE Speed', 'tarif' => 10000]);
+        $payment = PaymentMethod::create(['nama' => 'QRIS Pay']);
+
+        $order = Order::create([
+            'customer_id' => 1,
+            'nama_penerima' => 'Budi',
+            'alamat_penerima' => 'Jl. Delima',
+            'kurir_id' => $courier->id,
+            'payment_method_id' => $payment->id,
+            'subtotal' => 25000,
+            'ongkir' => 10000,
+            'total_harga' => 35000,
+            'status' => 'tiba',
+            'payment_status' => 'lunas',
+            'tanggal_antar' => now()->toDateString(),
+        ]);
+
+        $response = $this->withHeader('X-Pelanggan-Id', '1')->postJson("/api/pesanan/{$order->id}/selesai");
+        $response->assertOk();
+
+        $this->assertEquals('selesai', $order->fresh()->status);
+        $this->assertNotNull($order->fresh()->selesai_at);
     }
 }

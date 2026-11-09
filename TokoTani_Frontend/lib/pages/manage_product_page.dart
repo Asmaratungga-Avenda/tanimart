@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/theme_extension.dart';
 import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
@@ -33,7 +34,9 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
   @override
   void initState() {
     super.initState();
-    loadProducts();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) loadProducts();
+    });
   }
 
   @override
@@ -57,7 +60,9 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
     try {
       final result = await ApiService.getProducts(
         kategori: selectedKategori == 'Semua' ? null : selectedKategori,
-        cari: searchController.text.trim().isEmpty ? null : searchController.text.trim(),
+        cari: searchController.text.trim().isEmpty
+            ? null
+            : searchController.text.trim(),
       );
 
       if (!mounted) return;
@@ -98,14 +103,15 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
 
   /// Menghapus produk dengan konfirmasi dialog dan penanganan galat 409
   Future<void> deleteProduct(Product product) async {
+    final theme = AppColors.of(context);
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Hapus Produk'),
+            Icon(Icons.warning_amber_rounded, color: theme.errorRed),
+            const SizedBox(width: 8),
+            const Text('Hapus Produk'),
           ],
         ),
         content: Text(
@@ -118,7 +124,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
             child: const Text('Batal'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: theme.errorRed),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Hapus'),
           ),
@@ -133,7 +139,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: Colors.green.shade700,
+          backgroundColor: theme.primaryGreen,
           content: Text('Produk "${product.nama}" berhasil dihapus.'),
         ),
       );
@@ -157,18 +163,15 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.red.shade800,
-            content: Text(e.message),
-          ),
+          SnackBar(backgroundColor: theme.errorRed, content: Text(e.message)),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.red,
-            content: Text('Gagal menghapus produk. Periksa koneksi.'),
+          SnackBar(
+            backgroundColor: theme.errorRed,
+            content: const Text('Gagal menghapus produk. Periksa koneksi.'),
           ),
         );
       }
@@ -208,8 +211,9 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
   }
 
   Widget _buildFilterSection() {
+    final theme = AppColors.of(context);
     return Container(
-      color: Colors.white,
+      color: theme.surfaceColor,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Column(
         children: [
@@ -219,8 +223,8 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'Cari produk pertanian...',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-              prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
+              hintStyle: TextStyle(color: theme.textSecondary, fontSize: 14),
+              prefixIcon: Icon(Icons.search, color: theme.textSecondary),
               suffixIcon: searchController.text.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, size: 18),
@@ -231,19 +235,22 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                     )
                   : null,
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              fillColor: theme.backgroundColor,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 0,
+              ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                borderSide: BorderSide(color: theme.borderColor),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                borderSide: BorderSide(color: theme.borderColor),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 1.5),
+                borderSide: BorderSide(color: theme.primaryGreen, width: 1.5),
               ),
             ),
             onSubmitted: (_) => loadProducts(),
@@ -261,15 +268,21 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                     label: Text(cat),
                     selected: isSelected,
                     showCheckmark: false,
-                    backgroundColor: Colors.white,
-                    selectedColor: const Color(0xFF2E7D32),
+                    backgroundColor: theme.surfaceColor,
+                    selectedColor: theme.primaryGreen,
                     side: BorderSide(
-                      color: isSelected ? const Color(0xFF2E7D32) : const Color(0xFFE2E8F0),
+                      color: isSelected
+                          ? theme.primaryGreen
+                          : theme.borderColor,
                     ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : const Color(0xFF475569),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected ? theme.onPrimary : theme.textPrimary,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                       fontSize: 13,
                     ),
                     onSelected: (val) {
@@ -287,6 +300,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
   }
 
   Widget _buildBody() {
+    final theme = AppColors.of(context);
     switch (state) {
       case KeadaanMuat.memuat:
         return const Center(
@@ -307,17 +321,21 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade400),
+                Icon(
+                  Icons.inventory_2_outlined,
+                  size: 64,
+                  color: theme.textSecondary,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Belum Ada Produk Pertanian',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Tidak ada produk yang cocok dengan pencarian/kategori yang dipilih, atau belum ada produk yang ditambahkan.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black54),
+                  style: TextStyle(color: theme.textSecondary),
                 ),
                 const SizedBox(height: 20),
                 Wrap(
@@ -365,6 +383,7 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
   }
 
   Widget _buildErrorState() {
+    final theme = AppColors.of(context);
     IconData icon = Icons.cloud_off_rounded;
     String title = 'Terjadi Kesalahan';
     String message = lastError?.message ?? 'Gagal memuat produk dari server.';
@@ -395,11 +414,18 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: Colors.red.shade400),
+            Icon(icon, size: 64, color: theme.errorRed),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.textPrimary),
+            ),
             const SizedBox(height: 20),
             FilledButton.icon(
               icon: const Icon(Icons.refresh),
@@ -413,20 +439,21 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
   }
 
   Widget _buildProductCard(Product p) {
+    final theme = AppColors.of(context);
     final isStokHabis = p.stok <= 0;
     final isTidakTersedia = !p.tersedia;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isStokHabis ? Colors.red.shade100 : const Color(0xFFE2E8F0),
+          color: isStokHabis ? theme.errorContainer : theme.borderColor,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: theme.shadowColor,
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -469,7 +496,9 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: isStokHabis ? Colors.grey.shade700 : const Color(0xFF1E293B),
+                                color: isStokHabis
+                                    ? theme.textSecondary
+                                    : theme.textPrimary,
                               ),
                             ),
                           ),
@@ -481,15 +510,17 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                           Text(
                             formatRupiah(p.harga),
                             style: TextStyle(
-                              color: isStokHabis ? Colors.grey : const Color(0xFF2E7D32),
+                              color: isStokHabis
+                                  ? theme.textSecondary
+                                  : theme.primaryGreen,
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
                             ),
                           ),
                           Text(
                             ' / ${p.satuanJual}',
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
+                            style: TextStyle(
+                              color: theme.textSecondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -498,16 +529,19 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                       ),
                       const SizedBox(height: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
+                          color: theme.mutedContainer,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           p.kategori,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF475569),
+                            color: theme.textPrimary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -518,21 +552,30 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
 
                 // Menu Cepat Ubah & Hapus dengan Icon Ergonomis
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Color(0xFF64748B)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  icon: Icon(Icons.more_vert, color: theme.textSecondary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 3,
                   onSelected: (action) {
                     if (action == 'edit') openForm(p);
                     if (action == 'delete') deleteProduct(p);
                   },
-                  itemBuilder: (_) => const [
+                  itemBuilder: (_) => [
                     PopupMenuItem(
                       value: 'edit',
                       child: Row(
                         children: [
-                          Icon(Icons.edit_outlined, size: 20, color: Color(0xFF2563EB)),
-                          SizedBox(width: 10),
-                          Text('Ubah Produk', style: TextStyle(fontWeight: FontWeight.w500)),
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 20,
+                            color: theme.info,
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Ubah Produk',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
                         ],
                       ),
                     ),
@@ -540,9 +583,19 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                          SizedBox(width: 10),
-                          Text('Hapus Produk', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                          Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: theme.errorRed,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Hapus Produk',
+                            style: TextStyle(
+                              color: theme.errorRed,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -559,29 +612,42 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
               children: [
                 // Badge Stok
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: isStokHabis ? Colors.red.shade50 : const Color(0xFFE8F5E9),
+                    color: isStokHabis
+                        ? theme.errorContainer
+                        : theme.lightGreen,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isStokHabis ? Colors.red.shade200 : const Color(0xFFA5D6A7),
+                      color: isStokHabis ? theme.errorRed : theme.primaryGreen,
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isStokHabis ? Icons.warning_amber_rounded : Icons.inventory_2_outlined,
+                        isStokHabis
+                            ? Icons.warning_amber_rounded
+                            : Icons.inventory_2_outlined,
                         size: 13,
-                        color: isStokHabis ? Colors.red.shade800 : const Color(0xFF1B5E20),
+                        color: isStokHabis
+                            ? theme.errorRed
+                            : theme.primaryGreen,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isStokHabis ? 'STOK HABIS (0)' : 'Stok: ${p.stok} ${p.satuanJual}',
+                        isStokHabis
+                            ? 'STOK HABIS (0)'
+                            : 'Stok: ${p.stok} ${p.satuanJual}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: isStokHabis ? Colors.red.shade800 : const Color(0xFF1B5E20),
+                          color: isStokHabis
+                              ? theme.errorRed
+                              : theme.primaryGreen,
                         ),
                       ),
                     ],
@@ -591,38 +657,52 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                 // Penanda Ketersediaan
                 if (isTidakTersedia)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
                     ),
-                    child: const Text(
+                    decoration: BoxDecoration(
+                      color: theme.mutedContainer,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: theme.borderColor),
+                    ),
+                    child: Text(
                       'TIDAK AKTIF',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: theme.textSecondary,
+                      ),
                     ),
                   ),
 
                 // Atribut Khas Pertanian TokoTani: Mudah Rusak
                 if (p.mudahRusak)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: theme.warningContainer,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade200),
+                      border: Border.all(color: theme.warning),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.access_time_rounded, size: 13, color: Colors.orange.shade900),
+                        Icon(
+                          Icons.access_time_rounded,
+                          size: 13,
+                          color: theme.warning,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'MUDAH RUSAK',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade900,
+                            color: theme.warning,
                           ),
                         ),
                       ],
@@ -635,7 +715,11 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
               const SizedBox(height: 8),
               Text(
                 p.deskripsi!,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.3),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: theme.textSecondary,
+                  height: 1.3,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),

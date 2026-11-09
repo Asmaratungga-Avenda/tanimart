@@ -1,36 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../core/theme/app_theme.dart';
+import 'package:provider/provider.dart';
+import '../core/theme/theme_extension.dart';
 import '../core/widgets/product_image.dart';
 import '../models/product.dart';
-import '../services/api_service.dart';
+import '../providers/cart_provider.dart';
+import '../providers/product_provider.dart';
 import '../services/notification_service.dart';
 import 'product_detail_page.dart';
 
 class ProductCatalogPage extends StatefulWidget {
   final String? initialCategory;
   final String? initialQuery;
+  final bool showBackButton;
 
-  const ProductCatalogPage({super.key, this.initialCategory, this.initialQuery});
+  const ProductCatalogPage({
+    super.key,
+    this.initialCategory,
+    this.initialQuery,
+    this.showBackButton = false,
+  });
 
   @override
   State<ProductCatalogPage> createState() => _ProductCatalogPageState();
 }
 
 class _ProductCatalogPageState extends State<ProductCatalogPage> {
-  List<Product> _products = [];
-  bool _isLoading = true;
-  String? _errorMsg;
-
-  String _selectedCategory = 'Semua';
-  String _sortBy = 'default';
-  late final TextEditingController _searchController;
   String _searchQuery = '';
-
-  static const _primaryGreen = AppTheme.primaryGreen;
-  static const _lightGreen = AppTheme.lightGreen;
-  static const _textPrimary = AppTheme.textPrimary;
-  static const _textSecondary = AppTheme.textSecondary;
+  late final TextEditingController _searchController;
 
   final List<String> _categories = [
     'Semua',
@@ -51,57 +48,19 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     _searchQuery = widget.initialQuery ?? '';
     _searchController = TextEditingController(text: _searchQuery);
 
-    if (widget.initialCategory != null) {
-      final match = _categories.firstWhere(
-        (c) => c.toLowerCase().contains(
-            widget.initialCategory!.toLowerCase().replaceAll(' & ', ' ')),
-        orElse: () => 'Semua',
-      );
-      _selectedCategory = match;
-    }
-    _loadProducts();
-  }
-
-  Future<void> _loadProducts() async {
-    setState(() {
-      _isLoading = true;
-      _errorMsg = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.initialCategory != null) {
+        final match = _categories.firstWhere(
+          (category) => category.toLowerCase().contains(
+            widget.initialCategory!.toLowerCase().replaceAll(' & ', ' '),
+          ),
+          orElse: () => 'Semua',
+        );
+        context.read<ProductProvider>().setCategory(match);
+      }
+      _loadProducts();
     });
-    try {
-      final result = await ApiService.getProducts(
-        kategori: _selectedCategory == 'Semua' ? null : _selectedCategory,
-        cari: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
-      );
-      if (!mounted) return;
-      setState(() {
-        _products = result;
-        _isLoading = false;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMsg = e.message;
-        _isLoading = false;
-      });
-    }
-  }
-
-  List<Product> get _sortedProducts {
-    final list = List<Product>.from(_products);
-    switch (_sortBy) {
-      case 'price_asc':
-        list.sort((a, b) => a.harga.compareTo(b.harga));
-        break;
-      case 'price_desc':
-        list.sort((a, b) => b.harga.compareTo(a.harga));
-        break;
-      case 'name':
-        list.sort((a, b) => a.nama.compareTo(b.nama));
-        break;
-      default:
-        break;
-    }
-    return list;
   }
 
   @override
@@ -110,28 +69,55 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     super.dispose();
   }
 
+  Future<void> _loadProducts({String? sortBy}) async {
+    final provider = context.read<ProductProvider>();
+    await provider.loadProducts(
+      kategori: provider.selectedCategory == 'Semua'
+          ? null
+          : provider.selectedCategory,
+      cari: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
+      sortBy: sortBy,
+    );
+  }
+
+  List<Product> get _sortedProducts {
+    final provider = context.read<ProductProvider>();
+    return provider.products;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = AppColors.of(context);
+    final provider = context.watch<ProductProvider>();
+    final selectedCategory = provider.selectedCategory ?? 'Semua';
+    final products = _sortedProducts;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9F6),
+      backgroundColor: theme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: _primaryGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: theme.surfaceColor,
+        foregroundColor: theme.textPrimary,
         elevation: 0,
+        leading: widget.showBackButton
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
         title: Text(
           'Produk',
           style: GoogleFonts.poppins(
-            color: Colors.white,
+            color: theme.textPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
         ),
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.sort, color: Colors.white),
+            icon: Icon(Icons.sort, color: theme.textPrimary),
             tooltip: 'Urutkan',
-            onSelected: (value) {
-              setState(() => _sortBy = value);
+            onSelected: (value) async {
+              await _loadProducts(sortBy: value);
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'default', child: Text('Default')),
@@ -144,26 +130,26 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
       ),
       body: Column(
         children: [
-          _buildSearchAndFilter(),
-          _buildCategoryChips(),
-          Expanded(child: _buildBody()),
+          _buildSearchAndFilter(theme, selectedCategory),
+          _buildCategoryChips(theme, selectedCategory),
+          Expanded(child: _buildBody(provider, products, theme)),
         ],
       ),
     );
   }
 
-  Widget _buildSearchAndFilter() {
+  Widget _buildSearchAndFilter(AppColors theme, String selectedCategory) {
     return Container(
-      color: _primaryGreen,
+      color: theme.primaryGreen,
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: TextField(
         controller: _searchController,
-        style: GoogleFonts.poppins(fontSize: 14, color: _textPrimary),
+        style: GoogleFonts.poppins(fontSize: 14, color: theme.textPrimary),
         decoration: InputDecoration(
           hintText: 'Cari produk...',
-          hintStyle: GoogleFonts.poppins(color: _textSecondary, fontSize: 14),
+          hintStyle: GoogleFonts.poppins(color: theme.textSecondary, fontSize: 14),
           prefixIcon:
-              const Icon(Icons.search, color: Color(0xFF2E7D32), size: 20),
+              Icon(Icons.search, color: theme.primaryGreen, size: 20),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 18),
@@ -175,7 +161,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                 )
               : null,
           filled: true,
-          fillColor: Colors.white,
+          fillColor: theme.surfaceColor,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           border: OutlineInputBorder(
@@ -198,10 +184,10 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     );
   }
 
-  Widget _buildCategoryChips() {
+  Widget _buildCategoryChips(AppColors theme, String selectedCategory) {
     return Container(
       height: 48,
-      color: Colors.white,
+      color: theme.surfaceColor,
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -209,7 +195,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
         itemCount: _categories.length,
         itemBuilder: (ctx, i) {
           final cat = _categories[i];
-          final isSelected = _selectedCategory == cat;
+          final isSelected = selectedCategory == cat;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
@@ -219,19 +205,19 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                   fontSize: 12,
                   fontWeight:
                       isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected ? _primaryGreen : _textSecondary,
+                  color: isSelected ? theme.primaryGreen : theme.textSecondary,
                 ),
               ),
               selected: isSelected,
-              onSelected: (_) {
-                setState(() => _selectedCategory = cat);
-                _loadProducts();
+              onSelected: (_) async {
+                context.read<ProductProvider>().setCategory(cat);
+                await _loadProducts();
               },
-              backgroundColor: Colors.white,
-              selectedColor: _lightGreen,
-              checkmarkColor: _primaryGreen,
+              backgroundColor: theme.surfaceColor,
+              selectedColor: theme.lightGreen,
+              checkmarkColor: theme.primaryGreen,
               side: BorderSide(
-                color: isSelected ? _primaryGreen : Colors.grey.shade300,
+                color: isSelected ? theme.primaryGreen : theme.borderColor,
               ),
               shape:
                   RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -244,25 +230,26 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     );
   }
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: _primaryGreen),
+  Widget _buildBody(ProductProvider provider, List<Product> sorted, AppColors theme) {
+    if (provider.isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: theme.primaryGreen),
       );
     }
-    if (_errorMsg != null) {
+
+    if (provider.errorMessage != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.wifi_off_rounded, size: 60, color: Colors.grey),
+              Icon(Icons.wifi_off_rounded, size: 60, color: theme.textSecondary),
               const SizedBox(height: 12),
               Text(
-                _errorMsg!,
+                provider.errorMessage!,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(color: _textSecondary),
+                style: GoogleFonts.poppins(color: theme.textSecondary),
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
@@ -275,7 +262,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
         ),
       );
     }
-    final sorted = _sortedProducts;
+
     if (sorted.isEmpty) {
       return Center(
         child: Column(
@@ -288,13 +275,13 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
               style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: _textPrimary),
+                  color: theme.textPrimary),
             ),
             const SizedBox(height: 6),
             Text(
               'Coba kata kunci atau kategori lain',
               style:
-                  GoogleFonts.poppins(fontSize: 13, color: _textSecondary),
+                  GoogleFonts.poppins(fontSize: 13, color: theme.textSecondary),
             ),
           ],
         ),
@@ -302,7 +289,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     }
 
     return RefreshIndicator(
-      color: _primaryGreen,
+      color: theme.primaryGreen,
       onRefresh: _loadProducts,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -314,7 +301,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
               child: Text(
                 '${sorted.length} produk ditemukan',
                 style: GoogleFonts.poppins(
-                    fontSize: 12, color: _textSecondary),
+                    fontSize: 12, color: theme.textSecondary),
               ),
             ),
             Expanded(
@@ -328,10 +315,14 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                 itemCount: sorted.length,
                 itemBuilder: (ctx, i) => _CatalogProductCard(
                   product: sorted[i],
+                  theme: theme,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ProductDetailPage(product: sorted[i]),
+                      builder: (_) => ProductDetailPage(
+                        productId: sorted[i].id,
+                        initialProduct: sorted[i],
+                      ),
                     ),
                   ),
                   onAddToCart: () => _addToCart(sorted[i]),
@@ -347,32 +338,43 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
   void _addToCart(Product product) async {
     if (!product.tersedia || product.stok == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('Produk tidak tersedia atau stok habis.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.of(context).errorRed,
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
     try {
-      await ApiService.addCart(product.id, 1);
-      NotificationService.cartCountNotifier.value++;
+      final success = await context.read<CartProvider>().addItem(product.id, 1);
+      if (!mounted) return;
+      if (success) {
+        NotificationService.cartCountNotifier.value++;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.nama} ditambahkan ke keranjang 🛒'),
+            backgroundColor: AppColors.of(context).primaryGreen,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      } else {
+        final error = context.read<CartProvider>().errorMessage;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error ?? 'Gagal menambahkan ke keranjang.'),
+            backgroundColor: AppColors.of(context).errorRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${product.nama} ditambahkan ke keranjang 🛒'),
-          backgroundColor: _primaryGreen,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: Colors.red,
+          content: Text('Terjadi kesalahan jaringan.'),
+          backgroundColor: AppColors.of(context).errorRed,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -384,13 +386,11 @@ class _CatalogProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback onTap;
   final VoidCallback onAddToCart;
-
-  static const _primaryGreen = AppTheme.primaryGreen;
-  static const _textPrimary = AppTheme.textPrimary;
-  static const _textSecondary = AppTheme.textSecondary;
+  final AppColors theme;
 
   const _CatalogProductCard({
     required this.product,
+    required this.theme,
     required this.onTap,
     required this.onAddToCart,
   });
@@ -406,16 +406,10 @@ class _CatalogProductCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.surfaceColor,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE5E7EB), width: 0.8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
+          border: Border.all(color: theme.borderColor, width: 0.8),
+          boxShadow: theme.softShadow,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,12 +430,12 @@ class _CatalogProductCard extends StatelessWidget {
                     ),
                     if (!isAvailable)
                       Container(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        child: const Center(
+                        color: theme.imageOverlay,
+                        child: Center(
                           child: Text(
                             'Stok Habis',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: theme.onPrimary,
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
@@ -456,13 +450,13 @@ class _CatalogProductCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF59E0B),
+                            color: theme.accentOrange,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Segar',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onTertiary,
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
                             ),
@@ -483,7 +477,7 @@ class _CatalogProductCard extends StatelessWidget {
                       product.kategori,
                       style: GoogleFonts.poppins(
                         fontSize: 9.5,
-                        color: _primaryGreen,
+                        color: theme.primaryGreen,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -495,7 +489,7 @@ class _CatalogProductCard extends StatelessWidget {
                       style: GoogleFonts.poppins(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: _textPrimary,
+                        color: theme.textPrimary,
                         height: 1.2,
                       ),
                       maxLines: 2,
@@ -511,7 +505,7 @@ class _CatalogProductCard extends StatelessWidget {
                           style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: _primaryGreen,
+                            color: theme.primaryGreen,
                           ),
                         ),
                         const SizedBox(width: 3),
@@ -519,7 +513,7 @@ class _CatalogProductCard extends StatelessWidget {
                           '/${product.satuanJual}',
                           style: GoogleFonts.poppins(
                             fontSize: 9.5,
-                            color: _textSecondary,
+                            color: theme.textSecondary,
                           ),
                         ),
                       ],
@@ -528,7 +522,7 @@ class _CatalogProductCard extends StatelessWidget {
                       'Stok: ${product.stok}',
                       style: GoogleFonts.poppins(
                         fontSize: 9.5,
-                        color: _textSecondary,
+                        color: theme.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -538,8 +532,8 @@ class _CatalogProductCard extends StatelessWidget {
                       child: FilledButton(
                         onPressed: isAvailable ? onAddToCart : null,
                         style: FilledButton.styleFrom(
-                          backgroundColor: _primaryGreen,
-                          disabledBackgroundColor: Colors.grey.shade200,
+                          backgroundColor: theme.primaryGreen,
+                          disabledBackgroundColor: theme.borderColor,
                           padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -551,8 +545,8 @@ class _CatalogProductCard extends StatelessWidget {
                             fontSize: 10.5,
                             fontWeight: FontWeight.w600,
                             color: isAvailable
-                                ? Colors.white
-                                : Colors.grey.shade500,
+                                ? theme.onPrimary
+                                : theme.textSecondary,
                           ),
                         ),
                       ),
@@ -567,4 +561,3 @@ class _CatalogProductCard extends StatelessWidget {
     );
   }
 }
-

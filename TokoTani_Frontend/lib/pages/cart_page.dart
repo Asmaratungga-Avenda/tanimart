@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../core/theme/theme_extension.dart';
 import '../models/cart_item.dart';
-import '../services/api_service.dart';
+import '../providers/cart_provider.dart';
 import '../widgets/responsive_wrapper.dart';
-import 'catalog_page.dart';
+import 'product_catalog_page.dart';
 import 'checkout_page.dart';
 
 class CartPage extends StatefulWidget {
@@ -20,107 +22,39 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
-  // 4 Keadaan Layar wajib sesuai Kriteria 7
-  KeadaanMuat state = KeadaanMuat.memuat;
-  List<CartItem> items = [];
-  int subtotal = 0; // Wajib dari server, dilarang dihitung ulang di Flutter!
-  ApiException? lastError;
-  bool isProcessing = false;
-
   @override
   void initState() {
     super.initState();
-    loadCart();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<CartProvider>().loadCart();
+    });
   }
 
   String formatRupiah(int value) {
     return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
   }
 
-  /// Membaca isi keranjang dan subtotal langsung dari server
-  Future<void> loadCart() async {
-    setState(() {
-      state = KeadaanMuat.memuat;
-      lastError = null;
-    });
-
-    try {
-      final result = await ApiService.getCart();
-      if (!mounted) return;
-
-      setState(() {
-        items = result.items;
-        // Nilai subtotal murni dari server (Sumber Kebenaran Tunggal / Single Source of Truth)
-        subtotal = result.subtotal;
-        state = items.isEmpty ? KeadaanMuat.kosong : KeadaanMuat.berhasil;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        lastError = e;
-        state = KeadaanMuat.galat;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        lastError = const ApiException(
-          statusCode: 500,
-          message: 'Terjadi gangguan yang tidak terduga.',
-          errorType: ApiErrorType.other,
-        );
-        state = KeadaanMuat.galat;
-      });
-    }
-  }
-
-  /// Mengubah jumlah item di keranjang dengan penanganan galat 409 (stok tidak cukup)
   Future<void> changeQuantity(CartItem item, int newQuantity) async {
-    if (isProcessing) return;
     if (newQuantity < 1) return;
-
-    setState(() => isProcessing = true);
-
-    try {
-      await ApiService.updateCart(item.id, newQuantity);
-      // Muat ulang keranjang dari server agar data konsisten
-      await loadCart();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      // Penanganan galat 409 (Bentrok keadaan / Stok tidak cukup) dari server
-      if (e.errorType == ApiErrorType.conflict || e.statusCode == 409) {
-        _showWarningNotification(
-          title: 'Stok Tidak Mencukupi (409)',
-          message: e.message,
-        );
-      } else if (e.errorType == ApiErrorType.validation || e.statusCode == 422) {
-        _showWarningNotification(
-          title: 'Validasi Gagal (422)',
-          message: e.message,
-        );
-      } else {
-        _showErrorNotification(e.message);
-      }
-    } catch (_) {
-      if (mounted) {
-        _showErrorNotification('Gagal memperbarui jumlah barang. Periksa koneksi.');
-      }
-    } finally {
-      if (mounted) setState(() => isProcessing = false);
+    final cartProvider = context.read<CartProvider>();
+    final success = await cartProvider.updateItem(item.id, newQuantity);
+    if (!mounted) return;
+    if (!success) {
+      final error = cartProvider.errorMessage;
+      _showErrorNotification(error ?? 'Gagal memperbarui jumlah barang.');
     }
   }
 
-  /// Menghapus item dari keranjang dengan dialog konfirmasi terlebih dahulu
   Future<void> removeItem(CartItem item) async {
-    if (isProcessing) return;
-
+    final cartProvider = context.read<CartProvider>();
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.delete_outline, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Hapus Item'),
+            Icon(Icons.delete_outline, color: AppColors.of(ctx).errorRed),
+            const SizedBox(width: 8),
+            const Text('Hapus Item'),
           ],
         ),
         content: Text('Apakah Anda yakin ingin menghapus "${item.nama}" dari keranjang?'),
@@ -130,7 +64,9 @@ class _CartPageState extends State<CartPage> {
             child: const Text('Batal'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.of(ctx).errorRed,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Hapus'),
           ),
@@ -140,41 +76,34 @@ class _CartPageState extends State<CartPage> {
 
     if (confirm != true) return;
 
-    setState(() => isProcessing = true);
-
-    try {
-      await ApiService.deleteCart(item.id);
-      await loadCart();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: const Color(0xFF2E7D32),
-            content: Text('"${item.nama}" berhasil dihapus dari keranjang.'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } on ApiException catch (e) {
-      if (mounted) _showErrorNotification(e.message);
-    } catch (_) {
-      if (mounted) _showErrorNotification('Gagal menghapus item dari keranjang.');
-    } finally {
-      if (mounted) setState(() => isProcessing = false);
+    final success = await cartProvider.removeItem(item.id);
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.of(context).primaryGreen,
+          content: Text('"${item.nama}" berhasil dihapus dari keranjang.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      final error = cartProvider.errorMessage;
+      _showErrorNotification(error ?? 'Gagal menghapus item dari keranjang.');
     }
   }
 
-  /// Mengosongkan seluruh keranjang belanja
   Future<void> clearAllItems() async {
-    if (isProcessing || items.isEmpty) return;
+    final cartProvider = context.read<CartProvider>();
+    if (cartProvider.isLoading || cartProvider.isEmpty) return;
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.delete_sweep_outlined, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Kosongkan Keranjang'),
+            Icon(Icons.delete_sweep_outlined, color: AppColors.of(ctx).errorRed),
+            const SizedBox(width: 8),
+            const Text('Kosongkan Keranjang'),
           ],
         ),
         content: const Text('Hapus semua produk dari keranjang belanja?'),
@@ -184,7 +113,9 @@ class _CartPageState extends State<CartPage> {
             child: const Text('Batal'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.of(ctx).errorRed,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Kosongkan'),
           ),
@@ -194,58 +125,31 @@ class _CartPageState extends State<CartPage> {
 
     if (confirm != true) return;
 
-    setState(() => isProcessing = true);
-    try {
-      for (final item in items) {
-        await ApiService.deleteCart(item.id);
-      }
-      await loadCart();
-    } catch (_) {
-      await loadCart();
-    } finally {
-      if (mounted) setState(() => isProcessing = false);
-    }
-  }
-
-  void _showWarningNotification({required String title, required String message}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.orange.shade900,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-        content: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(message, style: const TextStyle(color: Colors.white)),
-                ],
-              ),
-            ),
-          ],
+    final success = await cartProvider.clearCart();
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.of(context).primaryGreen,
+          content: Text('Keranjang berhasil dikosongkan.'),
+          duration: const Duration(seconds: 2),
         ),
-      ),
-    );
+      );
+    } else {
+      _showErrorNotification(
+        cartProvider.errorMessage ?? 'Gagal mengosongkan keranjang.',
+      );
+    }
   }
 
   void _showErrorNotification(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        backgroundColor: Colors.red.shade800,
+        backgroundColor: AppColors.of(context).errorRed,
         behavior: SnackBarBehavior.floating,
         content: Row(
           children: [
-            const Icon(Icons.error_outline, color: Colors.white),
+            Icon(Icons.error_outline, color: AppColors.of(context).onPrimary),
             const SizedBox(width: 10),
             Expanded(child: Text(message)),
           ],
@@ -256,16 +160,19 @@ class _CartPageState extends State<CartPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = AppColors.of(context);
+    final cart = context.watch<CartProvider>();
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF5),
+      backgroundColor: theme.backgroundColor,
       appBar: AppBar(
         title: const Text(
           'Keranjang Belanja',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1E293B),
+        backgroundColor: theme.surfaceColor,
+        foregroundColor: theme.textPrimary,
         elevation: 0.5,
         leading: widget.showBackButton
             ? IconButton(
@@ -274,151 +181,143 @@ class _CartPageState extends State<CartPage> {
               )
             : null,
         actions: [
-          if (items.isNotEmpty)
+          if (cart.items.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              icon: Icon(Icons.delete_outline, color: theme.errorRed),
               tooltip: 'Kosongkan Keranjang',
-              onPressed: isProcessing ? null : clearAllItems,
+              onPressed: cart.isLoading ? null : clearAllItems,
             ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF2E7D32)),
+            icon: Icon(Icons.refresh, color: theme.primaryGreen),
             tooltip: 'Segarkan Keranjang',
-            onPressed: isProcessing ? null : loadCart,
+            onPressed: cart.isLoading ? null : () => cart.loadCart(),
           ),
         ],
       ),
-      body: ResponsiveScrollWrapper(child: _buildBody()),
-      bottomNavigationBar: state == KeadaanMuat.berhasil ? _buildBottomBar() : null,
+      body: ResponsiveScrollWrapper(child: _buildBody(cart, theme)),
+      bottomNavigationBar: cart.isLoading ||
+              cart.errorMessage != null ||
+              cart.items.isEmpty
+          ? null
+          : _buildBottomBar(cart, theme),
     );
   }
 
-  Widget _buildBody() {
-    switch (state) {
-      case KeadaanMuat.memuat:
-        return const Center(
+  Widget _buildBody(CartProvider cart, AppColors theme) {
+    if (cart.isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: theme.primaryGreen),
+      );
+    }
+
+    if (cart.errorMessage != null) {
+      return _buildErrorState(cart.errorMessage!, theme);
+    }
+
+    if (cart.items.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: Color(0xFF2E7D32)),
-              SizedBox(height: 16),
-              Text('Memuat isi keranjang dari server...'),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: theme.lightGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.shopping_cart_outlined,
+                  size: 64,
+                  color: theme.primaryGreen,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Keranjang Belanja Kosong',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Belum ada produk hasil tani segar di keranjang Anda.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.textSecondary),
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.primaryGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.storefront_outlined),
+                label: const Text('Mulai Belanja Produk Segar'),
+                onPressed: () {
+                  if (widget.onGoToCatalog != null) {
+                    widget.onGoToCatalog!();
+                  } else if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ProductCatalogPage()),
+                    );
+                  }
+                },
+              ),
             ],
           ),
-        );
-
-      case KeadaanMuat.kosong:
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE8F5E9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.shopping_cart_outlined, size: 64, color: Color(0xFF2E7D32)),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Keranjang Belanja Kosong',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Belum ada produk hasil tani segar di keranjang Anda.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  icon: const Icon(Icons.storefront_outlined),
-                  label: const Text('Mulai Belanja Produk Segar'),
-                  onPressed: () {
-                    if (widget.onGoToCatalog != null) {
-                      widget.onGoToCatalog!();
-                    } else if (Navigator.canPop(context)) {
-                      Navigator.pop(context);
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CatalogPage(showBackButton: true)),
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-
-      case KeadaanMuat.galat:
-        return _buildErrorState();
-
-      case KeadaanMuat.berhasil:
-        return RefreshIndicator(
-          onRefresh: loadCart,
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return _buildCartCard(item);
-            },
-          ),
-        );
+        ),
+      );
     }
+
+    return RefreshIndicator(
+      onRefresh: () => cart.loadCart(),
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        itemCount: cart.items.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final item = cart.items[index];
+          return _buildCartCard(item, theme);
+        },
+      ),
+    );
   }
 
-  Widget _buildErrorState() {
-    IconData icon = Icons.error_outline;
-    String title = 'Terjadi Kesalahan';
-    String message = lastError?.message ?? 'Tidak dapat memuat keranjang belanja.';
-
-    if (lastError != null) {
-      switch (lastError!.errorType) {
-        case ApiErrorType.connection:
-          icon = Icons.wifi_off_rounded;
-          title = 'Sambungan Gagal';
-          break;
-        case ApiErrorType.timeout:
-          icon = Icons.timer_off_outlined;
-          title = 'Batas Waktu Terlampaui';
-          break;
-        case ApiErrorType.server:
-          icon = Icons.dns_outlined;
-          title = 'Gangguan Server (500)';
-          break;
-        default:
-          icon = Icons.cloud_off_rounded;
-          break;
-      }
-    }
-
+  Widget _buildErrorState(String message, AppColors theme) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: Colors.red.shade400),
+            Icon(Icons.error_outline, size: 64, color: theme.errorRed),
             const SizedBox(height: 16),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'Terjadi Kesalahan',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: theme.textPrimary,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: theme.textSecondary),
+            ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
+              style: FilledButton.styleFrom(backgroundColor: theme.primaryGreen),
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
-              onPressed: loadCart,
+              onPressed: () => context.read<CartProvider>().loadCart(),
             ),
           ],
         ),
@@ -438,68 +337,47 @@ class _CartPageState extends State<CartPage> {
     return item.mudahRusak ? Icons.local_florist_rounded : Icons.eco_rounded;
   }
 
-  List<Color> _getItemGradient(CartItem item) {
-    final lower = item.nama.toLowerCase();
-    if (lower.contains('beras') || lower.contains('padi')) {
-      return const [Color(0xFFFFF9C4), Color(0xFFFFF176)];
-    }
-    if (lower.contains('cabai') || lower.contains('bawang') || lower.contains('bumbu') || lower.contains('rempah')) {
-      return const [Color(0xFFFFEBEE), Color(0xFFFFCDD2)];
-    }
-    if (lower.contains('sayur') || lower.contains('bayam') || lower.contains('kangkung')) {
-      return const [Color(0xFFE8F5E9), Color(0xFFC8E6C9)];
-    }
-    if (lower.contains('buah') || lower.contains('pisang') || lower.contains('jeruk')) {
-      return const [Color(0xFFFFF3E0), Color(0xFFFFCC80)];
-    }
-    return const [Color(0xFFE0F2F1), Color(0xFFB2DFDB)];
+  List<Color> _getItemGradient(AppColors theme) {
+    return [theme.lightGreen, theme.mutedContainer];
   }
 
-  Color _getItemAccent(CartItem item) {
-    final lower = item.nama.toLowerCase();
-    if (lower.contains('beras')) return const Color(0xFFF57F17);
-    if (lower.contains('cabai') || lower.contains('bawang')) return const Color(0xFFD32F2F);
-    if (lower.contains('buah')) return const Color(0xFFE65100);
-    return const Color(0xFF2E7D32);
+  Color _getItemAccent(CartItem item, AppColors theme) {
+    return item.mudahRusak ? theme.warning : theme.primaryGreen;
   }
 
-  Widget _buildCartCard(CartItem item) {
+  Widget _buildCartCard(CartItem item, AppColors theme) {
     final itemTotal = item.harga * item.jumlah;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        border: Border.all(color: theme.borderColor),
+        boxShadow: theme.softShadow,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gambar / Thumbnail Produk Tematik
           Container(
             width: 72,
             height: 72,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: _getItemGradient(item),
+                colors: _getItemGradient(theme),
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(_getItemIcon(item), size: 36, color: _getItemAccent(item)),
+            child: Icon(
+              _getItemIcon(item),
+              size: 36,
+              color: _getItemAccent(item, theme),
+            ),
           ),
           const SizedBox(width: 14),
 
-          // Detail Produk
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,10 +391,10 @@ class _CartPageState extends State<CartPage> {
                         children: [
                           Text(
                             item.nama,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: Color(0xFF1E293B),
+                              color: theme.textPrimary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -524,8 +402,8 @@ class _CartPageState extends State<CartPage> {
                           const SizedBox(height: 3),
                           Text(
                             '${formatRupiah(item.harga)} / ${item.satuanJual}',
-                            style: const TextStyle(
-                              color: Color(0xFF2E7D32),
+                            style: TextStyle(
+                              color: theme.primaryGreen,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
@@ -535,21 +413,23 @@ class _CartPageState extends State<CartPage> {
                               margin: const EdgeInsets.only(top: 4),
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
+                                color: theme.warningContainer,
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.orange.shade200),
+                                border: Border.all(
+                                  color: theme.warning.withValues(alpha: 0.4),
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.bolt, size: 10, color: Colors.orange.shade900),
+                                  Icon(Icons.bolt, size: 10, color: theme.warning),
                                   const SizedBox(width: 2),
                                   Text(
                                     'Wajib Instan/Same-Day',
                                     style: TextStyle(
                                       fontSize: 9,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.orange.shade900,
+                                      color: theme.warning,
                                     ),
                                   ),
                                 ],
@@ -562,10 +442,14 @@ class _CartPageState extends State<CartPage> {
                       color: Colors.transparent,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(20),
-                        onTap: isProcessing ? null : () => removeItem(item),
-                        child: const Padding(
-                          padding: EdgeInsets.all(6),
-                          child: Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        onTap: () => removeItem(item),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: theme.textSecondary,
+                          ),
                         ),
                       ),
                     ),
@@ -573,16 +457,14 @@ class _CartPageState extends State<CartPage> {
                 ),
                 const SizedBox(height: 10),
 
-                // Stepper Jumlah dan Subtotal Item Sesuai Desain
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Stepper (- / qty / +) dengan target sentuh ergonomis
                     Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        color: theme.mutedContainer,
+                        border: Border.all(color: theme.borderColor),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -592,7 +474,7 @@ class _CartPageState extends State<CartPage> {
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: const BorderRadius.horizontal(left: Radius.circular(9)),
-                              onTap: (isProcessing || item.jumlah <= 1)
+                              onTap: item.jumlah <= 1
                                   ? null
                                   : () => changeQuantity(item, item.jumlah - 1),
                               child: Padding(
@@ -600,7 +482,9 @@ class _CartPageState extends State<CartPage> {
                                 child: Icon(
                                   Icons.remove,
                                   size: 16,
-                                  color: item.jumlah > 1 ? const Color(0xFF1E293B) : const Color(0xFFCBD5E1),
+                                  color: item.jumlah > 1
+                                      ? theme.textPrimary
+                                      : theme.borderColor,
                                 ),
                               ),
                             ),
@@ -617,10 +501,14 @@ class _CartPageState extends State<CartPage> {
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: const BorderRadius.horizontal(right: Radius.circular(9)),
-                              onTap: isProcessing ? null : () => changeQuantity(item, item.jumlah + 1),
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                child: Icon(Icons.add, size: 16, color: Color(0xFF1E293B)),
+                              onTap: () => changeQuantity(item, item.jumlah + 1),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                child: Icon(
+                                  Icons.add,
+                                  size: 16,
+                                  color: theme.textPrimary,
+                                ),
                               ),
                             ),
                           ),
@@ -628,13 +516,12 @@ class _CartPageState extends State<CartPage> {
                       ),
                     ),
 
-                    // Subtotal Baris
                     Text(
                       formatRupiah(itemTotal),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: theme.textPrimary,
                       ),
                     ),
                   ],
@@ -647,14 +534,14 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildBottomBar() {
+  Widget _buildBottomBar(CartProvider cart, AppColors theme) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.07),
+            color: theme.shadowColor,
             offset: const Offset(0, -4),
             blurRadius: 14,
           ),
@@ -681,30 +568,33 @@ class _CartPageState extends State<CartPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Total Belanja (${items.length} item)',
+                              'Total Belanja (${cart.items.length} item)',
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: Color(0xFF64748B),
+                                color: theme.textSecondary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 2),
-                            const Text(
+                            Text(
                               'Subtotal dari API server',
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: theme.textSecondary,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        formatRupiah(subtotal),
-                        style: const TextStyle(
+                        formatRupiah(cart.subtotal),
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
+                          color: theme.textPrimary,
                           letterSpacing: -0.5,
                         ),
                       ),
@@ -716,18 +606,18 @@ class _CartPageState extends State<CartPage> {
                     height: 50,
                     child: FilledButton(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
+                        backgroundColor: theme.primaryGreen,
                         elevation: 1,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      onPressed: isProcessing
+                      onPressed: cart.isLoading
                           ? null
                           : () async {
-                              if (items.isEmpty) {
+                              if (cart.items.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                     content: Text('Keranjang belanja masih kosong.'),
-                                    backgroundColor: Colors.orange,
+                                    backgroundColor: theme.warning,
                                   ),
                                 );
                                 return;
@@ -735,31 +625,39 @@ class _CartPageState extends State<CartPage> {
                               final result = await Navigator.push<bool>(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => CheckoutPage(
-                                    items: items,
-                                    subtotal: subtotal,
-                                  ),
+                                  builder: (_) => const CheckoutPage(),
                                 ),
                               );
-                              if (result == true) {
-                                loadCart();
+                              if (result == true && mounted) {
+                                cart.loadCart();
                               }
                             },
-                      child: isProcessing
-                          ? const SizedBox(
+                      child: cart.isLoading
+                          ? SizedBox(
                               width: 22,
                               height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: theme.onPrimary,
+                              ),
                             )
-                          : const Row(
+                          : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
                                   'Checkout',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.onPrimary,
+                                  ),
                                 ),
                                 SizedBox(width: 8),
-                                Icon(Icons.arrow_forward_rounded, size: 20, color: Colors.white),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 20,
+                                  color: theme.onPrimary,
+                                ),
                               ],
                             ),
                     ),

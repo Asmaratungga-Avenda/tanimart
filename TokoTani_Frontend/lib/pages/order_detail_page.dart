@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/order.dart';
-import '../services/api_service.dart';
+import '../providers/order_provider.dart';
+import '../core/theme/theme_extension.dart';
 import '../widgets/responsive_wrapper.dart';
 import '../main.dart';
 
@@ -19,104 +21,88 @@ class OrderDetailPage extends StatefulWidget {
 }
 
 class _OrderDetailPageState extends State<OrderDetailPage> {
-  // 4 Keadaan Layar wajib
-  KeadaanMuat state = KeadaanMuat.memuat;
-  OrderModel? order;
-  ApiException? lastError;
-
   bool isPaying = false;
+
+  String formatRupiah(int value) {
+    final s = value.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(s[i]);
+    }
+    return 'Rp $buffer';
+  }
 
   @override
   void initState() {
     super.initState();
+    if (widget.initialOrder == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<OrderProvider>().loadOrderDetail(widget.orderId);
+        }
+      });
+    }
+  }
+
+  OrderModel? _order(OrderProvider provider) {
+    final loadedOrder = provider.orderDetail;
+    if (loadedOrder?.id == widget.orderId) {
+      return loadedOrder;
+    }
     if (widget.initialOrder != null) {
-      order = widget.initialOrder;
-      state = KeadaanMuat.berhasil;
-    } else {
-      loadOrderDetail();
+      return widget.initialOrder;
     }
+    return provider.orderDetail;
   }
 
-  String formatRupiah(int value) {
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-  }
+  Future<void> _processPayment() async {
+    final provider = context.read<OrderProvider>();
+    final currentOrder = _order(provider);
+    if (isPaying || currentOrder == null) return;
 
-  Future<void> loadOrderDetail() async {
-    setState(() {
-      state = KeadaanMuat.memuat;
-      lastError = null;
-    });
-
-    try {
-      final res = await ApiService.getOrder(widget.orderId);
-      if (!mounted) return;
-      setState(() {
-        order = res;
-        state = KeadaanMuat.berhasil;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        lastError = e;
-        state = e.statusCode == 404 ? KeadaanMuat.kosong : KeadaanMuat.galat;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        lastError = const ApiException(
-          statusCode: 500,
-          message: 'Gagal memuat rincian pesanan dari server.',
-          errorType: ApiErrorType.other,
-        );
-        state = KeadaanMuat.galat;
-      });
-    }
-  }
-
-  /// Simulasi pembayaran nyata melalui PATCH /api/pesanan/{id}/status ke backend
-  /// Bukan sekadar mengubah tampilan saja (Kriteria 7 Butir 7)
-  Future<void> simulatePayment() async {
-    if (isPaying || order == null) return;
-
+    final theme = AppColors.of(context);
     setState(() => isPaying = true);
 
     try {
-      final updated = await ApiService.updateOrderStatus(order!.id, 'dibayar');
+      final success = await provider.confirmPayment(
+        currentOrder.id,
+        currentOrder.paymentMethodId,
+      );
       if (!mounted) return;
-
-      setState(() {
-        order = updated;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text('Pembayaran berhasil diverifikasi oleh server!'),
-              ),
-            ],
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: theme.primaryGreen,
+            behavior: SnackBarBehavior.floating,
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: theme.onPrimary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Pembayaran berhasil diverifikasi oleh server!'),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red.shade800,
-          behavior: SnackBarBehavior.floating,
-          content: Text(e.message),
-        ),
-      );
+        );
+      } else {
+        final error = provider.errorMessage;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: theme.errorRed,
+            behavior: SnackBarBehavior.floating,
+            content: Text(error ?? 'Gagal memproses pembayaran.'),
+          ),
+        );
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.red,
+          SnackBar(
+            backgroundColor: theme.errorRed,
             behavior: SnackBarBehavior.floating,
             content: Text('Terjadi gangguan jaringan saat memproses pembayaran.'),
           ),
@@ -131,25 +117,25 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   void backToCatalog() {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const MainFocusedPage(initialIndex: 0)),
+      MaterialPageRoute(builder: (_) => const MainNavigationPage()),
       (route) => false,
     );
   }
 
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(String status, AppColors theme) {
     switch (status.toLowerCase()) {
       case 'dibayar':
       case 'selesai':
-        return const Color(0xFF2E7D32);
+        return theme.primaryGreen;
       case 'menunggu_pembayaran':
-        return Colors.orange.shade800;
+        return theme.warning;
       case 'diproses':
       case 'dikirim':
-        return Colors.blue.shade700;
+        return theme.info;
       case 'dibatalkan':
-        return Colors.red.shade700;
+        return theme.errorRed;
       default:
-        return const Color(0xFF64748B);
+        return theme.textSecondary;
     }
   }
 
@@ -172,28 +158,36 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     }
   }
 
-  Widget _buildStatusTimeline(String status) {
+  Widget _buildStatusTimeline(String status, AppColors theme) {
     final s = status.toLowerCase();
     final isPaid = s == 'dibayar' || s == 'diproses' || s == 'dikirim' || s == 'selesai';
     final isProcessing = s == 'diproses' || s == 'dikirim' || s == 'selesai';
     final isDone = s == 'selesai';
 
     Widget buildStep(String label, bool active, bool current, IconData icon) {
-      final color = active ? const Color(0xFF2E7D32) : (current ? Colors.orange.shade800 : const Color(0xFFCBD5E1));
+      final color = active
+          ? theme.primaryGreen
+          : current
+              ? theme.warning
+              : theme.borderColor;
       return Column(
         children: [
           Container(
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: active ? const Color(0xFF2E7D32) : (current ? Colors.orange.shade50 : const Color(0xFFF1F5F9)),
+              color: active
+                  ? theme.primaryGreen
+                  : current
+                      ? theme.warningContainer
+                      : theme.mutedContainer,
               shape: BoxShape.circle,
               border: Border.all(color: color, width: 2),
             ),
             child: Icon(
               active ? Icons.check : icon,
               size: 16,
-              color: active ? Colors.white : color,
+              color: active ? theme.onPrimary : color,
             ),
           ),
           const SizedBox(height: 4),
@@ -202,7 +196,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: active || current ? FontWeight.bold : FontWeight.normal,
-              color: active || current ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+              color: active || current ? theme.textPrimary : theme.textSecondary,
             ),
           ),
         ],
@@ -214,7 +208,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         child: Container(
           height: 2,
           margin: const EdgeInsets.only(bottom: 16),
-          color: active ? const Color(0xFF2E7D32) : const Color(0xFFE2E8F0),
+          color: active ? theme.primaryGreen : theme.borderColor,
         ),
       );
     }
@@ -222,9 +216,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: theme.borderColor),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -243,314 +237,363 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7FAF5),
-      appBar: AppBar(
-        title: Text(order != null ? 'Pesanan #${order!.id}' : 'Rincian Pesanan'),
-        centerTitle: true,
-      ),
-      body: ResponsiveScrollWrapper(
-        child: _buildBody(),
-      ),
-      bottomNavigationBar: state == KeadaanMuat.berhasil && order != null
-          ? _buildBottomBar()
-          : null,
+    return Consumer<OrderProvider>(
+      builder: (context, provider, child) {
+        final order = _order(provider);
+        final isLoading = provider.isLoading && widget.initialOrder == null;
+        final errorMessage = provider.errorMessage;
+        final theme = AppColors.of(context);
+
+        return Scaffold(
+          backgroundColor: theme.backgroundColor,
+          appBar: AppBar(
+            title: Text(order != null ? 'Pesanan #${order.id}' : 'Rincian Pesanan'),
+            centerTitle: true,
+            backgroundColor: theme.surfaceColor,
+            foregroundColor: theme.textPrimary,
+          ),
+          body: ResponsiveScrollWrapper(
+            child: _buildBody(provider, order, isLoading, errorMessage),
+          ),
+          bottomNavigationBar: order != null && !isLoading
+              ? _buildBottomBar(order)
+              : null,
+        );
+      },
     );
   }
 
-  Widget _buildBody() {
-    switch (state) {
-      case KeadaanMuat.memuat:
-        return const Center(
+  Widget _buildBody(OrderProvider provider, OrderModel? o, bool isLoading, String? errorMessage) {
+    final theme = AppColors.of(context);
+    if (isLoading && o == null) {
+      return Center(
+        child: CircularProgressIndicator(color: theme.primaryGreen),
+      );
+    }
+
+    if (o == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: Color(0xFF2E7D32)),
-              SizedBox(height: 16),
-              Text('Memuat rincian transaksi pesanan...'),
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 64,
+                color: theme.textSecondary,
+              ),
+              const SizedBox(height: 16),
+              const Text('Pesanan Tidak Ditemukan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(errorMessage ?? 'Pesanan tidak ditemukan pada sistem.', textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: theme.primaryGreen),
+                onPressed: backToCatalog,
+                child: const Text('Kembali ke Katalog Utama'),
+              ),
             ],
           ),
-        );
+        ),
+      );
+    }
 
-      case KeadaanMuat.kosong:
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.receipt_long_outlined, size: 64, color: Color(0xFF64748B)),
-                const SizedBox(height: 16),
-                const Text('Pesanan Tidak Ditemukan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                const Text('Nomor pesanan yang Anda cari tidak ada pada sistem.', textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
-                  onPressed: backToCatalog,
-                  child: const Text('Kembali ke Katalog Utama'),
-                ),
-              ],
-            ),
+    return _buildOrderDetailContent(o);
+  }
+
+  Widget _buildOrderDetailContent(OrderModel o) {
+    final theme = AppColors.of(context);
+    final statusColor = _getStatusColor(o.status, theme);
+    final statusLabel = _getStatusLabel(o.status);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      children: [
+        // Timeline Progres Status Transaksi
+        _buildStatusTimeline(o.status, theme),
+        const SizedBox(height: 12),
+
+        // Status Pesanan Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.borderColor),
           ),
-        );
-
-      case KeadaanMuat.galat:
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
-                const SizedBox(height: 16),
-                const Text('Gagal Memuat Pesanan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(lastError?.message ?? 'Terjadi kesalahan sistem.', textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                FilledButton(
-                  style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
-                  onPressed: loadOrderDetail,
-                  child: const Text('Coba Lagi'),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-          ),
-        );
-
-      case KeadaanMuat.berhasil:
-        final o = order!;
-        final statusColor = _getStatusColor(o.status);
-        final statusLabel = _getStatusLabel(o.status);
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-          children: [
-            // Timeline Progres Status Transaksi
-            _buildStatusTimeline(o.status),
-            const SizedBox(height: 12),
-
-            // Status Pesanan Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                child: Icon(
+                  o.status == 'dibayar' ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                  color: statusColor,
+                  size: 28,
+                ),
               ),
-              child: Row(
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pesanan #${o.id}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: theme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      statusLabel,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
+                      ),
+                    ),
+                    if (o.createdAt != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Waktu: ${o.createdAt!.substring(0, 16).replaceAll('T', ' ')}',
+                        style: TextStyle(fontSize: 11, color: theme.textSecondary),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Item-item Pembelian
+        Text(
+          'Daftar Produk yang Dibeli',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: theme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.borderColor),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(14),
+            itemCount: o.items.length,
+            separatorBuilder: (_, _) => Divider(
+              height: 20,
+              color: theme.borderColor.withValues(alpha: 0.5),
+            ),
+            itemBuilder: (context, index) {
+              final item = o.items[index];
+              final productName = item.product?.nama ?? item.namaProduk;
+              final satuan = item.product?.satuanJual ?? 'unit';
+
+              return Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
+                      color: theme.lightGreen,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      o.status == 'dibayar' ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
-                      color: statusColor,
-                      size: 28,
+                      Icons.eco,
+                      color: theme.primaryGreen,
+                      size: 22,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Pesanan #${o.id}',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                          productName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          statusLabel,
+                          '${item.quantity} $satuan × ${formatRupiah(item.hargaSatuan)}',
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: statusColor,
+                            fontSize: 12,
+                            color: theme.textSecondary,
                           ),
                         ),
-                        if (o.createdAt != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'Waktu: ${o.createdAt!.substring(0, 16).replaceAll('T', ' ')}',
-                            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                          ),
-                        ],
                       ],
+                    ),
+                  ),
+                  Text(
+                    formatRupiah(item.subtotal),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Informasi Pengiriman
+        Text(
+          'Informasi Pengiriman',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: theme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.borderColor),
+          ),
+          child: Column(
+            children: [
+              _buildRowInfo('Penerima', o.namaPenerima),
+              const SizedBox(height: 8),
+              _buildRowInfo('Alamat Tujuan', o.alamatPenerima),
+              const SizedBox(height: 8),
+              _buildRowInfo('Tanggal Antar', o.tanggalAntar),
+              const SizedBox(height: 8),
+              _buildRowInfo('Jasa Kurir', o.courier?.nama ?? 'Kurir #${o.kurirId}'),
+              const SizedBox(height: 8),
+              _buildRowInfo('Metode Pembayaran', o.paymentMethod?.nama ?? 'Metode #${o.paymentMethodId}'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Rincian Biaya
+        Text(
+          'Rincian Pembayaran',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: theme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.surfaceColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.borderColor),
+          ),
+          child: Column(
+            children: [
+              _buildSummaryRow('Subtotal Produk', formatRupiah(o.subtotal)),
+              const SizedBox(height: 8),
+              _buildSummaryRow('Ongkos Kirim', formatRupiah(o.ongkir)),
+              Divider(
+                height: 20,
+                color: theme.borderColor.withValues(alpha: 0.5),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total Tagihan',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: theme.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    formatRupiah(o.totalHarga),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryGreen,
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Item-item Pembelian
-            const Text(
-              'Daftar Produk yang Dibeli',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(14),
-                itemCount: o.items.length,
-                separatorBuilder: (_, _) => const Divider(height: 20, color: Color(0xFFF1F5F9)),
-                itemBuilder: (context, index) {
-                  final item = o.items[index];
-                  final productName = item.product?.nama ?? 'Produk Pertanian #${item.productId}';
-                  final satuan = item.product?.satuanJual ?? 'unit';
-
-                  return Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.eco, color: Color(0xFF2E7D32), size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              productName,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${item.quantity} $satuan × ${formatRupiah(item.hargaSatuan)}',
-                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        formatRupiah(item.subtotal),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Informasi Pengiriman
-            const Text(
-              'Informasi Pengiriman',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  _buildRowInfo('Penerima', o.namaPenerima),
-                  const SizedBox(height: 8),
-                  _buildRowInfo('Alamat Tujuan', o.alamatPenerima),
-                  const SizedBox(height: 8),
-                  _buildRowInfo('Tanggal Antar', o.tanggalAntar),
-                  const SizedBox(height: 8),
-                  _buildRowInfo('Jasa Kurir', o.courier?.nama ?? 'Kurir #${o.kurirId}'),
-                  const SizedBox(height: 8),
-                  _buildRowInfo('Metode Pembayaran', o.paymentMethod?.nama ?? 'Metode #${o.paymentMethodId}'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Rincian Biaya
-            const Text(
-              'Rincian Pembayaran',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  _buildSummaryRow('Subtotal Produk', formatRupiah(o.subtotal)),
-                  const SizedBox(height: 8),
-                  _buildSummaryRow('Ongkos Kirim', formatRupiah(o.ongkir)),
-                  const Divider(height: 20, color: Color(0xFFF1F5F9)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Total Tagihan',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                      ),
-                      Text(
-                        formatRupiah(o.totalHarga),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-    }
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildRowInfo(String label, String value) {
+    final theme = AppColors.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 120,
-          child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12, color: theme.textSecondary),
+          ),
         ),
         Expanded(
-          child: Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: theme.textPrimary,
+            ),
+          ),
         ),
       ],
     );
   }
 
   Widget _buildSummaryRow(String label, String value) {
+    final theme = AppColors.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+        Text(label, style: TextStyle(fontSize: 13, color: theme.textSecondary)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: theme.textPrimary,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildBottomBar() {
-    final o = order!;
+  Widget _buildBottomBar(OrderModel o) {
     final isUnpaid = o.status == 'menunggu_pembayaran';
+    final theme = AppColors.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.surfaceColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: theme.shadowColor,
             offset: const Offset(0, -3),
             blurRadius: 12,
           ),
@@ -573,21 +616,26 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                       height: 48,
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E7D32),
+                          backgroundColor: theme.primaryGreen,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         icon: isPaying
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.onPrimary,
+                                ),
                               )
                             : const Icon(Icons.payment_rounded),
                         label: Text(
-                          isPaying ? 'Memproses Pembayaran...' : 'Bayar Sekarang (Simulasi)',
+                          isPaying
+                              ? 'Mengonfirmasi Pembayaran...'
+                              : 'Konfirmasi Pembayaran',
                           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                         ),
-                        onPressed: isPaying ? null : simulatePayment,
+                        onPressed: isPaying ? null : _processPayment,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -599,8 +647,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                     height: 44,
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF2E7D32),
-                        side: const BorderSide(color: Color(0xFF2E7D32)),
+                        foregroundColor: theme.primaryGreen,
+                        side: BorderSide(color: theme.primaryGreen),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       icon: const Icon(Icons.storefront_outlined),
@@ -617,4 +665,3 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     );
   }
 }
-

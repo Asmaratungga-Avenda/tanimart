@@ -1,52 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/api_service.dart';
+import 'package:provider/provider.dart';
+import '../core/theme/app_theme.dart';
+import '../core/theme/theme_extension.dart';
+import '../providers/theme_provider.dart';
 import '../services/notification_service.dart';
 import 'notifications_page.dart';
+import 'order_history_page.dart';
+import 'product_catalog_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
-  static const _primaryGreen = Color(0xFF2E7D32);
-  static const _lightGreen = Color(0xFFE8F5E9);
-  static const _textPrimary = Color(0xFF1F2937);
-  static const _textSecondary = Color(0xFF6B7280);
-
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryGreen = AppTheme.getPrimaryGreen(isDark);
+    final lightGreen = AppTheme.getLightGreen(isDark);
+    final textPrimary = AppTheme.getTextPrimaryColor(isDark);
+    final textSecondary = AppTheme.getTextSecondaryColor(isDark);
+    final surfaceColor = AppTheme.getSurfaceColor(isDark);
+    final backgroundColor = AppTheme.getBackgroundColor(isDark);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9F6),
+      backgroundColor: backgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildHeader(),
+            _buildHeader(isDark, primaryGreen),
             const SizedBox(height: 20),
-            _buildApiModeToggle(context),
+            Consumer<ThemeProvider>(
+              builder: (context, themeProvider, _) => _buildThemeSection(
+                context,
+                themeProvider,
+                textPrimary,
+                textSecondary,
+                surfaceColor,
+                primaryGreen,
+                lightGreen,
+              ),
+            ),
             const SizedBox(height: 14),
             ValueListenableBuilder<int>(
               valueListenable: NotificationService.unreadCountNotifier,
               builder: (context, unread, _) => _buildMenuSection(
                 context,
-                'Akun',
+                'Notifikasi',
+                textPrimary,
+                textSecondary,
+                surfaceColor,
+                primaryGreen,
+                lightGreen,
                 [
-                  _MenuItem(
-                    icon: Icons.person_outline,
-                    title: 'Edit Profil',
-                    subtitle: 'Budi Santoso',
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  _MenuItem(
-                    icon: Icons.location_on_outlined,
-                    title: 'Alamat Tersimpan',
-                    subtitle: 'Kelola alamat pengiriman',
-                    onTap: () => _showComingSoon(context),
-                  ),
                   _MenuItem(
                     icon: Icons.notifications_outlined,
                     title: 'Notifikasi',
                     subtitle: unread > 0
                         ? '$unread notifikasi baru'
                         : 'Tidak ada notifikasi baru',
+                    iconColor: primaryGreen,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -59,13 +71,13 @@ class ProfilePage extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFDC2626),
+                              color: AppTheme.getErrorRed(isDark),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
                               '$unread',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onError,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -80,56 +92,32 @@ class ProfilePage extends StatelessWidget {
             _buildMenuSection(
               context,
               'Transaksi',
+              textPrimary,
+              textSecondary,
+              surfaceColor,
+              primaryGreen,
+              lightGreen,
               [
                 _MenuItem(
                   icon: Icons.shopping_bag_outlined,
                   title: 'Riwayat Pesanan',
                   subtitle: 'Lihat semua pesanan',
-                  onTap: () => _showComingSoon(context),
-                ),
-                _MenuItem(
-                  icon: Icons.favorite_outline,
-                  title: 'Produk Favorit',
-                  subtitle: 'Produk yang kamu sukai',
-                  onTap: () => _showComingSoon(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _buildMenuSection(
-              context,
-              'Tentang Aplikasi',
-              [
-                _MenuItem(
-                  icon: Icons.info_outline,
-                  title: 'Versi Aplikasi',
-                  subtitle: 'TokoTani v1.0.0',
-                  onTap: () {},
-                  trailing: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _lightGreen,
-                      borderRadius: BorderRadius.circular(10),
+                  iconColor: primaryGreen,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          OrderHistoryPage(
+                            showBackButton: true,
+                            onGoToCatalog: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ProductCatalogPage(),
+                              ),
+                            ),
+                          ),
                     ),
-                    child: Text('v1.0.0',
-                        style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: _primaryGreen)),
                   ),
-                ),
-                _MenuItem(
-                  icon: Icons.school_outlined,
-                  title: 'Proyek Mahasiswa',
-                  subtitle: 'Informatika · Aplikasi Mobile',
-                  onTap: () {},
-                ),
-                _MenuItem(
-                  icon: Icons.code_outlined,
-                  title: 'Teknologi',
-                  subtitle: 'Flutter · Laravel · MySQL',
-                  onTap: () {},
                 ),
               ],
             ),
@@ -140,12 +128,16 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isDark, Color primaryGreen) {
+    final foreground =
+        isDark ? AppTheme.darkTextPrimary : AppTheme.lightSurface;
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
+          colors: isDark
+              ? [AppTheme.darkBackground, AppTheme.darkSurface]
+              : [primaryGreen, AppTheme.lightSecondaryGreen],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -153,164 +145,134 @@ class ProfilePage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
       child: Column(
         children: [
-          Container(
-            width: 90,
-            height: 90,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-              border:
-                  Border.all(color: Colors.white.withValues(alpha: 0.5), width: 3),
-            ),
-            child: const Center(
-                child: Text('👨‍🌾', style: TextStyle(fontSize: 44))),
+      Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          color: foreground.withValues(alpha: 0.18),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: foreground.withValues(alpha: 0.45),
+            width: 2,
           ),
-          const SizedBox(height: 14),
-          Text(
-            'Budi Santoso',
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Pelanggan TokoTani',
-            style: GoogleFonts.poppins(
-              color: Colors.white.withValues(alpha: 0.85),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _statBox('3', 'Pesanan'),
-              _divider(),
-              _statBox('12', 'Produk\nDibeli'),
-              _divider(),
-              _statBox('Rp 270K', 'Total\nBelanja'),
-            ],
-          ),
+        ),
+        child: Icon(Icons.eco_rounded, color: foreground, size: 38),
+      ),
+      const SizedBox(height: 14),
+      Text(
+        'Profil & Pengaturan',
+        style: GoogleFonts.poppins(
+          color: foreground,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        'Preferensi dan aktivitas Tani Mart',
+        style: GoogleFonts.poppins(
+          color: foreground.withValues(alpha: 0.85),
+          fontSize: 13,
+        ),
+      ),
         ],
       ),
     );
   }
 
-  Widget _statBox(String value, String label) {
+  Widget _buildThemeSection(
+      BuildContext context,
+      ThemeProvider themeProvider,
+      Color textPrimary,
+      Color textSecondary,
+      Color surfaceColor,
+      Color primaryGreen,
+      Color lightGreen) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(value,
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              'Pengaturan Tampilan',
               style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold)),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  fontSize: 10,
-                  height: 1.3)),
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: textSecondary),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                    color: AppColors.of(context).shadowColor,
+                    blurRadius: 8,
+                    offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: lightGreen,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        themeProvider.isDark
+                            ? Icons.dark_mode_outlined
+                            : Icons.light_mode_outlined,
+                        color: primaryGreen,
+                        size: 18,
+                      ),
+                    ),
+                    title: Text(
+                      themeProvider.isDark ? 'Mode Gelap' : 'Mode Terang',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                          color: textPrimary),
+                    ),
+                    subtitle: Text(
+                      themeProvider.isDark
+                          ? 'Tampilan gelap untuk kenyamanan malam hari'
+                          : 'Tampilan terang untuk kenyamanan siang hari',
+                      style: GoogleFonts.poppins(
+                          fontSize: 11.5, color: textSecondary),
+                    ),
+                    trailing: Switch(
+                      value: themeProvider.isDark,
+                      activeThumbColor: primaryGreen,
+                      onChanged: (_) => themeProvider.toggleTheme(),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 4),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  Widget _divider() {
-    return Container(
-      height: 32,
-      width: 1,
-      color: Colors.white.withValues(alpha: 0.3),
-    );
-  }
-
-  Widget _buildApiModeToggle(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: StatefulBuilder(
-        builder: (ctx, setLocal) => Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2)),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: ApiService.useMock
-                      ? Colors.orange.shade50
-                      : _lightGreen,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  ApiService.useMock
-                      ? Icons.science_outlined
-                      : Icons.cloud_done_outlined,
-                  color: ApiService.useMock
-                      ? Colors.orange.shade700
-                      : _primaryGreen,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ApiService.useMock ? 'Mode Data Tiruan' : 'Mode Laravel API',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      ApiService.useMock
-                          ? 'Offline — data simulasi'
-                          : ApiService.baseUrl,
-                      style: GoogleFonts.poppins(
-                          fontSize: 11, color: _textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: ApiService.useMock,
-                activeThumbColor: _primaryGreen,
-                onChanged: (val) {
-                  setLocal(() => ApiService.useMock = val);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(val
-                          ? 'Beralih ke Mode Data Tiruan (Offline)'
-                          : 'Beralih ke Mode Laravel API'),
-                      backgroundColor: val
-                          ? Colors.orange.shade700
-                          : _primaryGreen,
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
 
   Widget _buildMenuSection(
-      BuildContext context, String title, List<_MenuItem> items) {
+      BuildContext context,
+      String title,
+      Color textPrimary,
+      Color textSecondary,
+      Color surfaceColor,
+      Color primaryGreen,
+      Color lightGreen,
+      List<_MenuItem> items) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -323,16 +285,16 @@ class ProfilePage extends StatelessWidget {
               style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: _textSecondary),
+                  color: textSecondary),
             ),
           ),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: surfaceColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: AppColors.of(context).shadowColor,
                     blurRadius: 8,
                     offset: const Offset(0, 2)),
               ],
@@ -345,29 +307,34 @@ class ProfilePage extends StatelessWidget {
                   final item = entry.value;
                   return Column(
                     children: [
-                      if (i > 0) const Divider(height: 1, indent: 16),
+                      if (i > 0)
+                        Divider(
+                          height: 1,
+                          indent: 16,
+                          color: AppTheme.getBorderColor(isDark(context)),
+                        ),
                       ListTile(
                         onTap: item.onTap,
                         leading: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: _lightGreen,
+                            color: lightGreen,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(item.icon,
-                              color: _primaryGreen, size: 18),
+                              color: item.iconColor, size: 18),
                         ),
                         title: Text(item.title,
                             style: GoogleFonts.poppins(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w500,
-                                color: _textPrimary)),
+                                color: textPrimary)),
                         subtitle: Text(item.subtitle,
                             style: GoogleFonts.poppins(
-                                fontSize: 11.5, color: _textSecondary)),
+                                fontSize: 11.5, color: textSecondary)),
                         trailing: item.trailing ??
-                            const Icon(Icons.chevron_right,
-                                color: Colors.grey, size: 20),
+                            Icon(Icons.chevron_right,
+                                color: textSecondary, size: 20),
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 4),
                       ),
@@ -382,17 +349,8 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Fitur ini akan segera hadir! 🚀'),
-        backgroundColor: _primaryGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
+  bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
+
 }
 
 class _MenuItem {
@@ -400,6 +358,7 @@ class _MenuItem {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final Color iconColor;
   final Widget? trailing;
 
   const _MenuItem({
@@ -407,7 +366,7 @@ class _MenuItem {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    required this.iconColor,
     this.trailing,
   });
 }
-
