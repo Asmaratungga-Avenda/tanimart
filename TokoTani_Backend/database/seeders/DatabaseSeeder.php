@@ -9,6 +9,34 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // 0. Pelanggan demo untuk mengisi foreign key keranjang/pesanan
+        DB::table('users')->upsert([
+            [
+                'id' => 1,
+                'name' => 'Pelanggan Demo 1',
+                'email' => 'pelanggan1@tokotani.local',
+                'password' => bcrypt('password'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => 2,
+                'name' => 'Pelanggan Demo 2',
+                'email' => 'pelanggan2@tokotani.local',
+                'password' => bcrypt('password'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => 3,
+                'name' => 'Pelanggan Demo 3',
+                'email' => 'pelanggan3@tokotani.local',
+                'password' => bcrypt('password'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ], ['id'], ['name', 'email', 'password', 'updated_at']);
+
         // 1. Data Kategori (2 Kategori)
         DB::table('categories')->upsert([
             ['id' => 1, 'nama_kategori' => 'Sayuran dan Buah Segar', 'created_at' => now(), 'updated_at' => now()],
@@ -177,9 +205,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('couriers')->upsert([
-            ['id' => 1, 'nama' => 'Kurir Toko Area Dekat', 'tarif' => 10000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 2, 'nama' => 'Kurir Toko Area Jauh', 'tarif' => 20000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
-        ], ['id'], ['nama', 'tarif', 'aktif', 'updated_at']);
+            ['id' => 1, 'nama' => 'Kurir Toko Area Dekat', 'wilayah' => 'Dalam Kota (0-5 km)', 'tarif' => 10000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'nama' => 'Kurir Toko Area Sedang', 'wilayah' => 'Kecamatan Sekitar (5-15 km)', 'tarif' => 20000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'nama' => 'Kurir Toko Area Jauh', 'wilayah' => 'Luar Kota (>15 km)', 'tarif' => 35000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
+        ], ['id'], ['nama', 'wilayah', 'tarif', 'aktif', 'updated_at']);
 
         DB::table('payment_methods')->upsert([
             ['id' => 1, 'nama' => 'Transfer Bank', 'deskripsi' => 'Simulasi pembayaran melalui transfer bank.', 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
@@ -188,6 +217,7 @@ class DatabaseSeeder extends Seeder
 
         DB::table('orders')->upsert([
             [
+                'pelanggan_id' => 1,
                 'nama_penerima' => 'Contoh Penerima',
                 'alamat_penerima' => 'Jl. Tani No. 1',
                 'kurir_id' => 1,
@@ -197,11 +227,14 @@ class DatabaseSeeder extends Seeder
                 'total_harga' => 85000,
                 'status' => 'menunggu_pembayaran',
                 'tanggal_antar' => now()->toDateString(),
+                'tanggal_pengantaran' => now()->toDateString(),
+                'slot_pengantaran' => 'pagi',
                 'idempotency_key' => 'contoh-pesanan-seeder',
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
         ], ['idempotency_key'], [
+            'pelanggan_id',
             'nama_penerima',
             'alamat_penerima',
             'kurir_id',
@@ -211,6 +244,8 @@ class DatabaseSeeder extends Seeder
             'total_harga',
             'status',
             'tanggal_antar',
+            'tanggal_pengantaran',
+            'slot_pengantaran',
             'updated_at',
         ]);
 
@@ -222,6 +257,7 @@ class DatabaseSeeder extends Seeder
             [
                 'order_id' => $sampleOrderId,
                 'product_id' => 8,
+                'nama_produk' => 'Beras Putih Premium',
                 'quantity' => 1,
                 'harga_satuan' => 75000,
                 'subtotal' => 75000,
@@ -229,6 +265,7 @@ class DatabaseSeeder extends Seeder
                 'updated_at' => now(),
             ],
         ], ['order_id', 'product_id'], [
+            'nama_produk',
             'quantity',
             'harga_satuan',
             'subtotal',
