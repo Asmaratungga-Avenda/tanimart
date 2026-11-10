@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tokotani/models/courier.dart';
 import 'package:tokotani/models/order.dart';
@@ -50,6 +51,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Produk Uji Sayuran'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
 
       expect(find.text('Produk Uji Sayuran'), findsWidgets);
       expect(find.text('Tambah ke Keranjang'), findsOneWidget);

@@ -2,9 +2,9 @@
 
 namespace App\Filament\Resources\Orders\Schemas;
 
-use App\Models\Order;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\RepeatableEntry\TableColumn;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
@@ -82,29 +82,52 @@ class OrderInfolist
                     ]),
 
                 Section::make('Produk Pesanan')
-                    ->columns(6)
+                    ->columns(1)
                     ->components([
                         RepeatableEntry::make('items')
                             ->label('')
-                            ->columns(6)
+                            ->columnSpanFull()
+                            ->table([
+                                TableColumn::make('Foto Produk')
+                                    ->width('10%'),
+                                TableColumn::make('Nama Produk')
+                                    ->width('36%')
+                                    ->wrapHeader(),
+                                TableColumn::make('Harga Satuan')
+                                    ->width('18%')
+                                    ->wrapHeader()
+                                    ->alignEnd(),
+                                TableColumn::make('Jumlah')
+                                    ->width('12%')
+                                    ->alignEnd(),
+                                TableColumn::make('Subtotal')
+                                    ->width('24%')
+                                    ->wrapHeader()
+                                    ->alignEnd(),
+                            ])
                             ->components([
                                 ImageEntry::make('product.gambar')
                                     ->label('Foto Produk')
                                     ->disk('public')
+                                    ->square()
                                     ->height(48)
                                     ->defaultImageUrl(null),
                                 TextEntry::make('product.nama')
                                     ->label('Nama Produk')
-                                    ->weight('bold'),
+                                    ->weight('bold')
+                                    ->wrap(),
                                 TextEntry::make('harga_satuan')
                                     ->label('Harga Satuan')
-                                    ->money('IDR', locale: 'id'),
+                                    ->money('IDR', locale: 'id')
+                                    ->alignEnd(),
                                 TextEntry::make('quantity')
-                                    ->label('Jumlah'),
+                                    ->label('Jumlah')
+                                    ->alignEnd(),
                                 TextEntry::make('subtotal')
                                     ->label('Subtotal')
                                     ->money('IDR', locale: 'id')
-                                    ->weight('bold'),
+                                    ->weight('bold')
+                                    ->alignEnd(),
                             ]),
                     ]),
 

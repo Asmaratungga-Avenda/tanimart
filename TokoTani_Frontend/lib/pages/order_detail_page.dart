@@ -54,9 +54,10 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   Future<void> _complete(OrderModel order) async {
     final ok = await confirmDialog(
       context,
-      title: 'Pesanan sudah diterima?',
-      message: 'Pastikan semua produk sudah Anda terima dengan baik.',
-      confirmLabel: 'Pesanan Selesai',
+      title: 'Konfirmasi pesanan diterima',
+      message:
+          'Pastikan semua produk sudah Anda terima dengan baik. Status pesanan akan diubah menjadi Selesai.',
+      confirmLabel: 'Ya, Pesanan Diterima',
     );
     if (!ok || !mounted) return;
     final error = await context.read<OrderProvider>().completeOrder(order.id);
@@ -244,7 +245,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                           onPressed: () => _pay(order),
                         )
                       : PrimaryButton(
-                          label: 'Pesanan Selesai',
+                          label: 'Pesanan Diterima',
                           icon: Icons.check_circle_outline_rounded,
                           loading: busy,
                           onPressed: () => _complete(order),
@@ -287,9 +288,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       case OrderStatus.processing:
         return 'Pesanan sedang disiapkan oleh penjual.';
       case OrderStatus.shipping:
-        return 'Kurir sedang mengantar pesanan Anda.';
+        return 'Kurir sedang mengantar pesanan Anda. Jika pesanan sudah diterima, tekan Pesanan Diterima.';
       case OrderStatus.arrived:
-        return 'Pesanan sudah tiba. Periksa produk, lalu tekan Pesanan Selesai.';
+        return 'Pesanan sudah tiba. Periksa produk, lalu tekan Pesanan Diterima.';
       case OrderStatus.completed:
         return 'Pesanan selesai. Terima kasih sudah berbelanja di TaniMart.';
       case OrderStatus.cancelled:

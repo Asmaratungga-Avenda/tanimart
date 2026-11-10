@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\DeliverOrderSimulation;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -9,13 +10,14 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\Support\AuthenticatedApiRequests;
 use Tests\TestCase;
 
 class FilamentAdminTest extends TestCase
 {
-    use RefreshDatabase;
     use AuthenticatedApiRequests;
+    use RefreshDatabase;
 
     public function test_admin_login_page_can_be_rendered(): void
     {
@@ -84,6 +86,9 @@ class FilamentAdminTest extends TestCase
         $response = $this->actingAs($user)->get("/admin/orders/{$order->id}");
 
         $response->assertSuccessful();
+        $response->assertSee('fi-in-table-repeatable', escape: false);
+        $response->assertSee('Nama Produk');
+        $response->assertSee('Cabai Merah');
     }
 
     public function test_cancelling_order_restores_product_stock_automatically(): void
@@ -169,7 +174,7 @@ class FilamentAdminTest extends TestCase
 
     public function test_shipping_order_workflow_with_delivery_simulation(): void
     {
-        \Illuminate\Support\Facades\Queue::fake();
+        Queue::fake();
 
         $courier = Courier::create(['nama' => 'JNE Express', 'tarif' => 10000]);
         $payment = PaymentMethod::create(['nama' => 'QRIS']);
@@ -194,7 +199,7 @@ class FilamentAdminTest extends TestCase
         $this->assertEquals('dikirim', $order->fresh()->status);
         $this->assertNotNull($order->fresh()->dikirim_at);
 
-        \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\DeliverOrderSimulation::class);
+        Queue::assertPushed(DeliverOrderSimulation::class);
     }
 
     public function test_customer_can_complete_order_when_status_is_tiba(): void

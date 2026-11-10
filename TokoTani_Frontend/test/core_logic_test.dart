@@ -28,7 +28,8 @@ void main() {
       expect(OrderStatus.canPay('menunggu_pembayaran'), isTrue);
       expect(OrderStatus.canPay('diproses'), isFalse);
       expect(OrderStatus.canComplete('tiba'), isTrue);
-      expect(OrderStatus.canComplete('dikirim'), isFalse);
+      expect(OrderStatus.canComplete('dikirim'), isTrue);
+      expect(OrderStatus.canComplete('diproses'), isFalse);
     });
 
     test('stepper menandai tahap aktif', () {

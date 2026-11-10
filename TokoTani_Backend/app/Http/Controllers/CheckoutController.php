@@ -2,19 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\DeliverOrderSimulation;
 use App\Models\Cart;
 use App\Models\Courier;
 use App\Models\Order;
 use App\Models\PaymentMethod;
 use App\Models\Product;
-use App\Jobs\DeliverOrderSimulation;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -24,11 +23,11 @@ class CheckoutController extends Controller
     {
         $response = [
             'success' => $status === 'sukses',
-            'status'  => $status,
-            'code'    => (string) $code,
+            'status' => $status,
+            'code' => (string) $code,
             'message' => $message,
-            'data'    => $data,
-            'meta'    => $meta,
+            'data' => $data,
+            'meta' => $meta,
         ];
 
         if ($errors !== null) {
@@ -143,6 +142,12 @@ class CheckoutController extends Controller
         if ($nextStatus === 'dibayar') {
             $order->payment_status = 'lunas';
         }
+        if ($nextStatus === 'tiba' && $order->tiba_at === null) {
+            $order->tiba_at = now();
+        }
+        if ($nextStatus === 'selesai' && $order->selesai_at === null) {
+            $order->selesai_at = now();
+        }
         $order->save();
 
         return $this->jsonResponse(
@@ -248,7 +253,7 @@ class CheckoutController extends Controller
         return $this->jsonResponse(
             'sukses',
             200,
-            'Pesanan berhasil dikirim. Pengiruman akan tiba dalam simulasi.',
+            'Pesanan berhasil dikirim. Pengiriman akan tiba dalam simulasi.',
             $order->load(['items.product', 'courier', 'paymentMethod'])
         );
     }
@@ -256,41 +261,67 @@ class CheckoutController extends Controller
     /**
      * POST /api/pesanan/{id}/selesai
      * Pelanggan menyelesaikan pesanan. Hanya boleh dilakukan oleh pemilik pesanan
-     * dan hanya ketika status sudah tiba.
+     * dan hanya ketika status sudah dikirim atau tiba.
      */
     public function selesai(Request $request, $id)
     {
         $customerId = $this->getCustomerId($request);
 
-        $order = Order::find($id);
+        try {
+            $order = DB::transaction(function () use ($id, $customerId) {
+                $order = Order::whereKey($id)->lockForUpdate()->first();
 
-        if (! $order) {
-            return $this->jsonResponse('gagal', 404, 'Pesanan tidak ditemukan');
+                if (! $order) {
+                    abort($this->jsonResponse('gagal', 404, 'Pesanan tidak ditemukan'));
+                }
+
+                // Hanya pemilik pesanan yang boleh menyelesaikan pesanan miliknya sendiri.
+                if ((int) $order->customer_id !== $customerId) {
+                    abort($this->jsonResponse('gagal', 403, 'Anda bukan pemilik pesanan ini.'));
+                }
+
+                if ($order->status === 'selesai') {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        'Pesanan ini sudah diselesaikan sebelumnya.'
+                    ));
+                }
+
+                if ($order->status === 'dibatalkan') {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        'Pesanan yang dibatalkan tidak dapat diselesaikan.'
+                    ));
+                }
+
+                if (! in_array($order->status, ['dikirim', 'tiba'], true)) {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        'Pesanan hanya dapat diselesaikan setelah status pesanan dikirim.'
+                    ));
+                }
+
+                $order->status = 'selesai';
+                $order->selesai_at = now();
+                if ($order->tiba_at === null) {
+                    $order->tiba_at = now();
+                }
+                $order->save();
+
+                return $order->load(['items.product', 'courier', 'paymentMethod']);
+            });
+        } catch (HttpResponseException $e) {
+            return $e->getResponse();
         }
-
-        // Hanya pemilik pesanan yang boleh menyelesaikan pesanan miliknya sendiri.
-        if ((int) $order->customer_id !== $customerId) {
-            return $this->jsonResponse('gagal', 403, 'Anda bukan pemilik pesanan ini.');
-        }
-
-        if ($order->status !== 'tiba') {
-            return $this->jsonResponse(
-                'gagal',
-                409,
-                'Pesanan hanya dapat diselesaikan setelah status pesanan tiba.'
-            );
-        }
-
-        $order->update([
-            'status' => 'selesai',
-            'selesai_at' => now(),
-        ]);
 
         return $this->jsonResponse(
             'sukses',
             200,
             'Pesanan selesai. Terima kasih telah berbelanja di TaniMart.',
-            $order->load(['items.product', 'courier', 'paymentMethod'])
+            $order
         );
     }
 
@@ -419,13 +450,17 @@ class CheckoutController extends Controller
                         ));
                     }
 
-                    if ($item['quantity'] > 20) {
+                    $maxQuantity = $product->mudah_rusak
+                        ? (int) Config::get('checkout.max_mudah_rusak_per_pesanan', 5)
+                        : 20;
+
+                    if ($item['quantity'] > $maxQuantity) {
                         abort($this->jsonResponse(
                             'gagal',
                             422,
-                            "Kuantitas maksimal 20 untuk produk '{$product->nama}'",
+                            "Kuantitas maksimal {$maxQuantity} untuk produk '{$product->nama}'",
                             null,
-                            ['checkout' => ["Kuantitas maksimal 20 untuk produk '{$product->nama}'"]]
+                            ['checkout' => ["Kuantitas maksimal {$maxQuantity} untuk produk '{$product->nama}'"]]
                         ));
                     }
 
@@ -454,19 +489,19 @@ class CheckoutController extends Controller
                 $ongkir = $kurir->tarif;
 
                 $order = Order::create([
-                    'customer_id'       => $customerId,
-                    'pelanggan_id'      => $customerId,
-                    'nama_penerima'     => $validated['nama_penerima'],
-                    'alamat_penerima'   => $validated['alamat_penerima'],
-                    'kurir_id'          => $validated['kurir_id'],
+                    'customer_id' => $customerId,
+                    'pelanggan_id' => $customerId,
+                    'nama_penerima' => $validated['nama_penerima'],
+                    'alamat_penerima' => $validated['alamat_penerima'],
+                    'kurir_id' => $validated['kurir_id'],
                     'payment_method_id' => $validated['payment_method_id'],
-                    'subtotal'          => $subtotal,
-                    'ongkir'            => $ongkir,
-                    'total_harga'       => $subtotal + $ongkir,
-                    'status'            => 'menunggu_pembayaran',
-                    'payment_status'    => 'belum_bayar',
-                    'idempotency_key'   => $idempotencyKey,
-                    'tanggal_antar'     => $validated['tanggal_antar'],
+                    'subtotal' => $subtotal,
+                    'ongkir' => $ongkir,
+                    'total_harga' => $subtotal + $ongkir,
+                    'status' => 'menunggu_pembayaran',
+                    'payment_status' => 'belum_bayar',
+                    'idempotency_key' => $idempotencyKey,
+                    'tanggal_antar' => $validated['tanggal_antar'],
                     'tanggal_pengantaran' => $validated['tanggal_antar'],
                     'slot_pengantaran' => $validated['slot_pengantaran'] ?? null,
                 ]);
@@ -480,7 +515,7 @@ class CheckoutController extends Controller
                     ->delete();
 
                 return $order->load('items');
-            });
+            }, 5);
 
             return $this->jsonResponse(
                 'sukses',
