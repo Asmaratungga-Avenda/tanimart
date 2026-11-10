@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,7 @@ import 'package:tokotani/services/api_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
   group('formatters', () {
     test('formatRupiah memakai pemisah ribuan', () {
       expect(formatRupiah(0), 'Rp 0');
@@ -96,10 +98,27 @@ void main() {
           );
         }
 
-        // Paginated produk response
         final allProducts = [
-          {'id': 1, 'nama': 'Tomat', 'harga': 9000, 'kategori': 'Sayuran', 'stok': 5, 'tersedia': true, 'satuan_jual': 'kg', 'foto': null},
-          {'id': 2, 'nama': 'Apel', 'harga': 30000, 'kategori': 'Buah', 'stok': 0, 'tersedia': true, 'satuan_jual': 'kg', 'foto': null},
+          {
+            'id': 1,
+            'nama': 'Tomat',
+            'harga': 9000,
+            'kategori': 'Sayuran',
+            'stok': 5,
+            'tersedia': true,
+            'satuan_jual': 'kg',
+            'foto': null,
+          },
+          {
+            'id': 2,
+            'nama': 'Apel',
+            'harga': 30000,
+            'kategori': 'Buah',
+            'stok': 0,
+            'tersedia': true,
+            'satuan_jual': 'kg',
+            'foto': null,
+          },
         ];
 
         final start = (page - 1) * 15;
@@ -127,7 +146,6 @@ void main() {
       expect(provider.categories.map((c) => c.nama), ['Sayuran', 'Buah']);
 
       provider.setCategory('Buah');
-      // Tunggu pemuatan ulang kategori selesai (async).
       while (provider.isLoading) {
         await Future.delayed(const Duration(milliseconds: 10));
       }
@@ -152,6 +170,30 @@ void main() {
       await provider.ensureLoaded();
       expect(provider.all.firstWhere((p) => p.id == 2).isAvailable, isFalse);
       expect(provider.latest().map((p) => p.id), [1]);
+    });
+
+    test('refresh gagal tetap mempertahankan produk sebelumnya', () async {
+      final provider = ProductProvider();
+      await provider.ensureLoaded();
+
+      final produkSebelumnya =
+          provider.all.map((p) => p.id).toList();
+
+      ApiService.httpClient = MockClient((request) async {
+        throw Exception('Koneksi terputus');
+      });
+
+      await provider.refresh();
+
+      expect(
+        provider.all.map((p) => p.id).toList(),
+        produkSebelumnya,
+      );
+     expect(
+  provider.refreshError,
+  'Terjadi gangguan pada sistem. Silakan coba beberapa saat lagi.',
+);
+      expect(provider.isRefreshing, isFalse);
     });
   });
 }
