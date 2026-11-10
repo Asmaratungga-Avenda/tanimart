@@ -13,7 +13,7 @@ class ProductCategory {
     return ProductCategory(
       id: int.tryParse('${json['id'] ?? 0}'),
       nama: '${json['nama'] ?? json['nama_kategori'] ?? json['kategori'] ?? json['name'] ?? ''}',
-      gambar: json['gambar']?.toString(),
+      gambar: (json['gambar_url'] ?? json['gambar'])?.toString(),
     );
   }
 }

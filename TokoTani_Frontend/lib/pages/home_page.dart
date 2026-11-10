@@ -13,6 +13,7 @@ import '../providers/product_provider.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/app_search_field.dart';
 import '../widgets/product_card.dart';
+import '../widgets/product_image.dart';
 import '../widgets/section_header.dart';
 import '../widgets/state_views.dart';
 import 'product_detail_page.dart';
@@ -398,7 +399,16 @@ class _CategoryItem extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: p.border),
               ),
-              child: Icon(icon, color: p.brandText, size: 26),
+              child: category.gambar == null || category.gambar!.isEmpty
+                  ? Icon(icon, color: p.brandText, size: 26)
+                  : ClipOval(
+                      child: ProductImage(
+                        url: category.gambar,
+                        width: 56,
+                        height: 56,
+                        cacheWidth: 112,
+                      ),
+                    ),
             ),
             const SizedBox(height: 6),
             Text(

@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:tokotani/core/config/api_config.dart';
 import 'package:tokotani/core/utils/formatters.dart';
 import 'package:tokotani/core/utils/order_status.dart';
+import 'package:tokotani/models/category.dart';
 import 'package:tokotani/providers/product_provider.dart';
 import 'package:tokotani/services/api_service.dart';
 
@@ -44,6 +45,19 @@ void main() {
     test('path relatif diarahkan ke storage server', () {
       final url = ApiConfig.resolveMediaUrl('produk/tomat.jpg');
       expect(url, '${ApiConfig.origin}/storage/produk/tomat.jpg');
+    });
+
+    test('category image paths from Laravel resolve to public storage', () {
+      final category = ProductCategory.fromJson({
+        'id': 8,
+        'nama_kategori': 'Sayuran Segar',
+        'gambar': 'categories/sayuranSegar/sayuran.jpg',
+      });
+
+      expect(
+        ApiConfig.resolveMedia(category.gambar),
+        '${ApiConfig.origin}/storage/categories/sayuranSegar/sayuran.jpg',
+      );
     });
 
     test('foto kosong menghasilkan null (tanpa foto pengganti)', () {
