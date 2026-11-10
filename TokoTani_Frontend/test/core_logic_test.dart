@@ -142,6 +142,7 @@ void main() {
     test('memuat sekali lalu memfilter di perangkat', () async {
       final provider = ProductProvider();
       await provider.ensureLoaded();
+
       expect(provider.all.length, 2);
       expect(provider.categories.map((c) => c.nama), ['Sayuran', 'Buah']);
 
@@ -168,6 +169,7 @@ void main() {
     test('produk stok 0 tidak dianggap tersedia', () async {
       final provider = ProductProvider();
       await provider.ensureLoaded();
+
       expect(provider.all.firstWhere((p) => p.id == 2).isAvailable, isFalse);
       expect(provider.latest().map((p) => p.id), [1]);
     });
@@ -189,11 +191,28 @@ void main() {
         provider.all.map((p) => p.id).toList(),
         produkSebelumnya,
       );
-     expect(
-  provider.refreshError,
-  'Terjadi gangguan pada sistem. Silakan coba beberapa saat lagi.',
-);
+      expect(
+        provider.refreshError,
+        'Terjadi gangguan pada sistem. Silakan coba beberapa saat lagi.',
+      );
       expect(provider.isRefreshing, isFalse);
+    });
+
+    test('produk dapat diurutkan berdasarkan harga dan nama', () async {
+      final provider = ProductProvider();
+      await provider.ensureLoaded();
+
+      provider.setSort(ProductSort.priceAsc);
+      expect(
+        provider.filtered.map((p) => p.nama).toList(),
+        ['Tomat', 'Apel'],
+      );
+
+      provider.setSort(ProductSort.name);
+      expect(
+        provider.filtered.map((p) => p.nama).toList(),
+        ['Apel', 'Tomat'],
+      );
     });
   });
 }
