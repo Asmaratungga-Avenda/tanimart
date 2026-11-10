@@ -82,7 +82,7 @@ void main() {
 
     test('memuat sekali lalu memfilter di perangkat', () async {
       final provider = ProductProvider();
-      final error = await provider.load();
+      final error = await provider.loadMore();
       expect(error, isNull);
       expect(provider.all.length, 2);
       expect(provider.categories, ['Sayuran', 'Buah']);
@@ -90,7 +90,7 @@ void main() {
       provider.setCategory('Buah');
       expect(provider.filtered.map((p) => p.nama), ['Apel']);
 
-      provider.setFilter(query: 'tom');
+      provider.setFilter(query: 'tomat');
       expect(provider.filtered.map((p) => p.nama), ['Tomat']);
 
       provider.setSort(ProductSort.priceDesc);
@@ -100,7 +100,7 @@ void main() {
 
     test('produk stok 0 tidak dianggap tersedia', () async {
       final provider = ProductProvider();
-      await provider.load();
+      await provider.loadMore();
       expect(provider.all.firstWhere((p) => p.id == 2).isAvailable, isFalse);
       expect(provider.latest().map((p) => p.id), [1]);
     });
