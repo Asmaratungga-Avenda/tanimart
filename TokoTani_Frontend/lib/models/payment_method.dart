@@ -19,10 +19,13 @@ class PaymentMethod {
         '$rawAktif' == '1' ||
         '$rawAktif'.toLowerCase() == 'true';
 
+    final nama = '${json['nama'] ?? ''}'.trim();
+    final deskripsi = json['deskripsi']?.toString().trim();
+
     return PaymentMethod(
       id: int.tryParse('${json['id']}') ?? 0,
-      nama: '${json['nama'] ?? ''}',
-      deskripsi: json['deskripsi']?.toString(),
+      nama: nama,
+      deskripsi: (deskripsi != null && deskripsi.isNotEmpty) ? deskripsi : null,
       aktif: isAktif,
     );
   }
