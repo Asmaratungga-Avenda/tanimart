@@ -38,7 +38,8 @@ class ItemsRelationManager extends RelationManager
                     ->label('Nama Produk')
                     ->searchable()
                     ->sortable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->wrap(),
                 TextColumn::make('product.kategori')
                     ->label('Kategori')
                     ->sortable(),

@@ -515,7 +515,7 @@ class CheckoutController extends Controller
                     ->delete();
 
                 return $order->load('items');
-            }, 3);
+            }, 5);
 
             return $this->jsonResponse(
                 'sukses',
