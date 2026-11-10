@@ -272,14 +272,29 @@ Demonstrasikan menjalankan backend dan Flutter, registrasi/login, katalog, keran
 Proyek Ini Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB Dan SisTer).
 
 
+Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB dan SisTer).
+
 ## 👥 Anggota Kelompok
 
 | No | Nama Lengkap | NIM | Peran |
-| :---: | :--- | :---: | :---:|
-| 1 | **Yudhistira Empi** | 24102023 | Ketua |
+| :---: | :--- | :---: | :---: |
+| 1 | Yudhistira Empi | 24102023 | Ketua |
 | 2 | Asmaratungga Avenda D.P. | 24102006 | Anggota |
 | 3 | Eka Yuvita Sari Widya Diningrum | 24102008 | Anggota |
 | 4 | Hikmah Nutriana | 24102011 | Anggota |
 | 5 | M. Adzahahabi Putra Darmawan | 24102013 | Anggota |
 | 6 | Moh Farhan Ali | 24102016 | Anggota |
 | 7 | Vera Adelia | 24102032 | Anggota |
+
+## Kontribusi
+
+Pengembangan TaniMart dilakukan secara kolaboratif. Setiap anggota tim dapat berkontribusi dengan cara:
+
+1. Memeriksa kode program sebelum melakukan perubahan.
+2. Memperbaiki bug yang ditemukan.
+3. Menambahkan atau meningkatkan fitur aplikasi.
+4. Melakukan pengujian setelah perubahan.
+5. Mengirimkan perubahan melalui Git commit dan pull request.
+
+Gunakan pesan commit yang jelas agar setiap perubahan mudah dipahami dan ditelusuri.
+
