@@ -35,6 +35,12 @@ class Product {
         '$rawMudahRusak' == '1' ||
         '$rawMudahRusak'.toLowerCase() == 'true';
 
+    final foto = (json['foto'] ??
+            json['gambar_url'] ??
+            json['image_url'] ??
+            json['gambar'])
+        ?.toString();
+
     return Product(
       id: int.tryParse('${json['id']}') ?? 0,
       nama: '${json['nama'] ?? ''}',
@@ -45,9 +51,12 @@ class Product {
       deskripsi: json['deskripsi']?.toString(),
       satuanJual: '${json['satuan_jual'] ?? 'kg'}',
       mudahRusak: isMudahRusak,
-      foto: json['foto']?.toString(),
+      foto: foto,
     );
   }
+
+  /// Dapat dibeli: tersedia menurut server dan stok masih ada.
+  bool get isAvailable => tersedia && stok > 0;
 
   Map<String, dynamic> toJson() => {
     'nama': nama,

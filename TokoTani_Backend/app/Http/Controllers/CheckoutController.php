@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\DeliverOrderSimulation;
 use App\Models\Cart;
 use App\Models\Courier;
 use App\Models\Order;
@@ -11,9 +12,8 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -23,11 +23,11 @@ class CheckoutController extends Controller
     {
         $response = [
             'success' => $status === 'sukses',
-            'status'  => $status,
-            'code'    => (string) $code,
+            'status' => $status,
+            'code' => (string) $code,
             'message' => $message,
-            'data'    => $data,
-            'meta'    => $meta,
+            'data' => $data,
+            'meta' => $meta,
         ];
 
         if ($errors !== null) {
@@ -39,11 +39,7 @@ class CheckoutController extends Controller
 
     private function getCustomerId(Request $request): int
     {
-        $id = $request->header('X-Pelanggan-Id')
-            ?: $request->header('X-Customer-Id')
-            ?: $request->input('customer_id');
-
-        return (int) ($id ?: 1);
+        return (int) $request->user()->id;
     }
 
     public function couriers()
@@ -73,6 +69,7 @@ class CheckoutController extends Controller
     public function index()
     {
         $orders = Order::with(['items.product', 'courier', 'paymentMethod'])
+            ->where('customer_id', request()->user()->id)
             ->latest()
             ->get();
 
@@ -86,7 +83,9 @@ class CheckoutController extends Controller
 
     public function show($id)
     {
-        $order = Order::with(['items.product', 'courier', 'paymentMethod'])->find($id);
+        $order = Order::with(['items.product', 'courier', 'paymentMethod'])
+            ->where('customer_id', request()->user()->id)
+            ->find($id);
 
         if (! $order) {
             return $this->jsonResponse(
@@ -117,7 +116,7 @@ class CheckoutController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'status' => 'required|string|in:menunggu_pembayaran,dibayar,diproses,dikirim,selesai,dibatalkan',
+            'status' => 'required|string|in:menunggu_pembayaran,menunggu_konfirmasi,dibayar,diproses,dikirim,tiba,selesai,dibatalkan',
         ]);
 
         if ($validator->fails()) {
@@ -130,7 +129,25 @@ class CheckoutController extends Controller
             );
         }
 
-        $order->status = $request->input('status');
+        $nextStatus = $request->input('status');
+        if (! $order->canTransitionTo($nextStatus)) {
+            return $this->jsonResponse(
+                'gagal',
+                409,
+                'Perubahan status pesanan tidak diizinkan.'
+            );
+        }
+
+        $order->status = $nextStatus;
+        if ($nextStatus === 'dibayar') {
+            $order->payment_status = 'lunas';
+        }
+        if ($nextStatus === 'tiba' && $order->tiba_at === null) {
+            $order->tiba_at = now();
+        }
+        if ($nextStatus === 'selesai' && $order->selesai_at === null) {
+            $order->selesai_at = now();
+        }
         $order->save();
 
         return $this->jsonResponse(
@@ -141,8 +158,177 @@ class CheckoutController extends Controller
         );
     }
 
+    /**
+     * POST /api/pesanan/{id}/pembayaran
+     * Pelanggan Konfirmasi pembayaran. Hanya boleh dilakukan oleh pemilik pesanan
+     * dan hanya ketika status masih menunggu_pembayaran.
+     * Konfirmasi hanya diajukan pelanggan; verifikasi tetap dilakukan admin.
+     */
+    public function pembayaran(Request $request, $id)
+    {
+        $customerId = $this->getCustomerId($request);
+
+        $order = Order::find($id);
+
+        if (! $order) {
+            return $this->jsonResponse('gagal', 404, 'Pesanan tidak ditemukan');
+        }
+
+        // Hanya pemilik pesanan yang boleh konfirmasi pembayaran.
+        if ((int) $order->customer_id !== $customerId) {
+            return $this->jsonResponse('gagal', 403, 'Anda bukan pemilik pesanan ini.');
+        }
+
+        if ($order->status !== 'menunggu_pembayaran') {
+            return $this->jsonResponse(
+                'gagal',
+                409,
+                'Pembayaran hanya dapat dikonfirmasi pada pesanan yang masih menunggu pembayaran.'
+            );
+        }
+
+        if (! $order->canTransitionTo('menunggu_konfirmasi')) {
+            return $this->jsonResponse('gagal', 409, 'Transisi status pembayaran tidak diizinkan.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'payment_method_id' => 'sometimes|required|integer|exists:payment_methods,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->jsonResponse('gagal', 422, 'Validasi gagal', null, $validator->errors());
+        }
+
+        $order->update([
+            'status' => 'menunggu_konfirmasi',
+            'payment_status' => 'menunggu_verifikasi',
+            'payment_method_id' => $validator->validated()['payment_method_id'] ?? $order->payment_method_id,
+        ]);
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Konfirmasi pembayaran diterima dan menunggu verifikasi admin.',
+            $order->load(['items.product', 'courier', 'paymentMethod'])
+        );
+    }
+
+    /**
+     * POST /api/pesanan/{id}/kirim
+     * Admin kirim pesanan. Hanya boleh dilakukan admin dan hanya ketika status diproses.
+     * Setelah dikirim, simulasi pengiriman berjalan di backend (Laravel Queue).
+     */
+    public function kirim(Request $request, $id)
+    {
+        $order = Order::find($id);
+
+        if (! $order) {
+            return $this->jsonResponse('gagal', 404, 'Pesanan tidak ditemukan');
+        }
+
+        if ($order->status !== 'diproses') {
+            return $this->jsonResponse(
+                'gagal',
+                409,
+                'Pesanan hanya dapat dikirim ketika statusnya diproses.'
+            );
+        }
+
+        if (! $order->canTransitionTo('dikirim')) {
+            return $this->jsonResponse('gagal', 409, 'Transisi status pesanan tidak diizinkan.');
+        }
+
+        $seconds = Config::get('delivery.seconds', 5);
+        $enabled = Config::get('delivery.enabled', true);
+
+        $order->update([
+            'status' => 'dikirim',
+            'dikirim_at' => now(),
+        ]);
+
+        if ($enabled) {
+            DeliverOrderSimulation::dispatch($order->id)->delay(now()->addSeconds($seconds));
+        }
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Pesanan berhasil dikirim. Pengiriman akan tiba dalam simulasi.',
+            $order->load(['items.product', 'courier', 'paymentMethod'])
+        );
+    }
+
+    /**
+     * POST /api/pesanan/{id}/selesai
+     * Pelanggan menyelesaikan pesanan. Hanya boleh dilakukan oleh pemilik pesanan
+     * dan hanya ketika status sudah dikirim atau tiba.
+     */
+    public function selesai(Request $request, $id)
+    {
+        $customerId = $this->getCustomerId($request);
+
+        try {
+            $order = DB::transaction(function () use ($id, $customerId) {
+                $order = Order::whereKey($id)->lockForUpdate()->first();
+
+                if (! $order) {
+                    abort($this->jsonResponse('gagal', 404, 'Pesanan tidak ditemukan'));
+                }
+
+                // Hanya pemilik pesanan yang boleh menyelesaikan pesanan miliknya sendiri.
+                if ((int) $order->customer_id !== $customerId) {
+                    abort($this->jsonResponse('gagal', 403, 'Anda bukan pemilik pesanan ini.'));
+                }
+
+                if ($order->status === 'selesai') {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        'Pesanan ini sudah diselesaikan sebelumnya.'
+                    ));
+                }
+
+                if ($order->status === 'dibatalkan') {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        'Pesanan yang dibatalkan tidak dapat diselesaikan.'
+                    ));
+                }
+
+                if (! in_array($order->status, ['dikirim', 'tiba'], true)) {
+                    abort($this->jsonResponse(
+                        'gagal',
+                        409,
+                        'Pesanan hanya dapat diselesaikan setelah status pesanan dikirim.'
+                    ));
+                }
+
+                $order->status = 'selesai';
+                $order->selesai_at = now();
+                if ($order->tiba_at === null) {
+                    $order->tiba_at = now();
+                }
+                $order->save();
+
+                return $order->load(['items.product', 'courier', 'paymentMethod']);
+            });
+        } catch (HttpResponseException $e) {
+            return $e->getResponse();
+        }
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Pesanan selesai. Terima kasih telah berbelanja di TaniMart.',
+            $order
+        );
+    }
+
     public function store(Request $request)
     {
+        $customerId = $this->getCustomerId($request);
+
         // Mendukung kunci idempoten baik dari header maupun body JSON
         $idempotencyKey = $request->header('X-Kunci-Idempoten')
             ?: $request->header('X-Idempotency-Key')
@@ -157,6 +343,14 @@ class CheckoutController extends Controller
                 ->first();
 
             if ($existingOrder) {
+                if ((int) $existingOrder->customer_id !== $customerId) {
+                    return $this->jsonResponse(
+                        'gagal',
+                        409,
+                        'Kunci idempotensi tidak dapat digunakan untuk akun ini.'
+                    );
+                }
+
                 return $this->jsonResponse(
                     'sukses',
                     200,
@@ -167,6 +361,15 @@ class CheckoutController extends Controller
         }
 
         $inputData = $request->all();
+        if (! array_key_exists('items', $inputData)) {
+            $inputData['items'] = Cart::where('customer_id', $customerId)
+                ->get(['product_id', 'quantity'])
+                ->map(fn (Cart $item) => [
+                    'product_id' => $item->product_id,
+                    'quantity' => $item->quantity,
+                ])
+                ->all();
+        }
         if ($idempotencyKey !== null) {
             $inputData['idempotency_key'] = $idempotencyKey;
         }
@@ -174,7 +377,12 @@ class CheckoutController extends Controller
         $validator = Validator::make($inputData, [
             'nama_penerima' => 'required|string|max:255',
             'alamat_penerima' => 'required|string|max:2000',
-            'kurir_id' => ['required', Rule::exists('couriers', 'id')->where('aktif', true)],
+            'kurir_id' => [
+                'required',
+                Rule::exists('couriers', 'id')
+                    ->where('aktif', true)
+                    ->whereNull('deleted_at'),
+            ],
             'payment_method_id' => ['required', Rule::exists('payment_methods', 'id')->where('aktif', true)],
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|distinct|exists:products,id',
@@ -193,7 +401,6 @@ class CheckoutController extends Controller
             );
         }
 
-        $customerId = $this->getCustomerId($request);
         $validated = $validator->validated();
         $tanggalAntar = Carbon::createFromFormat('Y-m-d', $validated['tanggal_antar'])->startOfDay();
         $isSameDay = $tanggalAntar->isSameDay(Carbon::today());
@@ -237,7 +444,23 @@ class CheckoutController extends Controller
                         abort($this->jsonResponse(
                             'gagal',
                             422,
-                            "Produk '{$product->nama}' bersifat mudah rusak dan wajib dikirim pada hari yang sama"
+                            "Produk '{$product->nama}' wajib dikirim pada hari yang sama",
+                            null,
+                            ['checkout' => ["Produk '{$product->nama}' wajib dikirim pada hari yang sama"]]
+                        ));
+                    }
+
+                    $maxQuantity = $product->mudah_rusak
+                        ? (int) Config::get('checkout.max_mudah_rusak_per_pesanan', 5)
+                        : 20;
+
+                    if ($item['quantity'] > $maxQuantity) {
+                        abort($this->jsonResponse(
+                            'gagal',
+                            422,
+                            "Kuantitas maksimal {$maxQuantity} untuk produk '{$product->nama}'",
+                            null,
+                            ['checkout' => ["Kuantitas maksimal {$maxQuantity} untuk produk '{$product->nama}'"]]
                         ));
                     }
 
@@ -252,6 +475,7 @@ class CheckoutController extends Controller
                     $product->save();
                     $orderItems[] = [
                         'product_id' => $product->id,
+                        'nama_produk' => $product->nama,
                         'quantity' => $item['quantity'],
                         'harga_satuan' => $product->harga,
                         'subtotal' => $itemSubtotal,
@@ -265,6 +489,8 @@ class CheckoutController extends Controller
                 $ongkir = $kurir->tarif;
 
                 $order = Order::create([
+                    'customer_id' => $customerId,
+                    'pelanggan_id' => $customerId,
                     'nama_penerima' => $validated['nama_penerima'],
                     'alamat_penerima' => $validated['alamat_penerima'],
                     'kurir_id' => $validated['kurir_id'],
@@ -273,25 +499,23 @@ class CheckoutController extends Controller
                     'ongkir' => $ongkir,
                     'total_harga' => $subtotal + $ongkir,
                     'status' => 'menunggu_pembayaran',
+                    'payment_status' => 'belum_bayar',
                     'idempotency_key' => $idempotencyKey,
                     'tanggal_antar' => $validated['tanggal_antar'],
+                    'tanggal_pengantaran' => $validated['tanggal_antar'],
+                    'slot_pengantaran' => $validated['slot_pengantaran'] ?? null,
                 ]);
 
                 $order->items()->createMany($orderItems);
 
                 // Sinkronisasi keranjang: Hapus item yang berhasil di-checkout dari tabel carts
-                if (Schema::hasTable('carts')) {
-                    $orderedProductIds = collect($orderItems)->pluck('product_id')->all();
-                    Cart::where('customer_id', $customerId)
-                        ->whereIn('product_id', $orderedProductIds)
-                        ->delete();
-                }
+                $orderedProductIds = collect($orderItems)->pluck('product_id')->all();
+                Cart::where('customer_id', $customerId)
+                    ->whereIn('product_id', $orderedProductIds)
+                    ->delete();
 
                 return $order->load('items');
-            });
-
-            $customerId = $request->header('X-Pelanggan-Id') ?? '1';
-            Cache::put("cart_user_{$customerId}", [], 86400);
+            }, 5);
 
             return $this->jsonResponse(
                 'sukses',
@@ -308,6 +532,14 @@ class CheckoutController extends Controller
                     ->first();
 
                 if ($existingOrder) {
+                    if ((int) $existingOrder->customer_id !== $customerId) {
+                        return $this->jsonResponse(
+                            'gagal',
+                            409,
+                            'Kunci idempotensi tidak dapat digunakan untuk akun ini.'
+                        );
+                    }
+
                     return $this->jsonResponse(
                         'sukses',
                         200,

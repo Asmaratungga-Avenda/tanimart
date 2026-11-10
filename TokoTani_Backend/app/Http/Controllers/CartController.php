@@ -13,12 +13,12 @@ class CartController extends Controller
     {
         $response = [
             'success' => $status === 'sukses',
-            'status'  => $status,
-            'code'    => (string) $code,
+            'status' => $status,
+            'code' => (string) $code,
             'message' => $message,
-            'data'    => $data,
-            'meta'    => $meta,
-            'errors'  => $errors,
+            'data' => $data,
+            'meta' => $meta,
+            'errors' => $errors,
         ];
 
         return response()->json($response, (int) $code);
@@ -26,11 +26,7 @@ class CartController extends Controller
 
     private function getCustomerId(Request $request): int
     {
-        $id = $request->header('X-Pelanggan-Id')
-            ?: $request->header('X-Customer-Id')
-            ?: $request->input('customer_id');
-
-        return (int) ($id ?: 1);
+        return (int) $request->user()->id;
     }
 
     public function index(Request $request)
@@ -46,7 +42,7 @@ class CartController extends Controller
 
         foreach ($carts as $cart) {
             $product = $cart->product;
-            if (!$product) {
+            if (! $product) {
                 continue;
             }
 
@@ -54,27 +50,29 @@ class CartController extends Controller
             $subtotal += $itemSubtotal;
 
             $items[] = [
-                'id'          => $cart->id,
+                'id' => $cart->id,
                 'customer_id' => $cart->customer_id,
-                'produk_id'   => $product->id,
-                'nama'        => $product->nama,
-                'harga'       => $product->harga,
-                'jumlah'      => $cart->quantity,
-                'stok'        => $product->stok,
+                'produk_id' => $product->id,
+                'nama' => $product->nama,
+                'harga' => $product->harga,
+                'jumlah' => $cart->quantity,
+                'stok' => $product->stok,
                 'satuan_jual' => $product->satuan_jual,
                 'mudah_rusak' => (bool) $product->mudah_rusak,
-                'foto'        => null,
-                'subtotal'    => $itemSubtotal,
-                'produk'      => [
-                    'id'          => $product->id,
-                    'nama'        => $product->nama,
-                    'harga'       => $product->harga,
-                    'kategori'    => $product->kategori,
-                    'stok'        => $product->stok,
-                    'tersedia'    => (bool) $product->tersedia,
-                    'deskripsi'   => $product->deskripsi,
+                'foto' => $product->gambar_url,
+                'subtotal' => $itemSubtotal,
+                'produk' => [
+                    'id' => $product->id,
+                    'nama' => $product->nama,
+                    'harga' => $product->harga,
+                    'kategori' => $product->kategori,
+                    'stok' => $product->stok,
+                    'tersedia' => (bool) $product->tersedia,
+                    'deskripsi' => $product->deskripsi,
                     'satuan_jual' => $product->satuan_jual,
                     'mudah_rusak' => (bool) $product->mudah_rusak,
+                    'gambar_url' => $product->gambar_url,
+                    'image_url' => $product->image_url,
                 ],
             ];
         }
@@ -84,7 +82,7 @@ class CartController extends Controller
             200,
             'Isi keranjang belanja berhasil diambil',
             [
-                'items'    => $items,
+                'items' => $items,
                 'subtotal' => $subtotal,
             ]
         );
@@ -96,19 +94,19 @@ class CartController extends Controller
 
         // Menerima baik produk_id maupun product_id, jumlah maupun quantity
         $productId = $request->input('produk_id', $request->input('product_id'));
-        $quantity  = $request->input('jumlah', $request->input('quantity', 1));
+        $quantity = $request->input('jumlah', $request->input('quantity', 1));
 
         $validator = Validator::make([
             'product_id' => $productId,
-            'quantity'   => $quantity,
+            'quantity' => $quantity,
         ], [
             'product_id' => 'required|integer|exists:products,id',
-            'quantity'   => 'required|integer|min:1',
+            'quantity' => 'required|integer|min:1',
         ], [
             'product_id.required' => 'ID produk wajib diisi.',
-            'product_id.exists'   => 'Produk tidak ditemukan.',
-            'quantity.required'   => 'Jumlah wajib diisi.',
-            'quantity.min'        => 'Jumlah minimal 1.',
+            'product_id.exists' => 'Produk tidak ditemukan.',
+            'quantity.required' => 'Jumlah wajib diisi.',
+            'quantity.min' => 'Jumlah minimal 1.',
         ]);
 
         if ($validator->fails()) {
@@ -123,7 +121,7 @@ class CartController extends Controller
 
         $product = Product::find($productId);
 
-        if (!$product->tersedia || $product->stok <= 0) {
+        if (! $product->tersedia || $product->stok <= 0) {
             return $this->jsonResponse(
                 'gagal',
                 409,
@@ -151,8 +149,8 @@ class CartController extends Controller
         } else {
             $cart = Cart::create([
                 'customer_id' => $customerId,
-                'product_id'  => $productId,
-                'quantity'    => $desiredQty,
+                'product_id' => $productId,
+                'quantity' => $desiredQty,
             ]);
         }
 
@@ -160,13 +158,13 @@ class CartController extends Controller
 
         return $this->jsonResponse(
             'sukses',
-            201,
+            $existing ? 200 : 201,
             'Produk berhasil ditambahkan ke keranjang',
             [
-                'id'        => $cart->id,
+                'id' => $cart->id,
                 'produk_id' => $cart->product_id,
-                'jumlah'    => $cart->quantity,
-                'produk'    => $cart->product,
+                'jumlah' => $cart->quantity,
+                'produk' => $cart->product,
             ]
         );
     }
@@ -202,7 +200,7 @@ class CartController extends Controller
             ->where('customer_id', $customerId)
             ->first();
 
-        if (!$cart) {
+        if (! $cart) {
             return $this->jsonResponse(
                 'gagal',
                 404,
@@ -211,13 +209,13 @@ class CartController extends Controller
         }
 
         $product = $cart->product;
-        if (!$product || $intQty > $product->stok) {
+        if (! $product || ! $product->tersedia || $intQty > $product->stok) {
             $stokTersedia = $product ? $product->stok : 0;
-            return $this->jsonResponse(
-                'gagal',
-                409,
-                "Stok untuk '{$cart->product?->nama}' tidak mencukupi (tersedia: {$stokTersedia})."
-            );
+            $message = $product && ! $product->tersedia
+                ? "Produk '{$product->nama}' saat ini tidak tersedia."
+                : "Stok untuk '{$cart->product?->nama}' tidak mencukupi (tersedia: {$stokTersedia}).";
+
+            return $this->jsonResponse('gagal', 409, $message);
         }
 
         $cart->update(['quantity' => $intQty]);
@@ -227,9 +225,9 @@ class CartController extends Controller
             200,
             'Jumlah item keranjang berhasil diperbarui',
             [
-                'id'        => $cart->id,
+                'id' => $cart->id,
                 'produk_id' => $cart->product_id,
-                'jumlah'    => $cart->quantity,
+                'jumlah' => $cart->quantity,
             ]
         );
     }
@@ -242,7 +240,7 @@ class CartController extends Controller
             ->where('customer_id', $customerId)
             ->first();
 
-        if (!$cart) {
+        if (! $cart) {
             return $this->jsonResponse(
                 'gagal',
                 404,
@@ -268,8 +266,7 @@ class CartController extends Controller
         return $this->jsonResponse(
             'sukses',
             200,
-            'Keranjang belanja berhasil dikosongkan'
+            'Seluruh isi keranjang belanja berhasil dikosongkan'
         );
     }
 }
-

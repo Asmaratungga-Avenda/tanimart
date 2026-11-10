@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../core/config/api_config.dart';
 import '../models/cart_item.dart';
@@ -65,23 +67,43 @@ class CartResponse {
 }
 
 class ApiService {
-  // Menggunakan konfigurasi dinamis sesuai platform (Emulator, Device Fisik, atau Localhost)
-  static String get baseUrl => ApiConfig.baseUrl;
-  static const Duration timeoutDuration = ApiConfig.timeoutDuration;
+  /// Dipanggil saat server menjawab 401 (token tidak berlaku lagi).
+  static void Function()? onUnauthorized;
 
-  // Token statis atau ID pelanggan yang disepakati kelompok (sesuai batasan tugas)
-  static const Map<String, String> headers = ApiConfig.defaultHeaders;
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const String _tokenKey = 'sanctum_token';
+  @visibleForTesting
+  static http.Client httpClient = http.Client();
+  @visibleForTesting
+  static Future<String?> Function()? authTokenReader;
 
-  /// Flag simulasi data tiruan (Jalur B pada dokumen tugas).
-  /// Bernilai false secara default agar seluruh data diambil langsung dari Laravel API (Single Source of Truth).
-  static bool useMock = false;
+  static const Map<String, String> _baseHeaders = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  };
+
+  static Future<String?> readAuthToken() =>
+      authTokenReader?.call() ?? _secureStorage.read(key: _tokenKey);
+
+  static Future<void> clearAuthToken() => _secureStorage.delete(key: _tokenKey);
+
+  static Future<Map<String, String>> _headers({
+    Map<String, String>? extraHeaders,
+  }) async {
+    final token = await readAuthToken();
+    return {
+      ..._baseHeaders,
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      ...?extraHeaders,
+    };
+  }
 
   // -------------------------------------------------------------
   // HELPER URI & RESPONSE DECODING
   // -------------------------------------------------------------
 
   static Uri _uri(String path, [Map<String, String>? query]) {
-    return Uri.parse('$baseUrl$path').replace(queryParameters: query);
+    return Uri.parse('${ApiConfig.baseUrl}$path').replace(queryParameters: query);
   }
 
   static Map<String, dynamic> _decodeResponse(http.Response response) {
@@ -103,11 +125,11 @@ class ApiService {
     final body = decoded is Map<String, dynamic>
         ? decoded
         : <String, dynamic>{};
-    // Kompatibel dengan respons dual 'status: sukses' dan 'success: true'
-    final isSuccessStatus =
-        body['status'] == 'sukses' || body['success'] == true;
+    final isSuccessStatus = body['status'] == 'sukses';
     final isHttpSuccess =
         response.statusCode >= 200 && response.statusCode < 300;
+
+    if (response.statusCode == 401) onUnauthorized?.call();
 
     if (!isHttpSuccess || !isSuccessStatus) {
       final code = int.tryParse('${body['code']}') ?? response.statusCode;
@@ -161,14 +183,84 @@ class ApiService {
   static dynamic _extractData(Map<String, dynamic> body) =>
       body['data'] ?? body;
 
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
+    final response = await _send('POST', '/auth/login', {
+      'email': email.trim(),
+      'password': password,
+    });
+    return _storeAuthResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> register(
+    String name,
+    String email,
+    String password,
+  ) async {
+    final response = await _send('POST', '/auth/register', {
+      'name': name.trim(),
+      'email': email.trim(),
+      'password': password,
+      'password_confirmation': password,
+    });
+    return _storeAuthResponse(response);
+  }
+
+  static Future<Map<String, dynamic>> currentUser() async {
+    try {
+      final response = await httpClient
+          .get(_uri('/auth/me'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
+      final body = _decodeResponse(response);
+      final data = _requireMap(_extractData(body), 'profil pelanggan');
+      return _requireMap(data['user'] ?? data, 'profil pelanggan');
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  static Future<void> logout() async {
+    await _send('POST', '/auth/logout');
+    await clearAuthToken();
+  }
+
+  static Future<Map<String, dynamic>> _storeAuthResponse(
+    Map<String, dynamic> response,
+  ) async {
+    final data = _requireMap(_extractData(response), 'autentikasi');
+    final token = data['token'];
+    if (token is! String || token.isEmpty) {
+      throw _invalidResponse('autentikasi');
+    }
+    await _secureStorage.write(key: _tokenKey, value: token);
+    return _requireMap(data['user'], 'profil pelanggan');
+  }
+
+  static ApiException _invalidResponse(String resource) => ApiException(
+    statusCode: 502,
+    message: 'Format respons $resource dari server tidak valid.',
+    errorType: ApiErrorType.other,
+  );
+
+  static List<dynamic> _requireList(dynamic data, String resource) {
+    if (data is! List) throw _invalidResponse(resource);
+    return data;
+  }
+
+  static Map<String, dynamic> _requireMap(dynamic data, String resource) {
+    if (data is! Map) throw _invalidResponse(resource);
+    return Map<String, dynamic>.from(data);
+  }
+
   static ApiException _handleNetworkError(Object error) {
     if (error is ApiException) return error;
 
     if (error is TimeoutException) {
       return const ApiException(
         statusCode: 408,
-        message:
-            'Server tidak membalas dalam batas waktu (10 detik). Silakan coba lagi.',
+        message: 'Server tidak membalas tepat waktu. Silakan coba lagi.',
         errorType: ApiErrorType.timeout,
       );
     }
@@ -196,36 +288,33 @@ class ApiService {
   /// GET /api/keranjang
   /// Mengambil isi keranjang belanja beserta subtotal yang dihitung oleh server.
   static Future<CartResponse> getCart() async {
-    if (useMock) return _mockGetCart();
-
     try {
-      final response = await http
-          .get(_uri('/keranjang'), headers: headers)
-          .timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/keranjang'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
 
       final body = _decodeResponse(response);
       final data = _extractData(body);
 
-      List<CartItem> items = [];
-      int subtotal = 0;
-
+      dynamic rawItems;
+      dynamic rawSubtotal;
       if (data is Map) {
         final map = Map<String, dynamic>.from(data);
-        final rawItems =
-            map['items'] ?? map['detail'] ?? map['keranjang'] ?? [];
-        if (rawItems is List) {
-          items = rawItems
-              .map((e) => CartItem.fromJson(Map<String, dynamic>.from(e)))
-              .toList();
-        }
-        subtotal = int.tryParse('${map['subtotal'] ?? 0}') ?? 0;
+        rawItems = map['items'] ?? map['detail'] ?? map['keranjang'];
+        rawSubtotal = map['subtotal'];
       } else if (data is List) {
-        items = data
-            .map((e) => CartItem.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
-        subtotal = int.tryParse('${body['subtotal'] ?? 0}') ?? 0;
+        rawItems = data;
+        rawSubtotal = body['subtotal'];
+      } else {
+        throw _invalidResponse('keranjang');
       }
 
+      if (rawItems is! List) throw _invalidResponse('keranjang');
+      final subtotal = int.tryParse('$rawSubtotal');
+      if (subtotal == null || subtotal < 0) throw _invalidResponse('keranjang');
+      final items = rawItems
+          .map((item) => CartItem.fromJson(_requireMap(item, 'item keranjang')))
+          .toList();
       return CartResponse(items: items, subtotal: subtotal);
     } catch (e) {
       throw _handleNetworkError(e);
@@ -235,7 +324,6 @@ class ApiService {
   /// POST /api/keranjang
   /// Menambah item baru ke keranjang belanja.
   static Future<void> addCart(int produkId, int jumlah) async {
-    if (useMock) return _mockAddCart(produkId, jumlah);
     await _send('POST', '/keranjang', {
       'produk_id': produkId,
       'jumlah': jumlah,
@@ -247,150 +335,98 @@ class ApiService {
   /// Server mengembalikan kode 409 bila stok tidak mencukupi,
   /// dan kode 422 bila jumlah <= 0.
   static Future<void> updateCart(int cartId, int jumlah) async {
-    if (useMock) return _mockUpdateCart(cartId, jumlah);
     await _send('PUT', '/keranjang/$cartId', {'jumlah': jumlah});
   }
 
   /// DELETE /api/keranjang/{id}
   /// Menghapus satu item dari keranjang belanja.
   static Future<void> deleteCart(int cartId) async {
-    if (useMock) return _mockDeleteCart(cartId);
     await _send('DELETE', '/keranjang/$cartId');
   }
 
+  /// DELETE /api/keranjang
+  /// Mengosongkan keranjang melalui API.
+  static Future<void> clearCart() async {
+    await _send('DELETE', '/keranjang');
+  }
+
   // -------------------------------------------------------------
-  // ENDPOINT KELOLA PRODUK (Anggota 5)
+  // ENDPOINT PRODUK
   // -------------------------------------------------------------
 
   /// GET /api/produk
-  /// Mendukung parameter ?kategori= dan ?cari= sesuai spesifikasi Kriteria 2.
-  static Future<List<Product>> getProducts({
-    String? kategori,
-    String? cari,
-  }) async {
-    if (useMock) return _mockGetProducts(kategori: kategori, cari: cari);
-
+  /// Mengambil seluruh produk. Bila Laravel mengirim respons berhalaman
+  /// (`current_page` / `last_page`), halaman berikutnya diambil otomatis.
+  static Future<List<Product>> getProducts() async {
     try {
-      final queryParams = <String, String>{};
-      if (kategori != null && kategori.isNotEmpty && kategori != 'Semua') {
-        queryParams['kategori'] = kategori;
-      }
-      if (cari != null && cari.trim().isNotEmpty) {
-        queryParams['cari'] = cari.trim();
-      }
+      final products = <Product>[];
+      var page = 1;
+      var lastPage = 1;
+      do {
+        final response = await httpClient
+            .get(
+              _uri('/produk', page > 1 ? {'page': '$page'} : null),
+              headers: await _headers(),
+            )
+            .timeout(ApiConfig.timeout);
+        final body = _decodeResponse(response);
+        final data = _extractData(body);
 
-      final uri = _uri('/produk', queryParams.isEmpty ? null : queryParams);
-      final response = await http
-          .get(uri, headers: headers)
-          .timeout(timeoutDuration);
-      final body = _decodeResponse(response);
-      final data = _extractData(body);
-
-      final list = data is List
-          ? data
-          : (data is Map && data['data'] is List
-                ? data['data'] as List
-                : <dynamic>[]);
-
-      return list
-          .map((e) => Product.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
+        final List<dynamic> list;
+        if (data is Map) {
+          list = _requireList(data['data'], 'produk');
+          final last = int.tryParse('${data['last_page'] ?? 1}') ?? 1;
+          lastPage = last.clamp(1, _maxProductPages);
+        } else {
+          list = _requireList(data, 'produk');
+        }
+        products.addAll(
+          list.map((e) => Product.fromJson(_requireMap(e, 'produk'))),
+        );
+        page++;
+      } while (page <= lastPage);
+      return products;
     } catch (e) {
       throw _handleNetworkError(e);
     }
   }
 
-  /// GET /api/kategori
-  static Future<List<String>> getCategories() async {
-    if (useMock) return _mockGetCategories();
-
-    try {
-      final response = await http
-          .get(_uri('/kategori'), headers: headers)
-          .timeout(timeoutDuration);
-      final body = _decodeResponse(response);
-      final data = _extractData(body);
-      if (data is! List) return const [];
-
-      return data
-          .map((item) {
-            if (item is String) return item;
-            if (item is Map) {
-              return '${item['nama_kategori'] ?? item['kategori'] ?? item['nama'] ?? ''}';
-            }
-            return '';
-          })
-          .where((category) => category.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
-    } catch (e) {
-      throw _handleNetworkError(e);
-    }
-  }
-
-  /// POST /api/produk
-  /// Menambah produk pertanian baru. Mengembalikan 422 jika validasi gagal.
-  static Future<void> createProduct(Map<String, dynamic> payload) async {
-    if (useMock) return _mockCreateProduct(payload);
-    await _send('POST', '/produk', payload);
-  }
-
-  /// PUT /api/produk/{id}
-  /// Memperbarui data produk pertanian. Mengembalikan 404 bila tidak ada, 422 bila validasi gagal.
-  static Future<void> updateProduct(
-    int id,
-    Map<String, dynamic> payload,
-  ) async {
-    if (useMock) return _mockUpdateProduct(id, payload);
-    await _send('PUT', '/produk/$id', payload);
-  }
-
-  /// DELETE /api/produk/{id}
-  /// Menghapus produk. Mengembalikan 409 bila produk masih terpakai pada pesanan aktif.
-  static Future<void> deleteProduct(int id) async {
-    if (useMock) return _mockDeleteProduct(id);
-    await _send('DELETE', '/produk/$id');
-  }
+  static const int _maxProductPages = 20;
 
   // -------------------------------------------------------------
-  // ENDPOINT KURIR
+  // ENDPOINT CHECKOUT & PENGIRIMAN
   // -------------------------------------------------------------
 
   /// GET /api/kurir
   static Future<List<Courier>> getCouriers() async {
-    if (useMock) return _mockGetCouriers();
     try {
-      final response = await http
-          .get(_uri('/kurir'), headers: headers)
-          .timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/kurir'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
-      final list = data is List ? data : <dynamic>[];
+      final list = _requireList(data, 'kurir');
       return list
-          .map((e) => Courier.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => Courier.fromJson(_requireMap(e, 'kurir')))
           .toList();
     } catch (e) {
       throw _handleNetworkError(e);
     }
   }
 
-  // -------------------------------------------------------------
-  // ENDPOINT METODE PEMBAYARAN
-  // -------------------------------------------------------------
-
   /// GET /api/metode-pembayaran
   static Future<List<PaymentMethod>> getPaymentMethods() async {
-    if (useMock) return _mockGetPaymentMethods();
     try {
-      final response = await http
-          .get(_uri('/metode-pembayaran'), headers: headers)
-          .timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/metode-pembayaran'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
-      final list = data is List ? data : <dynamic>[];
+      final list = _requireList(data, 'metode pembayaran');
       return list
-          .map((e) => PaymentMethod.fromJson(Map<String, dynamic>.from(e)))
+          .map(
+            (e) => PaymentMethod.fromJson(_requireMap(e, 'metode pembayaran')),
+          )
           .toList();
     } catch (e) {
       throw _handleNetworkError(e);
@@ -399,12 +435,37 @@ class ApiService {
 
   /// GET /api/produk/{id}
   static Future<Product> getProduct(int id) async {
-    if (useMock) return _mockGetProduct(id);
     try {
-      final response = await http.get(_uri('/produk/$id'), headers: headers).timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/produk/$id'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
-      return Product.fromJson(Map<String, dynamic>.from(data));
+      return Product.fromJson(_requireMap(data, 'produk'));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// GET /api/kategori
+  static Future<List<String>> getCategories() async {
+    try {
+      final response = await httpClient
+          .get(_uri('/kategori'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final list = _requireList(data, 'kategori');
+      final names = <String>[];
+      for (final item in list) {
+        final name = item is Map
+            ? (item['nama'] ?? item['name'] ?? item['kategori'])?.toString()
+            : item?.toString();
+        if (name != null && name.trim().isNotEmpty && !names.contains(name)) {
+          names.add(name);
+        }
+      }
+      return names;
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -416,79 +477,98 @@ class ApiService {
     Map<String, dynamic> payload, {
     String? idempotencyKey,
   }) async {
-    if (useMock) {
-      final mockOrder = await _mockCheckout(payload);
-      return {'data': mockOrder.toJson()};
-    }
-    final reqHeaders = Map<String, String>.from(headers);
-    if (idempotencyKey != null) {
-      reqHeaders['X-Kunci-Idempoten'] = idempotencyKey;
-    }
+    final extra = idempotencyKey != null
+        ? {'X-Kunci-Idempoten': idempotencyKey}
+        : null;
     try {
-      final response = await http
-          .post(_uri('/checkout'), headers: reqHeaders, body: jsonEncode(payload))
-          .timeout(const Duration(seconds: 30));
-      return _decodeResponse(response);
+      final res = await _send(
+        'POST',
+        '/checkout',
+        payload,
+        extra,
+        ApiConfig.checkoutTimeout,
+      );
+      return res;
     } catch (e) {
       throw _handleNetworkError(e);
     }
   }
 
-  // -------------------------------------------------------------
-  // ENDPOINT PESANAN
-  // -------------------------------------------------------------
-
   /// GET /api/pesanan (Riwayat Pesanan)
-  static Future<List<Order>> getOrders() async {
-    if (useMock) return _mockGetOrders();
+  static Future<List<OrderModel>> getOrders() async {
     try {
-      final response = await http
-          .get(_uri('/pesanan'), headers: headers)
-          .timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/pesanan'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
-      final list = data is List ? data : <dynamic>[];
+      final list = _requireList(data, 'pesanan');
       return list
-          .map((e) => Order.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => OrderModel.fromJson(_requireMap(e, 'pesanan')))
           .toList();
     } catch (e) {
       throw _handleNetworkError(e);
     }
   }
 
-  /// GET /api/pesanan/{id}
-  static Future<Order> getOrderDetail(int id) async {
-    if (useMock) return _mockGetOrderDetail(id);
+  /// GET /api/pesanan/{id} (Rincian Pesanan)
+  static Future<OrderModel> getOrder(int id) async {
     try {
-      final response = await http
-          .get(_uri('/pesanan/$id'), headers: headers)
-          .timeout(timeoutDuration);
+      final response = await httpClient
+          .get(_uri('/pesanan/$id'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
-      return Order.fromJson(Map<String, dynamic>.from(data));
+      return OrderModel.fromJson(_requireMap(data, 'pesanan'));
     } catch (e) {
       throw _handleNetworkError(e);
     }
   }
 
-  /// GET /api/pesanan/{id} (Alias)
-  static Future<Order> getOrder(int id) => getOrderDetail(id);
-
   /// PATCH /api/pesanan/{id}/status
-  static Future<Order> updateOrderStatus(int id, String status) async {
-    if (useMock) return _mockUpdateOrderStatus(id, status);
-    final body = await _send('PATCH', '/pesanan/$id/status', {
-      'status': status,
-    });
-    final data = _extractData(body);
-    if (data is! Map) {
-      throw const ApiException(
-        statusCode: 500,
-        message: 'Format balasan server tidak dapat dibaca.',
-        errorType: ApiErrorType.other,
-      );
+  static Future<OrderModel> updateOrderStatus(int id, String status) async {
+    try {
+      final res = await _send('PATCH', '/pesanan/$id/status', {
+        'status': status,
+      });
+      final data = _extractData(res);
+      return OrderModel.fromJson(_requireMap(data, 'pesanan'));
+    } catch (e) {
+      throw _handleNetworkError(e);
     }
-    return Order.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  /// POST /api/pesanan/{id}/selesai
+  /// Pelanggan pemilik pesanan mengonfirmasi bahwa pesanan sudah diterima.
+  static Future<OrderModel> completeOrder(int id) async {
+    try {
+      final response = await _send('POST', '/pesanan/$id/selesai');
+      final data = _extractData(response);
+      return OrderModel.fromJson(_requireMap(data, 'pesanan'));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// POST /api/pesanan/{id}/pembayaran
+  /// Meminta backend mengonfirmasi pembayaran pesanan.
+  static Future<OrderModel> confirmPayment(int id, int paymentMethodId) async {
+    try {
+      final response = await _send('POST', '/pesanan/$id/pembayaran', {
+        'payment_method_id': paymentMethodId,
+      });
+      final data = _extractData(response);
+      if (data is! Map) {
+        throw const ApiException(
+          statusCode: 500,
+          message: 'Respons konfirmasi pembayaran tidak valid.',
+          errorType: ApiErrorType.other,
+        );
+      }
+      return OrderModel.fromJson(Map<String, dynamic>.from(data));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
   }
 
   // -------------------------------------------------------------
@@ -499,32 +579,36 @@ class ApiService {
     String method,
     String path, [
     Map<String, dynamic>? payload,
+    Map<String, String>? extraHeaders,
+    Duration? timeout,
   ]) async {
+    final limit = timeout ?? ApiConfig.timeout;
     try {
       late http.Response response;
       final uri = _uri(path);
+      final reqHeaders = await _headers(extraHeaders: extraHeaders);
       final body = payload != null ? jsonEncode(payload) : null;
 
       switch (method) {
         case 'POST':
-          response = await http
-              .post(uri, headers: headers, body: body)
-              .timeout(timeoutDuration);
+          response = await httpClient
+              .post(uri, headers: reqHeaders, body: body)
+              .timeout(limit);
           break;
         case 'PUT':
-          response = await http
-              .put(uri, headers: headers, body: body)
-              .timeout(timeoutDuration);
+          response = await httpClient
+              .put(uri, headers: reqHeaders, body: body)
+              .timeout(limit);
           break;
         case 'PATCH':
-          response = await http
-              .patch(uri, headers: headers, body: body)
-              .timeout(timeoutDuration);
+          response = await httpClient
+              .patch(uri, headers: reqHeaders, body: body)
+              .timeout(limit);
           break;
         case 'DELETE':
-          response = await http
-              .delete(uri, headers: headers)
-              .timeout(timeoutDuration);
+          response = await httpClient
+              .delete(uri, headers: reqHeaders)
+              .timeout(limit);
           break;
         default:
           throw const ApiException(
@@ -541,636 +625,4 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // MOCK DATA STORE (Jalur B - Cadangan Pengujian Sisi Flutter)
-  // -------------------------------------------------------------
-
-  static final List<Product> _mockProducts = [
-    const Product(
-      id: 1,
-      nama: 'Beras Pandan Wangi Organik',
-      harga: 75000,
-      kategori: 'Beras & Biji-bijian',
-      stok: 25,
-      tersedia: true,
-      satuanJual: 'pak 5kg',
-      mudahRusak: false,
-      deskripsi: 'Beras putih alami tanpa pemutih, wangi dan pulen.',
-    ),
-    const Product(
-      id: 2,
-      nama: 'Cabai Merah Keriting Segar',
-      harga: 32000,
-      kategori: 'Bumbu & Rempah',
-      stok: 12,
-      tersedia: true,
-      satuanJual: 'kg',
-      mudahRusak: true,
-      deskripsi:
-          'Cabai segar dipanen langsung dari kebun petani lereng gunung.',
-    ),
-    const Product(
-      id: 3,
-      nama: 'Tomat Buah Segar',
-      harga: 14000,
-      kategori: 'Sayuran',
-      stok: 18,
-      tersedia: true,
-      satuanJual: 'kg',
-      mudahRusak: true,
-      deskripsi: 'Tomat segar kaya vitamin C, cocok untuk jus dan sambal.',
-    ),
-    const Product(
-      id: 4,
-      nama: 'Bawang Merah Brebes Pilihan',
-      harga: 38000,
-      kategori: 'Bumbu & Rempah',
-      stok: 20,
-      tersedia: true,
-      satuanJual: 'kg',
-      mudahRusak: false,
-      deskripsi: 'Bawang merah kering berkualitas tinggi, aroma sedap.',
-    ),
-    const Product(
-      id: 5,
-      nama: 'Bayam Hijau Hidroponik',
-      harga: 6000,
-      kategori: 'Sayuran',
-      stok: 15,
-      tersedia: true,
-      satuanJual: 'ikat',
-      mudahRusak: true,
-      deskripsi: 'Bayam segar hidroponik bebas pestisida kimia.',
-    ),
-    const Product(
-      id: 6,
-      nama: 'Kangkung Cabut Segar',
-      harga: 5000,
-      kategori: 'Sayuran',
-      stok: 0, // Produk stok nol untuk menguji penolakan di keranjang
-      tersedia: true,
-      satuanJual: 'ikat',
-      mudahRusak: true,
-      deskripsi: 'Kangkung cabut renyah dan segar.',
-    ),
-    const Product(
-      id: 7,
-      nama: 'Wortel Brastagi Manis',
-      harga: 16000,
-      kategori: 'Sayuran',
-      stok: 0, // Produk kedua berstok nol sesuai syarat ukuran data
-      tersedia: false,
-      satuanJual: 'kg',
-      mudahRusak: false,
-      deskripsi: 'Wortel segar berwarna oranye terang, manis dan renyah.',
-    ),
-  ];
-
-  static final List<CartItem> _mockCartItems = [
-    const CartItem(
-      id: 101,
-      produkId: 2,
-      nama: 'Cabai Merah Keriting Segar',
-      harga: 32000,
-      jumlah: 2,
-      stok: 12,
-      satuanJual: 'kg',
-      mudahRusak: true,
-    ),
-    const CartItem(
-      id: 102,
-      produkId: 5,
-      nama: 'Bayam Hijau Hidroponik',
-      harga: 6000,
-      jumlah: 3,
-      stok: 15,
-      satuanJual: 'ikat',
-      mudahRusak: true,
-    ),
-  ];
-
-  static Future<CartResponse> _mockGetCart() async {
-    await Future.delayed(const Duration(milliseconds: 350));
-    final subtotal = _mockCartItems.fold<int>(
-      0,
-      (sum, item) => sum + (item.harga * item.jumlah),
-    );
-    return CartResponse(items: List.from(_mockCartItems), subtotal: subtotal);
-  }
-
-  static Future<void> _mockAddCart(int produkId, int jumlah) async {
-    await Future.delayed(const Duration(milliseconds: 350));
-    final product = _mockProducts.firstWhere(
-      (p) => p.id == produkId,
-      orElse: () => throw const ApiException(
-        statusCode: 404,
-        message: 'Produk tidak ditemukan.',
-        errorType: ApiErrorType.notFound,
-      ),
-    );
-
-    if (product.stok < jumlah) {
-      throw ApiException(
-        statusCode: 409,
-        message:
-            'Stok tidak mencukupi untuk ${product.nama}. Sisa stok: ${product.stok}',
-        errorType: ApiErrorType.conflict,
-      );
-    }
-
-    final existingIndex = _mockCartItems.indexWhere(
-      (c) => c.produkId == produkId,
-    );
-    if (existingIndex >= 0) {
-      final current = _mockCartItems[existingIndex];
-      final newQty = current.jumlah + jumlah;
-      if (newQty > product.stok) {
-        throw ApiException(
-          statusCode: 409,
-          message: 'Stok tidak mencukupi. Sisa stok: ${product.stok}',
-          errorType: ApiErrorType.conflict,
-        );
-      }
-      _mockCartItems[existingIndex] = CartItem(
-        id: current.id,
-        produkId: current.produkId,
-        nama: current.nama,
-        harga: current.harga,
-        jumlah: newQty,
-        stok: current.stok,
-        satuanJual: current.satuanJual,
-        mudahRusak: current.mudahRusak,
-      );
-    } else {
-      _mockCartItems.add(
-        CartItem(
-          id: DateTime.now().millisecondsSinceEpoch % 10000,
-          produkId: product.id,
-          nama: product.nama,
-          harga: product.harga,
-          jumlah: jumlah,
-          stok: product.stok,
-          satuanJual: product.satuanJual,
-          mudahRusak: product.mudahRusak,
-        ),
-      );
-    }
-  }
-
-  static Future<void> _mockUpdateCart(int cartId, int jumlah) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (jumlah <= 0) {
-      throw const ApiException(
-        statusCode: 422,
-        message: 'Jumlah item harus lebih dari nol.',
-        errorType: ApiErrorType.validation,
-      );
-    }
-    final index = _mockCartItems.indexWhere((c) => c.id == cartId);
-    if (index < 0) {
-      throw const ApiException(
-        statusCode: 404,
-        message: 'Item keranjang tidak ditemukan.',
-        errorType: ApiErrorType.notFound,
-      );
-    }
-    final item = _mockCartItems[index];
-    if (jumlah > item.stok) {
-      throw ApiException(
-        statusCode: 409,
-        message:
-            'Stok tidak mencukupi untuk ${item.nama}! Tersedia hanya ${item.stok} ${item.satuanJual}.',
-        errorType: ApiErrorType.conflict,
-      );
-    }
-    _mockCartItems[index] = CartItem(
-      id: item.id,
-      produkId: item.produkId,
-      nama: item.nama,
-      harga: item.harga,
-      jumlah: jumlah,
-      stok: item.stok,
-      satuanJual: item.satuanJual,
-      mudahRusak: item.mudahRusak,
-    );
-  }
-
-  static Future<void> _mockDeleteCart(int cartId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    _mockCartItems.removeWhere((c) => c.id == cartId);
-  }
-
-  static Future<List<Product>> _mockGetProducts({
-    String? kategori,
-    String? cari,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 350));
-    var list = List<Product>.from(_mockProducts);
-    if (kategori != null && kategori.isNotEmpty && kategori != 'Semua') {
-      list = list
-          .where((p) => p.kategori.toLowerCase() == kategori.toLowerCase())
-          .toList();
-    }
-    if (cari != null && cari.trim().isNotEmpty) {
-      final q = cari.trim().toLowerCase();
-      list = list.where((p) => p.nama.toLowerCase().contains(q)).toList();
-    }
-    return list;
-  }
-
-  static Future<Product> _mockGetProduct(int id) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    return _mockProducts.firstWhere(
-      (p) => p.id == id,
-      orElse: () => throw const ApiException(
-        statusCode: 404,
-        message: 'Produk tidak ditemukan.',
-        errorType: ApiErrorType.notFound,
-      ),
-    );
-  }
-
-  static Future<List<String>> _mockGetCategories() async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    final categories =
-        _mockProducts.map((product) => product.kategori).toSet().toList()
-          ..sort();
-    return categories;
-  }
-
-  static Future<void> _mockCreateProduct(Map<String, dynamic> payload) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final errors = <String, dynamic>{};
-    if (payload['nama'] == null || '${payload['nama']}'.trim().isEmpty) {
-      errors['nama'] = ['Nama produk wajib diisi.'];
-    }
-    if (payload['harga'] == null ||
-        (int.tryParse('${payload['harga']}') ?? 0) <= 0) {
-      errors['harga'] = ['Harga produk harus lebih dari 0.'];
-    }
-    if (payload['stok'] == null ||
-        (int.tryParse('${payload['stok']}') ?? -1) < 0) {
-      errors['stok'] = ['Stok tidak boleh negatif.'];
-    }
-    if (payload['satuan_jual'] == null ||
-        '${payload['satuan_jual']}'.trim().isEmpty) {
-      errors['satuan_jual'] = ['Satuan jual wajib diisi.'];
-    }
-    if (errors.isNotEmpty) {
-      throw ApiException(
-        statusCode: 422,
-        message: 'Data produk yang dimasukkan belum lengkap.',
-        errorType: ApiErrorType.validation,
-        errors: errors,
-      );
-    }
-
-    final newId =
-        (_mockProducts.isEmpty
-            ? 1
-            : _mockProducts.map((p) => p.id).reduce((a, b) => a > b ? a : b)) +
-        1;
-    _mockProducts.add(
-      Product(
-        id: newId,
-        nama: payload['nama'],
-        harga: int.parse('${payload['harga']}'),
-        kategori: payload['kategori'] ?? 'Lainnya',
-        stok: int.parse('${payload['stok']}'),
-        tersedia: payload['tersedia'] == true || payload['tersedia'] == 1,
-        deskripsi: payload['deskripsi'],
-        satuanJual: payload['satuan_jual'] ?? 'kg',
-        mudahRusak:
-            payload['mudah_rusak'] == true || payload['mudah_rusak'] == 1,
-      ),
-    );
-  }
-
-  static Future<void> _mockUpdateProduct(
-    int id,
-    Map<String, dynamic> payload,
-  ) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final index = _mockProducts.indexWhere((p) => p.id == id);
-    if (index < 0) {
-      throw const ApiException(
-        statusCode: 404,
-        message: 'Produk tidak ditemukan untuk diperbarui.',
-        errorType: ApiErrorType.notFound,
-      );
-    }
-
-    final errors = <String, dynamic>{};
-    if (payload['nama'] == null || '${payload['nama']}'.trim().isEmpty) {
-      errors['nama'] = ['Nama produk wajib diisi.'];
-    }
-    if (payload['harga'] == null ||
-        (int.tryParse('${payload['harga']}') ?? 0) <= 0) {
-      errors['harga'] = ['Harga produk harus lebih dari 0.'];
-    }
-    if (payload['stok'] == null ||
-        (int.tryParse('${payload['stok']}') ?? -1) < 0) {
-      errors['stok'] = ['Stok tidak boleh negatif.'];
-    }
-    if (errors.isNotEmpty) {
-      throw ApiException(
-        statusCode: 422,
-        message: 'Periksa kembali isian formulir produk.',
-        errorType: ApiErrorType.validation,
-        errors: errors,
-      );
-    }
-
-    final p = _mockProducts[index];
-    _mockProducts[index] = Product(
-      id: p.id,
-      nama: payload['nama'] ?? p.nama,
-      harga: int.parse('${payload['harga'] ?? p.harga}'),
-      kategori: payload['kategori'] ?? p.kategori,
-      stok: int.parse('${payload['stok'] ?? p.stok}'),
-      tersedia: payload['tersedia'] == true || payload['tersedia'] == 1,
-      deskripsi: payload['deskripsi'],
-      satuanJual: payload['satuan_jual'] ?? p.satuanJual,
-      mudahRusak: payload['mudah_rusak'] == true || payload['mudah_rusak'] == 1,
-    );
-  }
-
-  static Future<void> _mockDeleteProduct(int id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    // Skenario 409 bila produk masih terkait di pesanan aktif (contoh: id == 1)
-    if (id == 1) {
-      throw const ApiException(
-        statusCode: 409,
-        message:
-            'Produk tidak dapat dihapus karena masih terpakai pada pesanan aktif.',
-        errorType: ApiErrorType.conflict,
-      );
-    }
-    _mockProducts.removeWhere((p) => p.id == id);
-  }
-
-  // ---- Mock Kurir ----
-  static final List<Courier> _mockCouriers = [
-    const Courier(id: 1, nama: 'JNE Regular', tarif: 15000, aktif: true),
-    const Courier(id: 2, nama: 'SiCepat HALU', tarif: 12000, aktif: true),
-    const Courier(id: 3, nama: 'Gojek Instant', tarif: 25000, aktif: true),
-  ];
-
-  static Future<List<Courier>> _mockGetCouriers() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return List.from(_mockCouriers);
-  }
-
-  // ---- Mock Metode Pembayaran ----
-  static final List<PaymentMethod> _mockPaymentMethods = [
-    const PaymentMethod(id: 1, nama: 'COD (Bayar di Tempat)', aktif: true),
-    const PaymentMethod(id: 2, nama: 'Transfer Bank BCA', aktif: true),
-    const PaymentMethod(id: 3, nama: 'Transfer Bank BRI', aktif: true),
-  ];
-
-  static Future<List<PaymentMethod>> _mockGetPaymentMethods() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return List.from(_mockPaymentMethods);
-  }
-
-  // ---- Mock Pesanan ----
-  static final List<Order> _mockOrders = [
-    Order(
-      id: 1001,
-      namaPenerima: 'Budi Santoso',
-      alamatPenerima: 'Jl. Merdeka No. 10, Jakarta Pusat',
-      kurirId: 1,
-      namaCourier: 'JNE Regular',
-      paymentMethodId: 1,
-      namaPaymentMethod: 'COD (Bayar di Tempat)',
-      subtotal: 110000,
-      ongkir: 15000,
-      totalHarga: 125000,
-      status: 'selesai',
-      tanggalAntar: '2026-11-01',
-      createdAt: '2026-10-31T10:00:00',
-      items: [
-        const OrderItem(
-          id: 1,
-          orderId: 1001,
-          productId: 1,
-          namaProduk: 'Beras Pandan Wangi Organik',
-          quantity: 1,
-          hargaSatuan: 75000,
-          subtotal: 75000,
-        ),
-        const OrderItem(
-          id: 2,
-          orderId: 1001,
-          productId: 3,
-          namaProduk: 'Tomat Buah Segar',
-          quantity: 2,
-          hargaSatuan: 14000,
-          subtotal: 28000,
-        ),
-        const OrderItem(
-          id: 3,
-          orderId: 1001,
-          productId: 5,
-          namaProduk: 'Bayam Hijau Hidroponik',
-          quantity: 1,
-          hargaSatuan: 6000,
-          subtotal: 6000,
-        ),
-      ],
-    ),
-    Order(
-      id: 1002,
-      namaPenerima: 'Siti Rahayu',
-      alamatPenerima: 'Jl. Pahlawan No. 25, Bandung',
-      kurirId: 2,
-      namaCourier: 'SiCepat HALU',
-      paymentMethodId: 2,
-      namaPaymentMethod: 'Transfer Bank BCA',
-      subtotal: 70000,
-      ongkir: 12000,
-      totalHarga: 82000,
-      status: 'dikirim',
-      tanggalAntar: '2026-11-07',
-      createdAt: '2026-11-06T14:30:00',
-      items: [
-        const OrderItem(
-          id: 4,
-          orderId: 1002,
-          productId: 2,
-          namaProduk: 'Cabai Merah Keriting Segar',
-          quantity: 2,
-          hargaSatuan: 32000,
-          subtotal: 64000,
-        ),
-        const OrderItem(
-          id: 5,
-          orderId: 1002,
-          productId: 4,
-          namaProduk: 'Bawang Merah Brebes Pilihan',
-          quantity: 0,
-          hargaSatuan: 38000,
-          subtotal: 0,
-        ),
-      ],
-    ),
-    Order(
-      id: 1003,
-      namaPenerima: 'Ahmad Fauzi',
-      alamatPenerima: 'Jl. Sudirman No. 88, Surabaya',
-      kurirId: 3,
-      namaCourier: 'Gojek Instant',
-      paymentMethodId: 1,
-      namaPaymentMethod: 'COD (Bayar di Tempat)',
-      subtotal: 38000,
-      ongkir: 25000,
-      totalHarga: 63000,
-      status: 'menunggu_pembayaran',
-      tanggalAntar: '2026-11-07',
-      createdAt: '2026-11-07T09:00:00',
-      items: [
-        const OrderItem(
-          id: 6,
-          orderId: 1003,
-          productId: 4,
-          namaProduk: 'Bawang Merah Brebes Pilihan',
-          quantity: 1,
-          hargaSatuan: 38000,
-          subtotal: 38000,
-        ),
-      ],
-    ),
-  ];
-
-  static Future<List<Order>> _mockGetOrders() async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return List.from(_mockOrders);
-  }
-
-  static Future<Order> _mockGetOrderDetail(int id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    try {
-      return _mockOrders.firstWhere((o) => o.id == id);
-    } catch (_) {
-      throw const ApiException(
-        statusCode: 404,
-        message: 'Pesanan tidak ditemukan.',
-        errorType: ApiErrorType.notFound,
-      );
-    }
-  }
-
-  static Future<Order> _mockUpdateOrderStatus(int id, String status) async {
-    const allowedStatuses = {
-      'menunggu_pembayaran',
-      'dibayar',
-      'diproses',
-      'dikirim',
-      'selesai',
-      'dibatalkan',
-    };
-    if (!allowedStatuses.contains(status)) {
-      throw const ApiException(
-        statusCode: 422,
-        message: 'Status pesanan tidak valid.',
-        errorType: ApiErrorType.validation,
-      );
-    }
-
-    final index = _mockOrders.indexWhere((order) => order.id == id);
-    if (index < 0) {
-      throw const ApiException(
-        statusCode: 404,
-        message: 'Pesanan tidak ditemukan.',
-        errorType: ApiErrorType.notFound,
-      );
-    }
-
-    final updatedOrder = _mockOrders[index].copyWith(status: status);
-    _mockOrders[index] = updatedOrder;
-    return updatedOrder;
-  }
-
-  static int _mockOrderIdCounter = 1004;
-
-  static Future<Order> _mockCheckout(Map<String, dynamic> payload) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    final errors = <String, dynamic>{};
-    if ((payload['nama_penerima'] ?? '').toString().trim().isEmpty) {
-      errors['nama_penerima'] = ['Nama penerima wajib diisi.'];
-    }
-    if ((payload['alamat_penerima'] ?? '').toString().trim().isEmpty) {
-      errors['alamat_penerima'] = ['Alamat pengiriman wajib diisi.'];
-    }
-    if (payload['kurir_id'] == null) {
-      errors['kurir_id'] = ['Kurir wajib dipilih.'];
-    }
-    if (payload['payment_method_id'] == null) {
-      errors['payment_method_id'] = ['Metode pembayaran wajib dipilih.'];
-    }
-    final rawItems = payload['items'];
-    if (rawItems == null || rawItems is! List || rawItems.isEmpty) {
-      errors['items'] = ['Keranjang tidak boleh kosong.'];
-    }
-    if (errors.isNotEmpty) {
-      throw ApiException(
-        statusCode: 422,
-        message: 'Periksa kembali data checkout.',
-        errorType: ApiErrorType.validation,
-        errors: errors,
-      );
-    }
-
-    final kurir = _mockCouriers.firstWhere(
-      (c) => c.id == payload['kurir_id'],
-      orElse: () => _mockCouriers.first,
-    );
-    final payment = _mockPaymentMethods.firstWhere(
-      (p) => p.id == payload['payment_method_id'],
-      orElse: () => _mockPaymentMethods.first,
-    );
-
-    final items = (rawItems as List).map((item) {
-      final productId = item['product_id'] as int;
-      final quantity = item['quantity'] as int;
-      final product = _mockProducts.firstWhere(
-        (p) => p.id == productId,
-        orElse: () => throw ApiException(
-          statusCode: 404,
-          message: 'Produk tidak ditemukan.',
-          errorType: ApiErrorType.notFound,
-        ),
-      );
-      return OrderItem(
-        id: 0,
-        orderId: 0,
-        productId: productId,
-        namaProduk: product.nama,
-        quantity: quantity,
-        hargaSatuan: product.harga,
-        subtotal: product.harga * quantity,
-      );
-    }).toList();
-
-    final subtotal = items.fold<int>(0, (s, i) => s + i.subtotal);
-    final ongkir = kurir.tarif;
-    final newOrder = Order(
-      id: _mockOrderIdCounter++,
-      namaPenerima: payload['nama_penerima'],
-      alamatPenerima: payload['alamat_penerima'],
-      kurirId: kurir.id,
-      namaCourier: kurir.nama,
-      paymentMethodId: payment.id,
-      namaPaymentMethod: payment.nama,
-      subtotal: subtotal,
-      ongkir: ongkir,
-      totalHarga: subtotal + ongkir,
-      status: 'menunggu_pembayaran',
-      tanggalAntar: payload['tanggal_antar'] ?? '',
-      createdAt: DateTime.now().toIso8601String(),
-      items: items,
-    );
-    _mockOrders.insert(0, newOrder);
-    return newOrder;
-  }
 }

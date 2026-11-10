@@ -2,7 +2,36 @@
 
 ## 1. Deskripsi Project
 
+<<<<<<< HEAD
+## TokoTani API authentication
+
+Run database migrations before using the API:
+
+```bash
+php artisan migrate
+```
+
+Customer accounts use Laravel Sanctum. Register at `POST /api/auth/register` or log
+in at `POST /api/auth/login`; the Flutter client stores the returned token in
+secure storage and uses it for cart, checkout, and order requests. Customer
+registration always assigns the `customer` role. It does not create administrator
+accounts.
+
+Create or promote an administrator interactively with:
+
+```bash
+php artisan admin:password
+```
+
+The command sets the account's password and administrator role. Admin-only API
+operations and the Filament panel require that role. Payment confirmation from
+the customer only records a request for review; an administrator must verify it
+before the order can progress to paid.
+
+## About Laravel
+=======
 TaniMart merupakan aplikasi toko online yang menyediakan berbagai produk pertanian dan kebutuhan sehari-hari. Aplikasi ini dibuat untuk membantu pengguna melihat produk, mengelola keranjang belanja, melakukan checkout, serta memantau pesanan.
+>>>>>>> 7905d6ff47137baa55e5b41b63709a2a36015363
 
 Project ini menggunakan Laravel sebagai backend dan Flutter sebagai frontend.
 

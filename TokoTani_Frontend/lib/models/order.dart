@@ -2,14 +2,14 @@ import 'courier.dart';
 import 'payment_method.dart';
 import 'product.dart';
 
-class Order {
+class OrderModel {
   final int id;
   final String namaPenerima;
   final String alamatPenerima;
   final int kurirId;
-  final String? namaCourier;
+  final Courier? courier;
   final int paymentMethodId;
-  final String? namaPaymentMethod;
+  final PaymentMethod? paymentMethod;
   final int subtotal;
   final int ongkir;
   final int totalHarga;
@@ -17,18 +17,16 @@ class Order {
   final String tanggalAntar;
   final String? createdAt;
   final String? idempotencyKey;
-  final List<OrderItem> items;
-  final Courier? courier;
-  final PaymentMethod? paymentMethod;
+  final List<OrderItemModel> items;
 
-  const Order({
+  const OrderModel({
     required this.id,
     required this.namaPenerima,
     required this.alamatPenerima,
     required this.kurirId,
-    this.namaCourier,
+    this.courier,
     required this.paymentMethodId,
-    this.namaPaymentMethod,
+    this.paymentMethod,
     required this.subtotal,
     required this.ongkir,
     required this.totalHarga,
@@ -37,82 +35,87 @@ class Order {
     this.createdAt,
     this.idempotencyKey,
     this.items = const [],
-    this.courier,
-    this.paymentMethod,
   });
 
-  Order copyWith({String? status}) => Order(
-    id: id,
-    namaPenerima: namaPenerima,
-    alamatPenerima: alamatPenerima,
-    kurirId: kurirId,
-    namaCourier: namaCourier,
-    paymentMethodId: paymentMethodId,
-    namaPaymentMethod: namaPaymentMethod,
-    subtotal: subtotal,
-    ongkir: ongkir,
-    totalHarga: totalHarga,
-    status: status ?? this.status,
-    tanggalAntar: tanggalAntar,
-    createdAt: createdAt,
-    idempotencyKey: idempotencyKey,
-    items: items,
-    courier: courier,
-    paymentMethod: paymentMethod,
-  );
+  OrderModel copyWith({
+    String? status,
+    Courier? courier,
+    PaymentMethod? paymentMethod,
+  }) =>
+      OrderModel(
+        id: id,
+        namaPenerima: namaPenerima,
+        alamatPenerima: alamatPenerima,
+        kurirId: kurirId,
+        courier: courier ?? this.courier,
+        paymentMethodId: paymentMethodId,
+        paymentMethod: paymentMethod ?? this.paymentMethod,
+        subtotal: subtotal,
+        ongkir: ongkir,
+        totalHarga: totalHarga,
+        status: status ?? this.status,
+        tanggalAntar: tanggalAntar,
+        createdAt: createdAt,
+        idempotencyKey: idempotencyKey,
+        items: items,
+      );
 
-  factory Order.fromJson(Map<String, dynamic> json) {
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'order_id': id,
+      'nama_penerima': namaPenerima,
+      'alamat_penerima': alamatPenerima,
+      'kurir_id': kurirId,
+      'payment_method_id': paymentMethodId,
+      'subtotal': subtotal,
+      'ongkir': ongkir,
+      'total_harga': totalHarga,
+      'status': status,
+      'tanggal_antar': tanggalAntar,
+      'created_at': createdAt,
+      'idempotency_key': idempotencyKey,
+      'items': items.map((e) => e.toJson()).toList(),
+    };
+  }
+
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
     final courierData = json['courier'] ?? json['kurir'];
     final paymentData = json['payment_method'] ?? json['metode_pembayaran'];
 
     final rawItems = json['items'] ?? json['order_items'] ?? [];
     final itemsList = rawItems is List
         ? rawItems
-              .map((e) => OrderItem.fromJson(Map<String, dynamic>.from(e)))
-              .toList()
-        : <OrderItem>[];
+            .whereType<Map>()
+            .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : <OrderItemModel>[];
 
-    return Order(
+    return OrderModel(
       id: int.tryParse('${json['id']}') ?? 0,
       namaPenerima: '${json['nama_penerima'] ?? ''}',
       alamatPenerima: '${json['alamat_penerima'] ?? ''}',
       kurirId: int.tryParse('${json['kurir_id'] ?? 0}') ?? 0,
-      namaCourier: courierData is Map ? '${courierData['nama'] ?? ''}' : null,
+      courier: courierData is Map
+          ? Courier.fromJson(Map<String, dynamic>.from(courierData))
+          : null,
       paymentMethodId: int.tryParse('${json['payment_method_id'] ?? 0}') ?? 0,
-      namaPaymentMethod: paymentData is Map
-          ? '${paymentData['nama'] ?? ''}'
+      paymentMethod: paymentData is Map
+          ? PaymentMethod.fromJson(Map<String, dynamic>.from(paymentData))
           : null,
       subtotal: int.tryParse('${json['subtotal'] ?? 0}') ?? 0,
       ongkir: int.tryParse('${json['ongkir'] ?? 0}') ?? 0,
       totalHarga: int.tryParse('${json['total_harga'] ?? 0}') ?? 0,
-      status: '${json['status'] ?? 'menunggu_pembayaran'}',
+      status: '${json['status'] ?? ''}'.trim().toLowerCase(),
       tanggalAntar: '${json['tanggal_antar'] ?? ''}',
       createdAt: json['created_at']?.toString(),
       idempotencyKey: json['idempotency_key']?.toString(),
       items: itemsList,
-      courier: courierData is Map ? Courier.fromJson(Map<String, dynamic>.from(courierData)) : null,
-      paymentMethod: paymentData is Map ? PaymentMethod.fromJson(Map<String, dynamic>.from(paymentData)) : null,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'nama_penerima': namaPenerima,
-    'alamat_penerima': alamatPenerima,
-    'kurir_id': kurirId,
-    'payment_method_id': paymentMethodId,
-    'subtotal': subtotal,
-    'ongkir': ongkir,
-    'total_harga': totalHarga,
-    'status': status,
-    'tanggal_antar': tanggalAntar,
-    if (createdAt != null) 'created_at': createdAt,
-    if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
-    'items': items.map((i) => i.toJson()).toList(),
-  };
 }
 
-class OrderItem {
+class OrderItemModel {
   final int id;
   final int orderId;
   final int productId;
@@ -123,11 +126,11 @@ class OrderItem {
   final String? fotoProduk;
   final Product? product;
 
-  const OrderItem({
+  const OrderItemModel({
     required this.id,
     required this.orderId,
     required this.productId,
-    this.namaProduk = 'Produk',
+    required this.namaProduk,
     required this.quantity,
     required this.hargaSatuan,
     required this.subtotal,
@@ -135,15 +138,32 @@ class OrderItem {
     this.product,
   });
 
-  factory OrderItem.fromJson(Map<String, dynamic> json) {
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'order_id': orderId,
+      'product_id': productId,
+      'quantity': quantity,
+      'harga_satuan': hargaSatuan,
+      'subtotal': subtotal,
+    };
+  }
+
+  factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     final produk = json['product'] ?? json['produk'];
-    final parsedProduct = produk is Map ? Product.fromJson(Map<String, dynamic>.from(produk)) : null;
     final namaProduk = produk is Map
         ? '${produk['nama'] ?? json['nama'] ?? 'Produk'}'
         : '${json['nama'] ?? 'Produk'}';
-    final foto = produk is Map ? produk['foto']?.toString() : null;
+    final foto = produk is Map
+        ? (produk['foto'] ??
+                produk['gambar_url'] ??
+                produk['image_url'] ??
+                produk['gambar'] ??
+                json['foto_produk'])
+            ?.toString()
+        : json['foto_produk']?.toString();
 
-    return OrderItem(
+    return OrderItemModel(
       id: int.tryParse('${json['id']}') ?? 0,
       orderId: int.tryParse('${json['order_id'] ?? 0}') ?? 0,
       productId: int.tryParse('${json['product_id'] ?? 0}') ?? 0,
@@ -152,22 +172,9 @@ class OrderItem {
       hargaSatuan: int.tryParse('${json['harga_satuan'] ?? 0}') ?? 0,
       subtotal: int.tryParse('${json['subtotal'] ?? 0}') ?? 0,
       fotoProduk: foto,
-      product: parsedProduct,
+      product: produk is Map
+          ? Product.fromJson(Map<String, dynamic>.from(produk))
+          : null,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'order_id': orderId,
-    'product_id': productId,
-    'nama_produk': namaProduk,
-    'quantity': quantity,
-    'harga_satuan': hargaSatuan,
-    'subtotal': subtotal,
-    if (fotoProduk != null) 'foto': fotoProduk,
-  };
 }
-
-typedef OrderModel = Order;
-typedef OrderItemModel = OrderItem;
-

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\WilayahAntar;
+use App\Models\Courier;
 
 class KurirController extends Controller
 {
@@ -18,7 +18,7 @@ class KurirController extends Controller
 
     public function index()
     {
-        $kurir = WilayahAntar::where('aktif', true)
+        $kurir = Courier::where('aktif', true)
             ->orderBy('tarif')
             ->get();
 
@@ -32,7 +32,7 @@ class KurirController extends Controller
 
     public function destroy($id)
     {
-        $kurir = WilayahAntar::find($id);
+        $kurir = Courier::find($id);
 
         if (! $kurir) {
             return $this->jsonResponse(

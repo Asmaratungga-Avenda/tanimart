@@ -9,11 +9,13 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\AuthenticatedApiRequests;
 use Tests\TestCase;
 
 class ProductTest extends TestCase
 {
     use RefreshDatabase;
+    use AuthenticatedApiRequests;
 
     public function test_can_list_products_and_filter_by_kategori_and_search(): void
     {
@@ -183,4 +185,3 @@ class ProductTest extends TestCase
         $this->assertCount(2, $response->json('data'));
     }
 }
-

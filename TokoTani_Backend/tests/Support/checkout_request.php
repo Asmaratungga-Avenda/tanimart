@@ -11,6 +11,7 @@ $payload = json_decode(base64_decode($argv[1] ?? ''), true) ?: [];
 $idempotencyKey = $argv[2] ?? '';
 $pelangganId = $argv[3] ?? '1';
 $barrier = $argv[4] ?? null;
+$token = $argv[5] ?? '';
 
 if ($barrier !== null) {
     $deadline = microtime(true) + 10;
@@ -30,7 +31,7 @@ $request = Request::create(
         'CONTENT_TYPE' => 'application/json',
         'HTTP_ACCEPT' => 'application/json',
         'HTTP_X_KUNCI_IDEMPOTEN' => $idempotencyKey,
-        'HTTP_X_PELANGGAN_ID' => $pelangganId,
+        'HTTP_AUTHORIZATION' => 'Bearer '.$token,
     ],
     json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
 );

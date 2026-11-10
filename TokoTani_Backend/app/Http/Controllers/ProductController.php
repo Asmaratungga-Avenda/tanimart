@@ -43,6 +43,22 @@ class ProductController extends Controller
         );
     }
 
+    public function banners()
+    {
+        if (Schema::hasTable('banners')) {
+            $banners = \App\Models\Banner::aktif()->get();
+        } else {
+            $banners = [];
+        }
+
+        return $this->jsonResponse(
+            'sukses',
+            200,
+            'Daftar banner promo berhasil diambil',
+            $banners
+        );
+    }
+
     public function index(Request $request)
     {
         $query = Product::query();
@@ -97,6 +113,7 @@ class ProductController extends Controller
             'deskripsi'   => 'nullable|string',
             'satuan_jual' => 'required|string',
             'mudah_rusak' => 'required|boolean',
+            'gambar'      => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
         ]);
 
         if ($validator->fails()) {
@@ -110,10 +127,19 @@ class ProductController extends Controller
         }
 
         $validated = $validator->validated();
-        if (isset($validated['stok']) && $validated['stok'] <= 0 && !isset($validated['tersedia'])) {
+        
+        // Default tersedia ke false jika stok <= 0
+        if (isset($validated['stok']) && $validated['stok'] <= 0) {
             $validated['tersedia'] = false;
         }
 
+        // Upload gambar menggunakan trait pada model Product
+        if ($request->hasFile('gambar')) {
+            $product = new Product();
+            $validated['gambar'] = $product->uploadImage($request->file('gambar'), 'products');
+        }
+
+        // Auto-assign kategori dari ID jika kategori teks kosong
         if (empty($validated['kategori']) && !empty($validated['category_id'])) {
             $category = \App\Models\Category::find($validated['category_id']);
             if ($category) {
@@ -150,9 +176,10 @@ class ProductController extends Controller
             'category_id' => 'sometimes|nullable|integer|exists:categories,id',
             'stok'        => 'sometimes|required|integer|min:0',
             'tersedia'    => 'sometimes|required|boolean',
-            'deskripsi'   => 'nullable|string',
+            'deskripsi'   => 'sometimes|nullable|string',
             'satuan_jual' => 'sometimes|required|string',
             'mudah_rusak' => 'sometimes|required|boolean',
+            'gambar'      => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
         ]);
 
         if ($validator->fails()) {
@@ -166,8 +193,14 @@ class ProductController extends Controller
         }
 
         $validated = $validator->validated();
-        if (isset($validated['stok']) && $validated['stok'] <= 0 && !isset($validated['tersedia'])) {
+        
+        if (isset($validated['stok']) && $validated['stok'] <= 0) {
             $validated['tersedia'] = false;
+        }
+
+        // Update gambar menggunakan trait (otomatis menghapus yang lama)
+        if ($request->hasFile('gambar')) {
+            $validated['gambar'] = $product->uploadImage($request->file('gambar'), 'products', $product->gambar);
         }
 
         if (array_key_exists('category_id', $validated) && empty($validated['kategori']) && !empty($validated['category_id'])) {
@@ -199,7 +232,7 @@ class ProductController extends Controller
             );
         }
 
-        // Pengecekan aman jika relasi pesanan ada
+        // Cek apakah produk sedang dalam pesanan aktif
         if (Schema::hasTable('order_items')) {
             $isUsedInActiveOrder = $product->orderItems()->whereHas('order', function ($query) {
                 $query->whereNotIn('status', ['selesai', 'dibatalkan']);
@@ -209,40 +242,13 @@ class ProductController extends Controller
                 return $this->jsonResponse(
                     'gagal',
                     409,
-                    'Produk tidak dapat dihapus karena masih terpakai pada pesanan aktif'
-                );
-            }
-
-            if ($product->orderItems()->exists()) {
-                return $this->jsonResponse(
-                    'gagal',
-                    409,
-                    'Produk tidak dapat dihapus karena memiliki riwayat pesanan'
-                );
-            }
-        } elseif (Schema::hasTable('order_details')) {
-            $isUsedInActiveOrder = $product->orderDetails()->whereHas('order', function ($query) {
-                $query->whereNotIn('status', ['selesai', 'dibatalkan']);
-            })->exists();
-
-            if ($isUsedInActiveOrder) {
-                return $this->jsonResponse(
-                    'gagal',
-                    409,
-                    'Produk tidak dapat dihapus karena masih terpakai pada pesanan aktif'
+                    'Produk tidak dapat dihapus karena sedang dalam pesanan yang sedang diproses.'
                 );
             }
         }
 
-        try {
-            $product->delete();
-        } catch (\Illuminate\Database\QueryException $e) {
-            return $this->jsonResponse(
-                'gagal',
-                409,
-                'Produk tidak dapat dihapus karena masih memiliki keterkaitan dengan data lain'
-            );
-        }
+        // Hapus produk (event deleted pada model akan otomatis menghapus gambar dari storage)
+        $product->delete();
 
         return $this->jsonResponse(
             'sukses',

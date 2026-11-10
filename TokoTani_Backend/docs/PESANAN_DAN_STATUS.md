@@ -5,6 +5,7 @@ Dokumen ini menjelaskan objektif:
 - `GET /api/pesanan`
 - `GET /api/pesanan/{id}`
 - `PATCH /api/pesanan/{id}/status`
+- `POST /api/pesanan/{id}/selesai` (konfirmasi pelanggan)
 - `GET /api/kurir` (kurir/wilayah + tarif)
 - Penyelesaian `POST /api/checkout`
 
@@ -19,7 +20,8 @@ Dokumen ini melengkapi `docs/CHECKOUT_SPESIFIKASI.md`,
 |--------|------|--------|
 | `GET` | `/api/pesanan` | Daftar riwayat pesanan, terbaru lebih dahulu |
 | `GET` | `/api/pesanan/{id}` | Detail pesanan + snapshot nama/harga produk |
-| `PATCH` | `/api/pesanan/{id}/status` | Mengubah status dengan aturan transisi |
+| `PATCH` | `/api/pesanan/{id}/status` | Mengubah status dengan aturan transisi (admin) |
+| `POST` | `/api/pesanan/{id}/selesai` | Pelanggan menandai pesanan diterima |
 | `GET` | `/api/kurir` | Daftar kurir/wilayah aktif beserta tarif |
 | `GET` | `/api/couriers` | Alias `/api/kurir` |
 | `GET` | `/api/wilayah` | Alias `/api/kurir` |
@@ -176,6 +178,7 @@ menunggu_konfirmasi
 dibayar
 diproses
 dikirim
+tiba
 selesai
 dibatalkan
 ```
@@ -191,7 +194,9 @@ menunggu_konfirmasi -> dibatalkan
 
 dibayar  -> diproses
 diproses -> dikirim
-dikirim  -> selesai
+dikirim  -> tiba
+dikirim  -> selesai (konfirmasi pelanggan)
+tiba     -> selesai
 
 selesai    -> (tidak ada)
 dibatalkan -> (tidak ada)
@@ -251,6 +256,20 @@ DB::transaction
   }
 }
 ```
+
+### Penyelesaian oleh pelanggan: `POST /api/pesanan/{id}/selesai`
+
+Pelanggan pemilik pesanan dapat menandai pesanan diterima ketika status
+`dikirim` atau `tiba`. Endpoint ini memakai transaksi dan `lockForUpdate`,
+lalu mengubah status menjadi `selesai`, mengisi `selesai_at`, dan mengisi
+`tiba_at` bila masih kosong.
+
+| Kondisi | HTTP |
+|---------|------|
+| Status berhasil diubah menjadi `selesai` | `200` |
+| Bukan pemilik pesanan | `403` |
+| Pesanan belum dikirim atau sudah selesai/dibatalkan | `409` |
+| Pesanan tidak ditemukan | `404` |
 
 ### Ringkasan status code
 
@@ -401,6 +420,7 @@ Nilai `subtotal`, `ongkir`, atau `total` dari klien diabaikan.
 | `tests/Feature/KeranjangTest.php` | Pengujian keranjang, termasuk revalidasi stok/ketersediaan |
 | `tests/Feature/KurirTest.php` | Pengujian wilayah, tarif, dan penghapusan kurir |
 | `tests/Feature/PesananAcceptanceTest.php` | Pengujian acceptance endpoint, status, pembayaran, dan checkout sekuensial |
+| `tests/Feature/PesananCompletionTest.php` | Pengujian konfirmasi pelanggan dari `dikirim`/`tiba` menjadi `selesai` |
 | `tests/Feature/PesananStatusTransitionTest.php` | Pengujian matriks seluruh transisi status |
 | `tests/Feature/CheckoutDemoTest.php` | Demonstrasi empat skenario checkout |
 | `tests/Feature/CheckoutConcurrencyTest.php` | Pengujian dua checkout hampir bersamaan |
@@ -439,7 +459,8 @@ PesananAcceptanceTest      : 12 tests, 141 assertions, passed
 PesananStatusTransitionTest: 1 test, 251 assertions, passed
 CheckoutDemoTest           : 4 tests, 35 assertions, passed
 CheckoutConcurrencyTest    : 2 tests, 24 assertions, passed
-Semua test                 : 69 tests, 745 assertions, passed
+PesananCompletionTest      : 5 tests, 25 assertions, passed
+Semua test                 : 84 tests, 770 assertions, passed
 ```
 
 Skenario penting yang diuji:

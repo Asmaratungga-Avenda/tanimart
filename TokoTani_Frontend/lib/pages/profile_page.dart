@@ -1,413 +1,173 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../services/api_service.dart';
-import '../services/notification_service.dart';
-import 'notifications_page.dart';
+import 'package:provider/provider.dart';
 
+import '../core/theme/app_palette.dart';
+import '../core/utils/ui.dart';
+import '../providers/auth_provider.dart';
+import '../providers/navigation_provider.dart';
+import '../providers/theme_provider.dart';
+import '../widgets/app_card.dart';
+
+/// Akun: profil pelanggan, pintasan pesanan, pilihan tema, dan keluar.
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
-  static const _primaryGreen = Color(0xFF2E7D32);
-  static const _lightGreen = Color(0xFFE8F5E9);
-  static const _textPrimary = Color(0xFF1F2937);
-  static const _textSecondary = Color(0xFF6B7280);
+  Future<void> _logout(BuildContext context) async {
+    final auth = context.read<AuthProvider>();
+    final nav = context.read<NavigationProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await confirmDialog(
+      context,
+      title: 'Keluar dari akun?',
+      message: 'Anda perlu masuk lagi untuk berbelanja.',
+      confirmLabel: 'Keluar',
+      destructive: true,
+    );
+    if (!ok) return;
+    final revoked = await auth.signOut();
+    nav.reset();
+    if (!revoked) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Anda sudah keluar di perangkat ini, tetapi server belum dapat dihubungi.',
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9F6),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildHeader(),
-            const SizedBox(height: 20),
-            _buildApiModeToggle(context),
-            const SizedBox(height: 14),
-            ValueListenableBuilder<int>(
-              valueListenable: NotificationService.unreadCountNotifier,
-              builder: (context, unread, _) => _buildMenuSection(
-                context,
-                'Akun',
-                [
-                  _MenuItem(
-                    icon: Icons.person_outline,
-                    title: 'Edit Profil',
-                    subtitle: 'Budi Santoso',
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  _MenuItem(
-                    icon: Icons.location_on_outlined,
-                    title: 'Alamat Tersimpan',
-                    subtitle: 'Kelola alamat pengiriman',
-                    onTap: () => _showComingSoon(context),
-                  ),
-                  _MenuItem(
-                    icon: Icons.notifications_outlined,
-                    title: 'Notifikasi',
-                    subtitle: unread > 0
-                        ? '$unread notifikasi baru'
-                        : 'Tidak ada notifikasi baru',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const NotificationsPage()),
-                      );
-                    },
-                    trailing: unread > 0
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDC2626),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '$unread',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          )
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            _buildMenuSection(
-              context,
-              'Transaksi',
-              [
-                _MenuItem(
-                  icon: Icons.shopping_bag_outlined,
-                  title: 'Riwayat Pesanan',
-                  subtitle: 'Lihat semua pesanan',
-                  onTap: () => _showComingSoon(context),
-                ),
-                _MenuItem(
-                  icon: Icons.favorite_outline,
-                  title: 'Produk Favorit',
-                  subtitle: 'Produk yang kamu sukai',
-                  onTap: () => _showComingSoon(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _buildMenuSection(
-              context,
-              'Tentang Aplikasi',
-              [
-                _MenuItem(
-                  icon: Icons.info_outline,
-                  title: 'Versi Aplikasi',
-                  subtitle: 'TokoTani v1.0.0',
-                  onTap: () {},
-                  trailing: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _lightGreen,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text('v1.0.0',
-                        style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: _primaryGreen)),
-                  ),
-                ),
-                _MenuItem(
-                  icon: Icons.school_outlined,
-                  title: 'Proyek Mahasiswa',
-                  subtitle: 'Informatika · Aplikasi Mobile',
-                  onTap: () {},
-                ),
-                _MenuItem(
-                  icon: Icons.code_outlined,
-                  title: 'Teknologi',
-                  subtitle: 'Flutter · Laravel · MySQL',
-                  onTap: () {},
-                ),
-              ],
-            ),
-            const SizedBox(height: 100),
-          ],
-        ),
-      ),
-    );
-  }
+    final auth = context.watch<AuthProvider>();
+    final themeMode = context.select<ThemeProvider, ThemeMode>((t) => t.mode);
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final name = auth.displayName;
+    final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
 
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF2E7D32), Color(0xFF4CAF50)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
-      child: Column(
+    return Scaffold(
+      body: ListView(
+        padding: EdgeInsets.zero,
         children: [
           Container(
-            width: 90,
-            height: 90,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-              border:
-                  Border.all(color: Colors.white.withValues(alpha: 0.5), width: 3),
-            ),
-            child: const Center(
-                child: Text('👨‍🌾', style: TextStyle(fontSize: 44))),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Budi Santoso',
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Pelanggan TokoTani',
-            style: GoogleFonts.poppins(
-              color: Colors.white.withValues(alpha: 0.85),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _statBox('3', 'Pesanan'),
-              _divider(),
-              _statBox('12', 'Produk\nDibeli'),
-              _divider(),
-              _statBox('Rp 270K', 'Total\nBelanja'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statBox(String value, String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Text(value,
-              style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold)),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  fontSize: 10,
-                  height: 1.3)),
-        ],
-      ),
-    );
-  }
-
-  Widget _divider() {
-    return Container(
-      height: 32,
-      width: 1,
-      color: Colors.white.withValues(alpha: 0.3),
-    );
-  }
-
-  Widget _buildApiModeToggle(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: StatefulBuilder(
-        builder: (ctx, setLocal) => Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2)),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: ApiService.useMock
-                      ? Colors.orange.shade50
-                      : _lightGreen,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  ApiService.useMock
-                      ? Icons.science_outlined
-                      : Icons.cloud_done_outlined,
-                  color: ApiService.useMock
-                      ? Colors.orange.shade700
-                      : _primaryGreen,
-                  size: 20,
-                ),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [p.brand, BrandColors.deep],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(28),
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                child: Row(
                   children: [
-                    Text(
-                      ApiService.useMock ? 'Mode Data Tiruan' : 'Mode Laravel API',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, fontWeight: FontWeight.w600),
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: p.onBrand,
+                      child: Text(
+                        initial,
+                        style: text.headlineSmall?.copyWith(
+                          color: BrandColors.deep,
+                        ),
+                      ),
                     ),
-                    Text(
-                      ApiService.useMock
-                          ? 'Offline — data simulasi'
-                          : ApiService.baseUrl,
-                      style: GoogleFonts.poppins(
-                          fontSize: 11, color: _textSecondary),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.titleLarge?.copyWith(color: p.onBrand),
+                          ),
+                          if (auth.email.isNotEmpty)
+                            Text(
+                              auth.email,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: text.bodySmall?.copyWith(
+                                color: p.onBrand.withValues(alpha: 0.9),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              Switch(
-                value: ApiService.useMock,
-                activeThumbColor: _primaryGreen,
-                onChanged: (val) {
-                  setLocal(() => ApiService.useMock = val);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(val
-                          ? 'Beralih ke Mode Data Tiruan (Offline)'
-                          : 'Beralih ke Mode Laravel API'),
-                      backgroundColor: val
-                          ? Colors.orange.shade700
-                          : _primaryGreen,
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuSection(
-      BuildContext context, String title, List<_MenuItem> items) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
           Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(
-              title,
-              style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: _textSecondary),
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2)),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Column(
-                children: items.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final item = entry.value;
-                  return Column(
-                    children: [
-                      if (i > 0) const Divider(height: 1, indent: 16),
-                      ListTile(
-                        onTap: item.onTap,
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _lightGreen,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(item.icon,
-                              color: _primaryGreen, size: 18),
-                        ),
-                        title: Text(item.title,
-                            style: GoogleFonts.poppins(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w500,
-                                color: _textPrimary)),
-                        subtitle: Text(item.subtitle,
-                            style: GoogleFonts.poppins(
-                                fontSize: 11.5, color: _textSecondary)),
-                        trailing: item.trailing ??
-                            const Icon(Icons.chevron_right,
-                                color: Colors.grey, size: 20),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 4),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppCard(
+                  padding: EdgeInsets.zero,
+                  onTap: () =>
+                      context.read<NavigationProvider>().select(AppTab.orders),
+                  child: ListTile(
+                    leading: Icon(Icons.receipt_long_outlined, color: p.brandText),
+                    title: Text('Pesanan Saya', style: text.titleSmall),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text('Tampilan', style: text.titleMedium),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<ThemeMode>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        icon: Icon(Icons.light_mode_outlined),
+                        label: Text('Terang'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        icon: Icon(Icons.dark_mode_outlined),
+                        label: Text('Gelap'),
+                      ),
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        icon: Icon(Icons.settings_suggest_outlined),
+                        label: Text('Sistem'),
                       ),
                     ],
-                  );
-                }).toList(),
-              ),
+                    selected: {themeMode},
+                    onSelectionChanged: (selection) => context
+                        .read<ThemeProvider>()
+                        .setMode(selection.first),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _logout(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.danger,
+                      side: BorderSide(color: p.danger),
+                    ),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Keluar'),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Fitur ini akan segera hadir! 🚀'),
-        backgroundColor: _primaryGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
 }
-
-class _MenuItem {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final Widget? trailing;
-
-  const _MenuItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.trailing,
-  });
-}
-

@@ -1,28 +1,44 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tokotani/main.dart';
+import 'package:tokotani/pages/main_shell.dart';
+
+import 'test_support.dart';
 
 void main() {
-  testWidgets('Memverifikasi judul dan navigasi utama TokoTani', (WidgetTester tester) async {
-    // Membangun aplikasi TokoTani
-    await tester.pumpWidget(const TokoTaniApp());
+  setUp(configureUnavailableApi);
 
-    // Memverifikasi teks judul 'TokoTani' muncul di AppBar
-    expect(find.text('TokoTani'), findsWidgets);
+  testWidgets('Navigasi bawah hanya memuat lima menu pelanggan', (tester) async {
+    await tester.pumpWidget(testApp(const MainShell()));
+    await tester.pumpAndSettle();
 
-    // Memverifikasi dua tab navigasi utama tugas Anggota 5
-    expect(find.text('Keranjang Belanja'), findsWidgets);
-    expect(find.text('Kelola Produk'), findsWidgets);
+    for (final label in ['Beranda', 'Produk', 'Keranjang', 'Pesanan', 'Akun']) {
+      expect(find.text(label), findsWidgets, reason: label);
+    }
+    expect(find.text('Mode Laravel'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Memverifikasi menu navigasi evaluasi TokoTani', (WidgetTester tester) async {
-    // Membangun menu ringkasan tugas
-    await tester.pumpWidget(const TokoTaniApp(home: MenuPage()));
+  testWidgets('Setiap tab dapat dibuka tanpa galat', (tester) async {
+    await tester.pumpWidget(testApp(const MainShell()));
+    await tester.pumpAndSettle();
 
-    // Memverifikasi teks judul 'TokoTani' muncul
-    expect(find.textContaining('TokoTani'), findsWidgets);
+    for (final label in ['Produk', 'Pesanan', 'Akun', 'Beranda']) {
+      await tester.tap(find.text(label).last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: label);
+    }
+  });
 
-    // Memverifikasi kartu navigasi bagian Anggota 5 muncul
-    expect(find.text('Keranjang Belanja'), findsOneWidget);
-    expect(find.text('Kelola Produk (CRUD)'), findsOneWidget);
+  testWidgets('Tema gelap langsung berlaku tanpa restart', (tester) async {
+    await tester.pumpWidget(testApp(const MainShell()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Akun').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gelap'));
+    await tester.pumpAndSettle();
+
+    final context = tester.element(find.byType(Scaffold).first);
+    expect(Theme.of(context).brightness, Brightness.dark);
   });
 }

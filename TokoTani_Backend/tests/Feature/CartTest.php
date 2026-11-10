@@ -7,11 +7,13 @@ use App\Models\Courier;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthenticatedApiRequests;
 use Tests\TestCase;
 
 class CartTest extends TestCase
 {
     use RefreshDatabase;
+    use AuthenticatedApiRequests;
 
     private function createProduct(array $overrides = []): Product
     {
@@ -29,7 +31,7 @@ class CartTest extends TestCase
 
     public function test_get_cart_empty_returns_empty_items_and_zero_subtotal(): void
     {
-        $response = $this->getJson('/api/keranjang', ['X-Pelanggan-Id' => '1'])
+        $response = $this->getJson('/api/cart', ['X-Pelanggan-Id' => '1'])
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('status', 'sukses')
@@ -43,7 +45,7 @@ class CartTest extends TestCase
         $p2 = $this->createProduct(['nama' => 'Beras', 'harga' => 20000, 'stok' => 5]);
 
         // Tambah Bayam (2 ikat x 5.000 = 10.000)
-        $this->postJson('/api/keranjang', [
+        $this->postJson('/api/cart', [
             'produk_id' => $p1->id,
             'jumlah'    => 2,
         ], ['X-Pelanggan-Id' => '1'])
@@ -52,14 +54,14 @@ class CartTest extends TestCase
             ->assertJsonPath('status', 'sukses');
 
         // Tambah Beras (1 sak x 20.000 = 20.000)
-        $this->postJson('/api/keranjang', [
+        $this->postJson('/api/cart', [
             'produk_id' => $p2->id,
             'jumlah'    => 1,
         ], ['X-Pelanggan-Id' => '1'])
             ->assertCreated();
 
         // Cek isi keranjang dan subtotal otoritatif dari server (harus 30.000)
-        $response = $this->getJson('/api/keranjang', ['X-Pelanggan-Id' => '1'])
+        $response = $this->getJson('/api/cart', ['X-Pelanggan-Id' => '1'])
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.subtotal', 30000)
@@ -73,18 +75,18 @@ class CartTest extends TestCase
     {
         $product = $this->createProduct(['harga' => 10000, 'stok' => 10]);
 
-        $this->postJson('/api/keranjang', [
+        $this->postJson('/api/cart', [
             'produk_id' => $product->id,
             'jumlah'    => 2,
         ], ['X-Pelanggan-Id' => '1'])->assertCreated();
 
-        $this->postJson('/api/keranjang', [
+        $this->postJson('/api/cart', [
             'produk_id' => $product->id,
             'jumlah'    => 3,
-        ], ['X-Pelanggan-Id' => '1'])->assertCreated();
+        ], ['X-Pelanggan-Id' => '1'])->assertOk();
 
         $this->assertDatabaseHas('carts', [
-            'customer_id' => 1,
+            'customer_id' => $this->apiUser->id,
             'product_id'  => $product->id,
             'quantity'    => 5,
         ]);
@@ -94,7 +96,7 @@ class CartTest extends TestCase
     {
         $product = $this->createProduct(['stok' => 3]);
 
-        $this->postJson('/api/keranjang', [
+        $this->postJson('/api/cart', [
             'produk_id' => $product->id,
             'jumlah'    => 5,
         ], ['X-Pelanggan-Id' => '1'])
@@ -107,7 +109,7 @@ class CartTest extends TestCase
     {
         $product = $this->createProduct(['stok' => 0, 'tersedia' => false]);
 
-        $this->postJson('/api/keranjang', [
+        $this->postJson('/api/cart', [
             'produk_id' => $product->id,
             'jumlah'    => 1,
         ], ['X-Pelanggan-Id' => '1'])
@@ -119,12 +121,12 @@ class CartTest extends TestCase
     {
         $product = $this->createProduct(['stok' => 10]);
         $cart = Cart::create([
-            'customer_id' => 1,
+            'customer_id' => $this->apiUser->id,
             'product_id'  => $product->id,
             'quantity'    => 2,
         ]);
 
-        $this->putJson("/api/keranjang/{$cart->id}", [
+        $this->putJson("/api/cart/{$cart->id}", [
             'jumlah' => 4,
         ], ['X-Pelanggan-Id' => '1'])
             ->assertOk()
@@ -141,12 +143,12 @@ class CartTest extends TestCase
     {
         $product = $this->createProduct(['stok' => 5]);
         $cart = Cart::create([
-            'customer_id' => 1,
+            'customer_id' => $this->apiUser->id,
             'product_id'  => $product->id,
             'quantity'    => 2,
         ]);
 
-        $this->putJson("/api/keranjang/{$cart->id}", [
+        $this->putJson("/api/cart/{$cart->id}", [
             'jumlah' => 10,
         ], ['X-Pelanggan-Id' => '1'])
             ->assertStatus(409)
@@ -157,12 +159,12 @@ class CartTest extends TestCase
     {
         $product = $this->createProduct(['stok' => 5]);
         $cart = Cart::create([
-            'customer_id' => 1,
+            'customer_id' => $this->apiUser->id,
             'product_id'  => $product->id,
             'quantity'    => 2,
         ]);
 
-        $this->putJson("/api/keranjang/{$cart->id}", [
+        $this->putJson("/api/cart/{$cart->id}", [
             'jumlah' => 0,
         ], ['X-Pelanggan-Id' => '1'])
             ->assertStatus(422)
@@ -173,12 +175,12 @@ class CartTest extends TestCase
     {
         $product = $this->createProduct(['stok' => 10]);
         $cart = Cart::create([
-            'customer_id' => 1,
+            'customer_id' => $this->apiUser->id,
             'product_id'  => $product->id,
             'quantity'    => 2,
         ]);
 
-        $this->deleteJson("/api/keranjang/{$cart->id}", [], ['X-Pelanggan-Id' => '1'])
+        $this->deleteJson("/api/cart/{$cart->id}", [], ['X-Pelanggan-Id' => '1'])
             ->assertOk()
             ->assertJsonPath('success', true);
 
@@ -195,13 +197,13 @@ class CartTest extends TestCase
 
         // Item masuk ke keranjang
         Cart::create([
-            'customer_id' => 1,
+            'customer_id' => $this->apiUser->id,
             'product_id'  => $product->id,
             'quantity'    => 2,
         ]);
 
         $this->assertDatabaseHas('carts', [
-            'customer_id' => 1,
+            'customer_id' => $this->apiUser->id,
             'product_id'  => $product->id,
         ]);
 
@@ -224,9 +226,8 @@ class CartTest extends TestCase
 
         // Pastikan item yang sudah dibeli telah terhapus dari keranjang pelanggan
         $this->assertDatabaseMissing('carts', [
-            'customer_id' => 1,
+            'customer_id' => $this->apiUser->id,
             'product_id'  => $product->id,
         ]);
     }
 }
-

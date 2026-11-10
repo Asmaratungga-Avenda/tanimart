@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Courier;
 use App\Models\PaymentMethod;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 use Tests\Support\CheckoutFixtures;
 use Tests\TestCase;
@@ -13,6 +14,38 @@ class CheckoutConcurrencyTest extends TestCase
 {
     use CheckoutFixtures;
     use DatabaseMigrations;
+
+    private ?string $sqliteDatabase = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (config('database.default') !== 'sqlite'
+            || config('database.connections.sqlite.database') !== ':memory:') {
+            return;
+        }
+
+        $this->sqliteDatabase = tempnam(sys_get_temp_dir(), 'tokotani-concurrency-');
+
+        config([
+            'database.connections.sqlite.database' => $this->sqliteDatabase,
+            'database.connections.sqlite.busy_timeout' => 5000,
+            'database.connections.sqlite.transaction_mode' => 'IMMEDIATE',
+        ]);
+        DB::purge('sqlite');
+
+        $this->artisan('migrate:fresh');
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+        if ($this->sqliteDatabase !== null) {
+            @unlink($this->sqliteDatabase);
+        }
+    }
 
     public function test_two_simultaneous_checkouts_on_limited_stock_create_only_one_order(): void
     {
@@ -28,8 +61,18 @@ class CheckoutConcurrencyTest extends TestCase
         $payload = $this->cartCheckoutPayload($courier, $paymentMethod);
 
         $results = $this->runConcurrentCheckouts([
-            ['payload' => $payload, 'key' => 'race-stok-pembeli-1', 'pelanggan_id' => $buyerOne->id],
-            ['payload' => $payload, 'key' => 'race-stok-pembeli-2', 'pelanggan_id' => $buyerTwo->id],
+            [
+                'payload' => $payload,
+                'key' => 'race-stok-pembeli-1',
+                'pelanggan_id' => $buyerOne->id,
+                'token' => $buyerOne->createToken('concurrent-checkout')->plainTextToken,
+            ],
+            [
+                'payload' => $payload,
+                'key' => 'race-stok-pembeli-2',
+                'pelanggan_id' => $buyerTwo->id,
+                'token' => $buyerTwo->createToken('concurrent-checkout')->plainTextToken,
+            ],
         ]);
 
         $successes = collect($results)->where('http_status', 201);
@@ -56,14 +99,14 @@ class CheckoutConcurrencyTest extends TestCase
             'tersedia' => false,
         ]);
 
-        $this->assertDatabaseMissing('keranjang', [
-            'pelanggan_id' => $winnerId,
+        $this->assertDatabaseMissing('carts', [
+            'customer_id' => $winnerId,
             'product_id' => $product->id,
         ]);
-        $this->assertDatabaseHas('keranjang', [
-            'pelanggan_id' => $loserId,
+        $this->assertDatabaseHas('carts', [
+            'customer_id' => $loserId,
             'product_id' => $product->id,
-            'jumlah' => 1,
+            'quantity' => 1,
         ]);
     }
 
@@ -79,8 +122,18 @@ class CheckoutConcurrencyTest extends TestCase
         $payload = $this->cartCheckoutPayload($courier, $paymentMethod);
 
         $results = $this->runConcurrentCheckouts([
-            ['payload' => $payload, 'key' => 'race-kunci-sama', 'pelanggan_id' => $pelanggan->id],
-            ['payload' => $payload, 'key' => 'race-kunci-sama', 'pelanggan_id' => $pelanggan->id],
+            [
+                'payload' => $payload,
+                'key' => 'race-kunci-sama',
+                'pelanggan_id' => $pelanggan->id,
+                'token' => $pelanggan->createToken('concurrent-checkout')->plainTextToken,
+            ],
+            [
+                'payload' => $payload,
+                'key' => 'race-kunci-sama',
+                'pelanggan_id' => $pelanggan->id,
+                'token' => $pelanggan->createToken('concurrent-checkout')->plainTextToken,
+            ],
         ]);
 
         $statuses = collect($results)->pluck('http_status')->sort()->values()->all();
@@ -111,8 +164,8 @@ class CheckoutConcurrencyTest extends TestCase
             'id' => $product->id,
             'stok' => 3,
         ]);
-        $this->assertDatabaseMissing('keranjang', [
-            'pelanggan_id' => $pelanggan->id,
+        $this->assertDatabaseMissing('carts', [
+            'customer_id' => $pelanggan->id,
             'product_id' => $product->id,
         ]);
     }
@@ -130,7 +183,7 @@ class CheckoutConcurrencyTest extends TestCase
     }
 
     /**
-     * @param  array<int, array{payload: array, key: string, pelanggan_id: int}>  $requests
+     * @param  array<int, array{payload: array, key: string, pelanggan_id: int, token: string}>  $requests
      * @return array<int, array{http_status: int, body: array}>
      */
     private function runConcurrentCheckouts(array $requests): array
@@ -138,15 +191,24 @@ class CheckoutConcurrencyTest extends TestCase
         $barrier = sys_get_temp_dir().DIRECTORY_SEPARATOR.'tokotani-race-'.uniqid('', true);
         $processes = [];
 
+        $phpArguments = [PHP_BINARY];
+
+        if (config('database.default') === 'sqlite') {
+            $phpArguments = array_merge($phpArguments, [
+                '-d', 'extension=pdo_sqlite',
+                '-d', 'extension=sqlite3',
+            ]);
+        }
+
         foreach ($requests as $request) {
-            $process = new Process([
-                PHP_BINARY,
+            $process = new Process(array_merge($phpArguments, [
                 base_path('tests/Support/checkout_request.php'),
                 base64_encode(json_encode($request['payload'])),
                 $request['key'],
                 (string) $request['pelanggan_id'],
                 $barrier,
-            ], base_path(), $this->processEnvironment());
+                $request['token'],
+            ]), base_path(), $this->processEnvironment());
 
             $process->setTimeout(60);
             $process->start();
@@ -200,6 +262,10 @@ class CheckoutConcurrencyTest extends TestCase
             'DB_DATABASE' => $database['database'] ?? null,
             'DB_USERNAME' => $database['username'] ?? null,
             'DB_PASSWORD' => $database['password'] ?? null,
+            'DB_BUSY_TIMEOUT' => isset($database['busy_timeout']) ? (string) $database['busy_timeout'] : null,
+            'DB_JOURNAL_MODE' => $database['journal_mode'] ?? null,
+            'DB_SYNCHRONOUS' => isset($database['synchronous']) ? (string) $database['synchronous'] : null,
+            'DB_TRANSACTION_MODE' => $database['transaction_mode'] ?? null,
             'CACHE_STORE' => 'array',
             'SESSION_DRIVER' => 'array',
             'QUEUE_CONNECTION' => 'sync',

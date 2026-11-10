@@ -2,8 +2,8 @@
 
 namespace Tests\Support;
 
+use App\Models\Cart;
 use App\Models\Courier;
-use App\Models\Keranjang;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\User;
@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 
 trait CheckoutFixtures
 {
+    use AuthenticatedApiRequests;
+
     protected function createProduct(array $overrides = []): Product
     {
         return Product::create(array_merge([
@@ -52,12 +54,12 @@ trait CheckoutFixtures
         ], $overrides));
     }
 
-    protected function addToCart(int $pelangganId, int $productId, int $jumlah): Keranjang
+    protected function addToCart(int $pelangganId, int $productId, int $jumlah): Cart
     {
-        return Keranjang::create([
-            'pelanggan_id' => $pelangganId,
+        return Cart::create([
+            'customer_id' => $pelangganId,
             'product_id' => $productId,
-            'jumlah' => $jumlah,
+            'quantity' => $jumlah,
         ]);
     }
 

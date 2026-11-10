@@ -1,105 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tokotani/main.dart';
 import 'package:tokotani/pages/cart_page.dart';
-import 'package:tokotani/pages/manage_product_page.dart';
-import 'package:tokotani/pages/product_form_page.dart';
-import 'package:tokotani/services/api_service.dart';
+import 'package:tokotani/pages/home_page.dart';
+import 'package:tokotani/pages/main_shell.dart';
+import 'package:tokotani/pages/order_history_page.dart';
+import 'package:tokotani/pages/product_catalog_page.dart';
+import 'package:tokotani/pages/profile_page.dart';
+
+import 'test_support.dart';
 
 void main() {
-  setUp(() {
-    ApiService.useMock = true;
-  });
+  setUp(configureUnavailableApi);
 
-  group('Pengujian Tampilan Responsif (Mobile vs Desktop)', () {
-    testWidgets('MainFocusedPage tampil proporsional di ukuran Mobile (400x800)', (tester) async {
-      tester.view.physicalSize = const Size(400, 800);
-      tester.view.devicePixelRatio = 1.0;
+  for (final size in [const Size(360, 640), const Size(400, 800), const Size(1280, 800)]) {
+    testWidgets('Kerangka utama tidak overflow pada layar $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
       addTearDown(() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
 
-      await tester.pumpWidget(const TokoTaniApp());
+      await tester.pumpWidget(testApp(const MainShell()));
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  }
 
-      expect(find.text('TokoTani'), findsWidgets);
-      expect(find.text('Keranjang Belanja'), findsWidgets);
-      expect(find.text('Kelola Produk'), findsWidgets);
+  testWidgets('Semua halaman tab tidak overflow pada layar mobile', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
     });
 
-    testWidgets('MainFocusedPage tampil proporsional di ukuran Desktop (1280x800)', (tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+    final pages = <Widget>[
+      const HomePage(),
+      const ProductCatalogPage(),
+      const CartPage(),
+      const OrderHistoryPage(),
+      const ProfilePage(),
+    ];
 
-      await tester.pumpWidget(const TokoTaniApp());
+    for (final page in pages) {
+      await tester.pumpWidget(testApp(page));
       await tester.pumpAndSettle();
-
-      expect(find.text('TokoTani'), findsWidgets);
-      expect(find.text('Keranjang Belanja'), findsWidgets);
-      expect(find.text('Kelola Produk'), findsWidgets);
-    });
-
-    testWidgets('CartPage merender dengan baik di Desktop dan Mobile', (tester) async {
-      // Desktop
-      tester.view.physicalSize = const Size(1440, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: CartPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Keranjang Belanja'), findsOneWidget);
-    });
-
-    testWidgets('ManageProductsPage merender dengan baik di Desktop dan Mobile', (tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: ManageProductsPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Kelola Produk'), findsOneWidget);
-      expect(find.text('Tambah Produk'), findsOneWidget);
-    });
-
-    testWidgets('ProductFormPage merender dengan baik di Desktop', (tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: ProductFormPage(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Tambah Produk Pertanian'), findsOneWidget);
-      expect(find.text('Nama Produk Pertanian *'), findsOneWidget);
-    });
+      expect(tester.takeException(), isNull, reason: '${page.runtimeType}');
+    }
   });
 }
-

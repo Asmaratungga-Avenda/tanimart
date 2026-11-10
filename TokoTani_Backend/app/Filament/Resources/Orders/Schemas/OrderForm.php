@@ -17,74 +17,48 @@ class OrderForm
             ->components([
                 TextInput::make('nama_penerima')
                     ->label('Nama Penerima')
-                    ->required()
-                    ->maxLength(255),
+                    ->disabled(),
                 Textarea::make('alamat_penerima')
                     ->label('Alamat Penerima')
-                    ->required()
+                    ->disabled()
                     ->columnSpanFull(),
                 Select::make('kurir_id')
                     ->label('Kurir')
-                    ->relationship('courier', 'nama', fn ($query) => $query->where('aktif', true))
-                    ->required()
-                    ->searchable()
-                    ->preload()
-                    ->reactive()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                        if ($state) {
-                            $courier = Courier::find($state);
-                            if ($courier) {
-                                $set('ongkir', $courier->tarif);
-                                $subtotal = (int) ($get('subtotal') ?: 0);
-                                $set('total_harga', $subtotal + $courier->tarif);
-                            }
-                        }
-                    }),
+                    ->relationship('courier', 'nama')
+                    ->disabled(),
                 Select::make('payment_method_id')
                     ->label('Metode Pembayaran')
-                    ->relationship('paymentMethod', 'nama', fn ($query) => $query->where('aktif', true))
-                    ->required()
-                    ->searchable()
-                    ->preload(),
+                    ->relationship('paymentMethod', 'nama')
+                    ->disabled(),
                 DatePicker::make('tanggal_antar')
                     ->label('Tanggal Pengantaran')
-                    ->required(),
+                    ->disabled(),
                 Select::make('status')
                     ->label('Status Pesanan')
                     ->options([
                         'menunggu_pembayaran' => 'Menunggu Pembayaran',
                         'diproses' => 'Diproses',
                         'dikirim' => 'Dikirim',
+                        'tiba' => 'Tiba',
                         'selesai' => 'Selesai',
                         'dibatalkan' => 'Dibatalkan',
                     ])
-                    ->default('menunggu_pembayaran')
-                    ->required(),
+                    ->disabled(),
                 TextInput::make('subtotal')
                     ->label('Subtotal')
                     ->numeric()
                     ->prefix('Rp')
-                    ->required()
-                    ->reactive()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                        $ongkir = (int) ($get('ongkir') ?: 0);
-                        $set('total_harga', ((int) $state) + $ongkir);
-                    }),
+                    ->disabled(),
                 TextInput::make('ongkir')
                     ->label('Ongkos Kirim')
                     ->numeric()
                     ->prefix('Rp')
-                    ->required()
-                    ->reactive()
-                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                        $subtotal = (int) ($get('subtotal') ?: 0);
-                        $set('total_harga', $subtotal + ((int) $state));
-                    }),
+                    ->disabled(),
                 TextInput::make('total_harga')
                     ->label('Total Harga')
                     ->numeric()
                     ->prefix('Rp')
-                    ->required(),
+                    ->disabled(),
                 TextInput::make('idempotency_key')
                     ->label('Idempotency Key')
                     ->disabled()

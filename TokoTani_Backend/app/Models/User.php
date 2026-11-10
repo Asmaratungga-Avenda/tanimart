@@ -12,17 +12,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use App\Models\Cart;
+use App\Models\Order;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'role'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return true;
+        return $this->role === 'admin';
     }
 
     /**
@@ -38,18 +41,18 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
-    public function keranjang(): HasMany
+    public function isAdmin(): bool
     {
-        return $this->hasMany(Keranjang::class, 'pelanggan_id');
+        return $this->role === 'admin';
     }
 
-    public function pesanan(): HasMany
+    public function keranjangs(): HasMany
     {
-        return $this->hasMany(Pesanan::class, 'pelanggan_id');
+        return $this->hasMany(Cart::class, 'customer_id');
     }
 
     public function orders(): HasMany
     {
-        return $this->hasMany(Order::class, 'pelanggan_id');
+        return $this->hasMany(Order::class, 'customer_id');
     }
 }

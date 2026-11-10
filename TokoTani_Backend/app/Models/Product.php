@@ -2,14 +2,23 @@
 
 namespace App\Models;
 
+use App\Traits\HandleImageStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use App\Models\Category;
+use App\Models\ProductImage;
+use App\Models\OrderItem;
+use App\Models\Cart;
 
 class Product extends Model
 {
-    use HasFactory;
+    use HasFactory, HandleImageStorage;
+
+    protected $appends = ['gambar_url', 'image_url'];
 
     // Melindungi kolom id agar tidak bisa diisi sembarang, sisanya mass-assignable
     protected $guarded = ['id'];
@@ -22,6 +31,7 @@ class Product extends Model
             'category_id' => 'integer',
             'tersedia' => 'boolean',
             'mudah_rusak' => 'boolean',
+            'gambar' => 'string',
         ];
     }
 
@@ -31,12 +41,46 @@ class Product extends Model
             if ($product->stok <= 0) {
                 $product->tersedia = false;
             }
+
+            if (empty($product->category_id) && ! empty($product->kategori)) {
+                $category = Category::where('nama_kategori', $product->kategori)->first();
+                if ($category) {
+                    $product->category_id = $category->id;
+                }
+            }
         });
+
+        static::deleted(function (Product $product) {
+            $product->deleteImage($product->gambar);
+        });
+    }
+
+    public function getGambarUrlAttribute(): ?string
+    {
+        if (! $this->gambar) {
+            return null;
+        }
+
+        if (Str::startsWith($this->gambar, ['http://', 'https://'])) {
+            return $this->gambar;
+        }
+
+        return Storage::disk('public')->url($this->gambar);
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->getGambarUrlAttribute();
     }
 
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function productImages(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order', 'asc');
     }
 
     public function orderItems(): HasMany
