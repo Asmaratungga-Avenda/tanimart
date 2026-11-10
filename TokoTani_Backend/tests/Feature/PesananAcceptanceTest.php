@@ -277,10 +277,10 @@ class PesananAcceptanceTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('order_items', 0);
         $this->assertDatabaseHas('products', ['id' => $product->id, 'stok' => 2]);
-        $this->assertDatabaseHas('keranjang', [
-            'pelanggan_id' => $pelanggan->id,
+        $this->assertDatabaseHas('carts', [
+            'customer_id' => $pelanggan->id,
             'product_id' => $product->id,
-            'jumlah' => 3,
+            'quantity' => 3,
         ]);
     }
 
@@ -316,10 +316,10 @@ class PesananAcceptanceTest extends TestCase
         $this->assertDatabaseCount('order_items', 0);
         $this->assertDatabaseHas('products', ['id' => $firstProduct->id, 'stok' => 5]);
         $this->assertDatabaseHas('products', ['id' => $secondProduct->id, 'stok' => 1]);
-        $this->assertDatabaseHas('keranjang', [
-            'pelanggan_id' => $pelanggan->id,
+        $this->assertDatabaseHas('carts', [
+            'customer_id' => $pelanggan->id,
             'product_id' => $firstProduct->id,
-            'jumlah' => 2,
+            'quantity' => 2,
         ]);
     }
 

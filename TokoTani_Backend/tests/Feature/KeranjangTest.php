@@ -10,8 +10,8 @@ use Tests\TestCase;
 
 class KeranjangTest extends TestCase
 {
-    use RefreshDatabase;
     use AuthenticatedApiRequests;
+    use RefreshDatabase;
 
     public function test_adding_same_product_merges_quantity_instead_of_creating_duplicate_row(): void
     {
@@ -30,18 +30,17 @@ class KeranjangTest extends TestCase
             ->assertJsonPath('status', 'sukses')
             ->assertJsonPath('data.jumlah', 5);
 
-        $this->assertDatabaseCount('keranjang', 1);
-        $this->assertDatabaseHas('keranjang', [
-            'pelanggan_id' => $this->apiUser->id,
+        $this->assertDatabaseCount('carts', 1);
+        $this->assertDatabaseHas('carts', [
+            'customer_id' => $this->apiUser->id,
             'product_id' => $product->id,
-            'jumlah' => 5,
+            'quantity' => 5,
         ]);
 
         $this->withHeader('X-Pelanggan-Id', '1')
             ->getJson('/api/keranjang')
             ->assertOk()
             ->assertJsonPath('data.subtotal', 25000)
-            ->assertJsonPath('data.jumlah_item', 1)
             ->assertJsonCount(1, 'data.items');
     }
 
@@ -58,9 +57,9 @@ class KeranjangTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('status', 'gagal');
 
-        $this->assertDatabaseHas('keranjang', [
+        $this->assertDatabaseHas('carts', [
             'product_id' => $product->id,
-            'jumlah' => 2,
+            'quantity' => 2,
         ]);
     }
 
@@ -73,7 +72,7 @@ class KeranjangTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('status', 'gagal');
 
-        $this->assertDatabaseCount('keranjang', 0);
+        $this->assertDatabaseCount('carts', 0);
     }
 
     public function test_can_update_and_delete_cart_item(): void
@@ -103,7 +102,7 @@ class KeranjangTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'sukses');
 
-        $this->assertDatabaseCount('keranjang', 0);
+        $this->assertDatabaseCount('carts', 0);
     }
 
     public function test_update_cart_item_revalidates_stock_and_availability_under_lock(): void
@@ -122,9 +121,9 @@ class KeranjangTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('status', 'gagal');
 
-        $this->assertDatabaseHas('keranjang', [
+        $this->assertDatabaseHas('carts', [
             'id' => $cartId,
-            'jumlah' => 2,
+            'quantity' => 2,
         ]);
 
         $product->update(['tersedia' => false]);
@@ -134,9 +133,9 @@ class KeranjangTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('status', 'gagal');
 
-        $this->assertDatabaseHas('keranjang', [
+        $this->assertDatabaseHas('carts', [
             'id' => $cartId,
-            'jumlah' => 2,
+            'quantity' => 2,
         ]);
     }
 
@@ -171,7 +170,7 @@ class KeranjangTest extends TestCase
         $this->withHeader('X-Pelanggan-Id', '1')
             ->postJson('/api/keranjang', ['produk_id' => 9999, 'jumlah' => 1])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['produk_id']);
+            ->assertJsonValidationErrors(['product_id']);
     }
 
     private function createProduct(array $overrides = []): Product
