@@ -1,103 +1,94 @@
-# TokoTani / TaniMart
+# TaniMart
 
-Sistem jual beli kebutuhan pertanian dan kebutuhan harian. Terdiri dari **Backend Laravel** (REST API + panel admin Filament) dan **Frontend Flutter** (aplikasi pelanggan).
+TaniMart adalah aplikasi toko online untuk produk pertanian dan kebutuhan harian. Repositori ini berisi backend Laravel sebagai REST API dan panel admin, serta aplikasi pelanggan berbasis Flutter. Proyek dibuat untuk keperluan pendidikan mata kuliah PAPB.
 
-> Proyek ini dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB).
+## Fitur
 
-## Daftar Isi
+### Pelanggan
 
-1. [Deskripsi Proyek](#1-deskripsi-proyek)
-2. [Anggota Kelompok dan Pembagian Tugas](#2-anggota-kelompok-dan-pembagian-tugas)
-3. [Fitur Utama](#3-fitur-utama)
-4. [Teknologi](#4-teknologi)
-5. [Struktur Repositori](#5-struktur-repositori)
-6. [Instalasi dan Menjalankan Aplikasi](#6-instalasi-dan-menjalankan-aplikasi)
-7. [Akun Uji (Hasil Seeder)](#7-akun-uji-hasil-seeder)
-8. [Dokumentasi Endpoint API](#8-dokumentasi-endpoint-api)
-9. [Video Demonstrasi](#9-video-demonstrasi)
-10. [Troubleshooting](#10-troubleshooting)
+- Registrasi, login, dan logout menggunakan Laravel Sanctum.
+- Katalog produk dengan pencarian, filter kategori, pengurutan, dan pagination.
+- Detail produk, keranjang, checkout, konfirmasi pembayaran, dan riwayat pesanan.
+- Tema terang, gelap, dan mengikuti sistem.
+- Cache produk dan kategori serta antrean permintaan offline di aplikasi Flutter.
 
----
+### Admin
 
-## 1. Deskripsi Proyek
+- Mengelola produk, termasuk unggah gambar.
+- Mengelola status pesanan melalui API dan panel Filament.
+- Operasi admin hanya tersedia bagi akun dengan peran administrator.
 
-TaniMart adalah aplikasi e-commerce untuk produk pertanian dan kebutuhan harian. Pelanggan dapat melihat katalog, mencari dan memfilter produk, memasukkan produk ke keranjang, melakukan checkout, dan memantau pesanan. Admin mengelola produk dan pesanan melalui panel Filament dan endpoint API khusus admin.
-
-Aplikasi Flutter hanya untuk pelanggan. Tidak ada halaman admin di aplikasi Flutter.
-
-## 2. Anggota Kelompok dan Pembagian Tugas
-
-
-
-Setiap anggota memiliki sekurang-kurangnya lima commit bermakna. Kontribusi dapat dilihat di tab **Commits** atau **Insights > Contributors** pada repositori ini.
-
-## 3. Fitur Utama
-
-**Pelanggan (Flutter)**
-- Registrasi, login, dan logout (token Sanctum)
-- Katalog produk dengan foto, pencarian, filter kategori, pengurutan, dan infinite scroll
-- Detail produk, keranjang, checkout, konfirmasi pembayaran, dan riwayat pesanan
-- Tema terang, gelap, dan ikut sistem
-
-**Admin (Backend)**
-- Kelola produk (tambah, ubah, hapus, unggah foto)
-- Kelola pesanan (ubah status, tandai terkirim)
-
-## 4. Teknologi
+## Teknologi dan Struktur
 
 | Bagian | Teknologi |
-|--------|-----------|
-| Backend | PHP 8.2+, Laravel, Laravel Sanctum, Filament, MySQL/SQLite |
-| Frontend | Flutter, Provider, http, cached_network_image, flutter_secure_storage, shared_preferences |
+|---|---|
+| Backend | PHP 8.3+, Laravel, Laravel Sanctum, Filament |
+| Database | MySQL atau SQLite |
+| Frontend | Flutter, Provider, Hive |
 
-## 5. Struktur Repositori
-
-```
-TokoTani/
+```text
+TaniMart/
 ├── README.md
-├── TokoTani_Backend/     # Laravel API (Sanctum, Filament)
-└── TokoTani_Frontend/    # Flutter aplikasi pelanggan
+├── TokoTani_Backend/     # REST API dan panel admin Laravel
+└── TokoTani_Frontend/    # Aplikasi pelanggan Flutter
 ```
 
-## 6. Instalasi dan Menjalankan Aplikasi
+## Menjalankan Backend
 
-### 6.1 Prasyarat
+Prasyarat: PHP 8.3 atau lebih baru, Composer, dan MySQL atau SQLite.
 
-- PHP 8.2+ dan Composer
-- MySQL atau SQLite
-- Flutter SDK (versi stabil terbaru) dan Android Studio/emulator atau Chrome
-- Node.js dan NPM (opsional, hanya untuk build asset)
+Setelah clone repository:
 
-### 6.2 Backend
+```powershell
+git clone URL_REPOSITORY TaniMart
+cd TaniMart
+```
+
+Saat mengambil pembaruan di clone yang sudah ada, jalankan `git pull` dari root repository. Perubahan kode dan berkas gambar yang terlacak akan ikut diperbarui; data database lokal tidak otomatis dihapus atau diganti.
 
 ```powershell
 cd TokoTani_Backend
 composer install
-cp .env.example .env
+Copy-Item .env.example .env
 php artisan key:generate
 ```
 
-Atur koneksi database di `.env` (`DB_*`), lalu pastikan `APP_URL=http://127.0.0.1:8000`.
-
-Jalankan migrasi **dan seeder dalam satu perintah**:
+Atur koneksi database pada `.env`, lalu jalankan migrasi dan data awal:
 
 ```powershell
-php artisan migrate:fresh --seed
+php artisan migrate --seed
 php artisan serve
 ```
 
-Seeder mengisi akun admin, akun pelanggan uji, kategori, dan produk contoh. Server berjalan di `http://127.0.0.1:8000`.
+API tersedia di `http://127.0.0.1:8000`. Gambar publik disimpan pada `storage/app/public/` dan disajikan melalui route Laravel `/storage`.
 
-Gambar publik disimpan di `TokoTani_Backend/storage/app/public/` dan disertakan di Git. Berkas di `TokoTani_Backend/public/` juga tidak diabaikan Git. Backend menyajikan gambar melalui route `/storage`, jadi tidak perlu menjalankan `php artisan storage:link`.
+Akun demo yang dibuat oleh seeder:
 
-### 6.3 Frontend
+| Peran | Email | Password |
+|---|---|---|
+| Admin | `admin@tokotani.test` | `password` |
+| Pelanggan | `user@tokotani.test` | `password` |
+
+Akun ini dibuat dengan kredensial yang sama pada database baru melalui `php artisan migrate --seed` atau `php artisan db:seed`. Seeder hanya membuat akun demo di luar environment production. Jika akun sudah ada, seeder tidak mengubah password yang tersimpan; karena itu pull atau seed ulang tidak mereset password lokal yang sudah diganti. Akun demo hanya untuk pengembangan lokal. Ganti password sebelum penggunaan selain pengujian lokal. Administrator juga dapat dibuat atau diatur ulang secara interaktif dengan:
+
+```powershell
+php artisan admin:password
+```
+
+Registrasi pelanggan selalu memberikan peran `customer`; endpoint registrasi tidak membuat akun admin. Jalankan migrasi sebelum memakai API. Panel Filament dan operasi admin memerlukan peran administrator.
+
+## Menjalankan Frontend
+
+Prasyarat: Flutter SDK versi stabil dan Android Studio/emulator atau Chrome.
 
 ```powershell
 cd TokoTani_Frontend
 flutter pub get
+flutter analyze
+flutter test
 ```
 
-Jalankan dengan menyebut alamat backend:
+Jalankan aplikasi dengan URL API yang sesuai:
 
 ```powershell
 # Chrome / desktop
@@ -105,105 +96,176 @@ flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8000/api
 
 # Emulator Android
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
+
+# Perangkat Android fisik (ganti dengan IP komputer)
+flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000/api
 ```
 
-Gunakan satu jenis host secara konsisten (`127.0.0.1` atau `localhost`, jangan dicampur).
+Jika `API_BASE_URL` tidak ditentukan, aplikasi menggunakan `10.0.2.2` untuk emulator Android dan `127.0.0.1` untuk Web/platform lain. Gunakan host yang konsisten. URL media dari backend diselesaikan oleh `ApiConfig.resolveMedia()`; path relatif Laravel mendapat awalan `storage/`. Gambar yang URL-nya kosong atau gagal dimuat tidak diganti placeholder.
 
-## 7. Akun Uji (Hasil Seeder)
+Build APK produksi:
 
-| Peran | Email | Password |
-|-------|-------|----------|
-| Admin | `admin@tokotani.test` | `password` |
-| Pelanggan | `user@tokotani.test` | `password` |
+```powershell
+flutter build apk --dart-define=API_BASE_URL=https://api.tanimart.id/api
+```
 
-Akun demo hanya dibuat di luar environment production. Ganti password demo sebelum memakai data tersebut untuk keperluan selain development lokal.
-Admin juga dapat dibuat atau diatur ulang dengan `php artisan admin:password`.
+## API
 
-## 8. Dokumentasi Endpoint API
+Base URL lokal: `http://127.0.0.1:8000/api`. Endpoint bertanda **Login** memerlukan token Sanctum pada header `Authorization: Bearer <token>`. Endpoint bertanda **Admin** juga memerlukan peran administrator.
 
-Base URL: `http://127.0.0.1:8000/api`. Endpoint bertanda "Login" memerlukan header `Authorization: Bearer <token>`.
+| Metode | Endpoint | Akses | Fungsi |
+|---|---|---|---|
+| `POST` | `/auth/register` | Publik | Daftar pelanggan |
+| `POST` | `/auth/login` | Publik | Login dan memperoleh token |
+| `GET` | `/auth/me` | Login | Profil pengguna |
+| `POST` | `/auth/logout` | Login | Logout dan menghapus token |
+| `GET` | `/produk` | Publik | Daftar produk; mendukung pagination |
+| `GET` | `/produk/{id}` | Publik | Detail produk |
+| `GET` | `/kategori` | Publik | Daftar kategori |
+| `GET` | `/banners` | Publik | Daftar banner |
+| `POST` | `/produk` | Admin | Membuat produk, unggah multipart melalui field `gambar` |
+| `PUT` | `/produk/{id}` | Admin | Mengubah produk |
+| `DELETE` | `/produk/{id}` | Admin | Menghapus produk |
+| `GET` / `POST` | `/keranjang` | Login | Melihat atau menambah item keranjang |
+| `PUT` / `DELETE` | `/keranjang/{id}` | Login | Mengubah atau menghapus item |
+| `DELETE` | `/keranjang` | Login | Mengosongkan keranjang |
+| `GET` | `/kurir` | Publik | Daftar kurir/wilayah aktif dan tarif |
+| `GET` | `/metode-pembayaran` | Publik | Daftar metode pembayaran |
+| `POST` | `/checkout` | Login | Membuat pesanan |
+| `GET` | `/pesanan` | Login | Riwayat pesanan terbaru lebih dahulu |
+| `GET` | `/pesanan/{id}` | Login | Detail pesanan |
+| `POST` | `/pesanan/{id}/pembayaran` | Login | Mengajukan konfirmasi pembayaran |
+| `POST` | `/pesanan/{id}/selesai` | Login | Mengonfirmasi pesanan diterima |
+| `PATCH` | `/pesanan/{id}/status` | Admin | Mengubah status sesuai transisi yang diizinkan |
+| `POST` | `/pesanan/{id}/kirim` | Admin | Menandai pesanan dikirim |
 
-### Autentikasi
+Alias kurir yang tersedia: `/couriers` dan `/wilayah`. Endpoint penghapusan kurir menggunakan soft delete agar data pesanan lama tetap utuh.
 
-| Metode | Endpoint | Akses | Deskripsi |
-|--------|----------|-------|-----------|
-| POST | `/auth/register` | Publik | Daftar akun pelanggan |
-| POST | `/auth/login` | Publik | Masuk dan menerima token |
-| GET | `/auth/me` | Login | Profil pengguna |
-| POST | `/auth/logout` | Login | Keluar dan hapus token |
+Respons API mengikuti bentuk umum berikut:
 
-### Produk dan Kategori
+```json
+{
+  "status": "sukses",
+  "code": "200",
+  "message": "Pesan",
+  "data": {}
+}
+```
 
-| Metode | Endpoint | Akses | Deskripsi |
-|--------|----------|-------|-----------|
-| GET | `/produk` | Publik | Daftar produk |
-| GET | `/produk/{id}` | Publik | Detail produk |
-| GET | `/kategori` | Publik | Daftar kategori |
-| POST | `/produk` | Admin | Tambah produk (multipart, dengan foto) |
-| PUT | `/produk/{id}` | Admin | Ubah produk |
-| DELETE | `/produk/{id}` | Admin | Hapus produk |
+Respons validasi dapat menyertakan properti `errors`.
 
-### Keranjang
+### Autentikasi dan keamanan data
 
-| Metode | Endpoint | Akses | Deskripsi |
-|--------|----------|-------|-----------|
-| GET | `/keranjang` | Login | Isi keranjang |
-| POST | `/keranjang` | Login | Tambah produk |
-| PUT | `/keranjang/{id}` | Login | Ubah jumlah |
-| DELETE | `/keranjang/{id}` | Login | Hapus item |
-| DELETE | `/keranjang` | Login | Kosongkan keranjang |
+- Token pelanggan dikelola aplikasi Flutter melalui secure storage.
+- Data keranjang dan pesanan dibatasi berdasarkan pemiliknya.
+- Password tidak dikirim dalam respons API.
+- Konfirmasi pembayaran pelanggan hanya mengajukan pembayaran untuk ditinjau admin; admin harus memverifikasi sebelum pesanan berstatus dibayar.
+- Foto produk disimpan di `storage/app/public/products/`; respons dapat memuat `gambar_url` atau `image_url`.
 
-### Checkout dan Pesanan
+### Keranjang dan transaksi
 
-| Metode | Endpoint | Akses | Deskripsi |
-|--------|----------|-------|-----------|
-| POST | `/checkout` | Login | Buat pesanan dari keranjang |
-| GET | `/pesanan` | Login | Riwayat pesanan |
-| GET | `/pesanan/{id}` | Login | Detail pesanan |
-| POST | `/pesanan/{id}/pembayaran` | Login | Konfirmasi pembayaran |
-| POST | `/pesanan/{id}/selesai` | Login | Tandai selesai |
-| PATCH | `/pesanan/{id}/status` | Admin | Ubah status pesanan |
-| POST | `/pesanan/{id}/kirim` | Admin | Tandai dikirim |
+- Keranjang tersimpan di server. Penambahan produk yang sama menggabungkan jumlah pada baris yang sama.
+- Subtotal dihitung server dari harga produk dan jumlah; nilai total kiriman klien tidak dipercaya.
+- Pesanan menyimpan snapshot nama dan harga produk di detail pesanan agar riwayat tidak berubah ketika katalog diperbarui.
+- Tarif kurir diambil dari data server. Pilihan kurir contoh memiliki tarif 10.000, 20.000, dan 35.000.
+- Checkout menggunakan transaksi database dan penguncian data produk/keranjang untuk memvalidasi ulang stok dan mencegah overselling.
+- Kunci idempoten wajib dikirim pada header `X-Kunci-Idempoten` (alias yang didukung: `X-Idempotency-Key`, `Idempotency-Key`, atau body `idempotency_key`). Kunci dan payload sama mengembalikan pesanan yang telah dibuat; kunci sama dengan payload berbeda menghasilkan `409`.
+- Isi `items` dapat dikirim pada request checkout; jika tidak dikirim, backend memakai keranjang pelanggan.
+- Produk mudah rusak wajib dikirim pada hari yang sama. Batas jumlah per produk dikonfigurasi melalui `CHECKOUT_MAX_MUDAH_RUSAK` (default 5). Slot pengantaran yang valid: `pagi`, `siang`, dan `sore`.
 
-### Foto Produk
+### Status pesanan
 
-Foto disimpan di `storage/app/public/products/` dan diakses melalui route Laravel `/storage`. Respons JSON memuat `gambar_url` / `image_url`. Aplikasi Flutter membaca field `foto`, `gambar_url`, atau `image_url`.
+Transisi yang diizinkan:
 
-### Keamanan
+```text
+menunggu_pembayaran -> menunggu_konfirmasi -> dibayar -> diproses -> dikirim -> tiba -> selesai
+menunggu_pembayaran -> dibatalkan
+menunggu_konfirmasi -> dibatalkan
+dikirim -> selesai
+```
 
-| Aspek | Implementasi |
-|-------|--------------|
-| Autentikasi | Laravel Sanctum (Bearer token) |
-| Penyimpanan token | `flutter_secure_storage` |
-| Manajemen produk dan status pesanan | Middleware `admin` |
-| Data keranjang dan pesanan | Difilter per `customer_id` |
-| Password | Tidak dikirim di respons JSON (`#[Hidden]`) |
+Transisi di luar aturan, termasuk mengubah status ke nilai yang sama, ditolak dengan `409 Conflict`. Status `selesai` dan `dibatalkan` bersifat terminal. Pelanggan dapat mengonfirmasi pesanan menjadi `selesai` ketika pesanan berstatus `dikirim` atau `tiba`.
 
-## 9. Video Demonstrasi
+## Database dan Gambar
 
-Tautan video (maksimal 5 menit): **[isi tautan video]**
+Tabel transaksi utama:
 
-Isi video:
-1. Menjalankan backend (`migrate:fresh --seed`) dan aplikasi Flutter
-2. Registrasi dan login pelanggan
-3. Katalog: pencarian, filter, dan detail produk
-4. Keranjang, checkout, dan konfirmasi pembayaran
-5. Riwayat pesanan
-6. **Demonstrasi galat**: contoh login dengan password salah, validasi form, atau stok tidak cukup, beserta pesan galat yang tampil
-7. Panel admin: kelola produk dan ubah status pesanan
+| Domain | Tabel |
+|---|---|
+| Pelanggan | `users` |
+| Produk | `products` |
+| Keranjang | `keranjang` |
+| Kurir/wilayah | `couriers` |
+| Metode pembayaran | `payment_methods` |
+| Pesanan | `orders` |
+| Detail pesanan | `order_items` |
 
-## 10. Troubleshooting
+`keranjang` memiliki batas unik pada pasangan pelanggan dan produk. `order_items` menyimpan `nama_produk`, `harga_satuan`, serta `subtotal` sebagai snapshot transaksi. `orders` menyimpan ringkasan biaya, status, jadwal pengantaran, dan kunci idempoten unik.
 
-| Masalah | Penyebab dan solusi |
-|---------|---------------------|
-| Foto produk tidak muncul | Pastikan gambar tersedia di `storage/app/public/`, server hidup, dan `API_BASE_URL` serta `APP_URL` mengarah ke backend |
-| Foto diblokir CORS di Flutter web (`No 'Access-Control-Allow-Origin'`) | Pastikan gambar disajikan melalui route Laravel `/storage` dengan header CORS. Jangan buat symlink `public/storage`, karena file statis dapat melewati route tersebut. Setelah mengubah konfigurasi CORS, jalankan `php artisan config:clear` |
-| Aplikasi di emulator tidak terhubung | Gunakan `10.0.2.2` sebagai ganti `127.0.0.1` |
-| HTTP diblokir di Android | Tambahkan `android:usesCleartextTraffic="true"` pada `AndroidManifest.xml` untuk pengembangan |
-| Error 403 pada `/produk` (POST/PUT/DELETE) | Endpoint ini khusus admin. Masuk dengan akun berperan `admin` |
-| Dependensi Flutter bermasalah | `flutter clean`, lalu `flutter pub get` |
-| Seeder gagal | Pastikan database terkoneksi dan jalankan `php artisan migrate:fresh --seed` dari folder `TokoTani_Backend` |
+Berkas gambar demo backend disimpan dan dilacak Git di `TokoTani_Backend/storage/app/public/`; seeder menghubungkan gambar kategori, dua foto produk contoh, dan banner ke berkas tersebut. Route Laravel `/storage/{path}` menyajikan berkas secara langsung, sehingga tidak perlu membuat symlink `public/storage`. Aset logo, banner, font, dan ikon Flutter juga disimpan di `TokoTani_Frontend/assets/` serta direktori platform. Jangan menghapus atau mengganti nama berkas yang dirujuk seeder atau `pubspec.yaml`.
 
-## Lisensi
+Setelah pull yang memuat perubahan data contoh/seeder, jalankan dari folder backend:
+
+```powershell
+php artisan db:seed --no-interaction
+```
+
+Perintah tersebut memperbarui data contoh, termasuk referensi gambar, tanpa menghapus database. Jangan gunakan `migrate:fresh` pada database yang berisi data yang ingin dipertahankan.
+
+## Pengujian
+
+Jalankan pengujian backend dari `TokoTani_Backend`:
+
+```powershell
+php artisan test
+```
+
+Pengujian terpilih:
+
+```powershell
+php artisan test --filter=CheckoutTest
+php artisan test --filter=CheckoutConcurrencyTest
+php artisan test --filter=PesananStatusTransitionTest
+php artisan test --filter=KeranjangTest
+php artisan test --filter=KurirTest
+```
+
+Suite backend mencakup validasi checkout, perhitungan server, snapshot transaksi, idempotensi, rollback, keranjang, tarif dan penghapusan kurir, matriks transisi status, serta checkout konkuren. Jalankan pengujian frontend dari `TokoTani_Frontend` dengan `flutter analyze` dan `flutter test`. Hasil yang dicatat pada dokumen terdahulu merupakan snapshot dari waktu berbeda; gunakan hasil perintah terbaru sebagai acuan.
+
+## Troubleshooting
+
+| Masalah | Solusi |
+|---|---|
+| Emulator Android tidak terhubung ke API | Gunakan `10.0.2.2` alih-alih `127.0.0.1`. |
+| HTTP diblokir Android | Untuk pengembangan lokal, aktifkan cleartext traffic di `AndroidManifest.xml`; jangan gunakan konfigurasi ini sebagai pengaturan produksi tanpa pertimbangan keamanan. |
+| Foto produk tidak muncul | Pastikan file tersedia di `storage/app/public/`, backend berjalan, dan `API_BASE_URL` serta `APP_URL` menunjuk host backend yang benar. |
+| CORS pada Flutter Web | Pastikan route `/storage` disajikan oleh Laravel dengan header CORS. Setelah mengubah konfigurasi, jalankan `php artisan config:clear`. |
+| Operasi produk admin mendapat `403` | Login dengan akun berperan `admin`. |
+| Dependensi Flutter bermasalah | Jalankan `flutter clean`, lalu `flutter pub get`. |
+| Seeder gagal | Periksa koneksi database pada `.env`, lalu jalankan `php artisan migrate --seed`. |
+
+## Catatan Pengembangan
+
+- Ikuti struktur folder, pola, helper, dan gaya kode yang sudah digunakan.
+- Gunakan versi API sesuai dependensi yang terpasang dan jangan mengubah dependensi tanpa persetujuan.
+- Validasi perubahan dengan linter, build, atau pengujian terpilih yang relevan; tambahkan pengujian untuk perubahan perilaku.
+- Jangan memasukkan kredensial atau rahasia ke repositori.
+- Gunakan perintah Artisan dengan `--no-interaction` bila menjalankan perintah otomatis.
+- Untuk kode PHP, gunakan tipe parameter dan tipe kembalian eksplisit serta kurung kurawal pada struktur kontrol.
+- Perubahan dokumentasi saja tidak memerlukan validasi kode.
+
+## Aset Launch Screen Flutter
+
+Aset launch screen dapat diganti dengan berkas gambar yang diinginkan. Di macOS, aset juga dapat dikelola melalui project Xcode pada `ios/Runner.xcworkspace`, di bagian `Runner/Assets.xcassets`. Perintah menjalankan frontend tetap dilakukan dari folder `TokoTani_Frontend`:
+
+```shell
+flutter pub get
+flutter test
+flutter run
+```
+
+## Demonstrasi dan Lisensi
+
+Tautan video demonstrasi (maksimal lima menit): **[isi tautan video]**. Demonstrasikan menjalankan backend dan Flutter, registrasi/login, katalog, keranjang, checkout, riwayat pesanan, satu skenario galat, dan panel admin.
 
 Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB).

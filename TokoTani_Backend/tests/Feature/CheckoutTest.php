@@ -11,8 +11,8 @@ use Tests\TestCase;
 
 class CheckoutTest extends TestCase
 {
-    use RefreshDatabase;
     use AuthenticatedApiRequests;
+    use RefreshDatabase;
 
     public function test_checkout_calculates_total_and_decrements_stock(): void
     {
@@ -270,16 +270,16 @@ class CheckoutTest extends TestCase
             ->assertJsonPath('status', 'sukses');
     }
 
-    public function test_database_seeder_does_not_create_dummy_customers_products_or_orders(): void
+    public function test_database_seeder_is_repeatable_and_does_not_create_orders(): void
     {
         $this->apiUser->delete();
         $this->seed();
         $this->seed();
 
-        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('users', 2);
         $this->assertDatabaseCount('categories', 6);
-        $this->assertDatabaseCount('products', 0);
-        $this->assertDatabaseCount('couriers', 2);
+        $this->assertDatabaseCount('products', 15);
+        $this->assertDatabaseCount('couriers', 3);
         $this->assertDatabaseCount('payment_methods', 2);
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('order_items', 0);
