@@ -87,6 +87,7 @@ class OrdersTable
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
+            ->poll('10s')
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status Pesanan')

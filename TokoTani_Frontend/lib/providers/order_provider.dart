@@ -104,7 +104,7 @@ class OrderProvider extends ChangeNotifier {
   /// Pelanggan menandai pesanan selesai. Mengembalikan null bila berhasil.
   Future<String?> completeOrder(int id) => _mutate(
     id,
-    () => ApiService.updateOrderStatus(id, 'selesai'),
+    () => ApiService.completeOrder(id),
     'Pesanan belum dapat diselesaikan. Silakan coba lagi.',
   );
 

@@ -704,6 +704,19 @@ class ApiService {
     }
   }
 
+  /// POST /api/pesanan/{id}/selesai
+  /// Pelanggan pemilik pesanan mengonfirmasi bahwa pesanan sudah diterima.
+  static Future<OrderModel> completeOrder(int id) async {
+    try {
+      final response = await _send('POST', '/pesanan/$id/selesai');
+      final data = _extractData(response);
+      return OrderModel.fromJson(_requireMap(data, 'pesanan'));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// POST /api/pesanan/{id}/pembayaran
   static Future<OrderModel> confirmPayment(int id, int paymentMethodId) async {
     try {
       final response = await _send('POST', '/pesanan/$id/pembayaran', {

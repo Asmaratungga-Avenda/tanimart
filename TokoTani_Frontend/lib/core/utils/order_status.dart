@@ -98,7 +98,10 @@ class OrderStatus {
   }
 
   static bool canPay(String raw) => normalize(raw) == waitingPayment;
-  static bool canComplete(String raw) => normalize(raw) == arrived;
+  static bool canComplete(String raw) {
+    final status = normalize(raw);
+    return status == shipping || status == arrived;
+  }
 
   /// Empat tahap seperti pada desain: Dibuat, Diproses, Dikirim, Selesai.
   /// Tidak ada cap waktu karena API tidak menyediakannya.
