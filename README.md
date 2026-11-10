@@ -274,12 +274,12 @@ Proyek Ini Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB Dan Sis
 
 ## 👥 Anggota Kelompok
 
-| No | Nama Lengkap | NIM |
-| :---: | :--- | :---: |
-| 1 | **Yudhistira Empi** | 24102023 |
-| 2 | Asmaratungga Avenda D.P. | 24102006 |
-| 3 | Eka Yuvita Sari Widya Diningrum | 24102008 |
-| 4 | Hikmah Nutriana | 24102011 |
-| 5 | M. Adzahahabi Putra Darmawan | 24102013 |
-| 6 | Moh Farhan Ali | 24102016 |
-| 7 | Vera Adelia | 24102032 |
+| No | Nama Lengkap | NIM | Peran |
+| :---: | :--- | :---: | :---:|
+| 1 | **Yudhistira Empi** | 24102023 | Ketua |
+| 2 | Asmaratungga Avenda D.P. | 24102006 | Anggota |
+| 3 | Eka Yuvita Sari Widya Diningrum | 24102008 | Anggota |
+| 4 | Hikmah Nutriana | 24102011 | Anggota |
+| 5 | M. Adzahahabi Putra Darmawan | 24102013 | Anggota |
+| 6 | Moh Farhan Ali | 24102016 | Anggota |
+| 7 | Vera Adelia | 24102032 | Anggota |
