@@ -1,11 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:tokotani/pages/cart_page.dart';
 import 'package:tokotani/pages/home_page.dart';
 import 'package:tokotani/pages/main_shell.dart';
 import 'package:tokotani/pages/order_history_page.dart';
 import 'package:tokotani/pages/product_catalog_page.dart';
 import 'package:tokotani/pages/profile_page.dart';
+import 'package:tokotani/services/api_service.dart';
 
 import 'test_support.dart';
 
@@ -48,5 +53,40 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: '${page.runtimeType}');
     }
+  });
+
+  testWidgets('Nama kategori dua baris tidak overflow di beranda', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      ApiService.httpClient.close();
+      ApiService.httpClient = http.Client();
+      ApiService.authTokenReader = null;
+    });
+
+    ApiService.authTokenReader = () async => null;
+    ApiService.httpClient = MockClient((request) async {
+      final data = request.url.path.endsWith('/kategori')
+          ? [
+              {'id': 8, 'nama_kategori': 'Sayuran Segar', 'gambar': null},
+              {'id': 9, 'nama_kategori': 'Kebutuhan Dapur', 'gambar': null},
+            ]
+          : <Map<String, dynamic>>[];
+      return http.Response(
+        jsonEncode({'status': 'sukses', 'code': 200, 'data': data}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    });
+
+    await tester.pumpWidget(testApp(const HomePage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kebutuhan Dapur'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

@@ -171,7 +171,6 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                           child: ProductImage(
                             url: item.product?.foto ?? item.fotoProduk,
                             cacheWidth: 180,
-                            iconSize: 22,
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),

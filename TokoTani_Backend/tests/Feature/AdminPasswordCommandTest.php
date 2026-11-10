@@ -111,4 +111,17 @@ class AdminPasswordCommandTest extends TestCase
 
         $this->assertTrue(Hash::check('old-password', $user->fresh()->password));
     }
+
+    public function test_database_seeding_creates_demo_admin_and_customer_accounts(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $admin = User::query()->where('email', 'admin@tokotani.test')->firstOrFail();
+        $customer = User::query()->where('email', 'user@tokotani.test')->firstOrFail();
+
+        $this->assertSame('admin', $admin->role);
+        $this->assertTrue(Hash::check('password', $admin->password));
+        $this->assertSame('customer', $customer->role);
+        $this->assertTrue(Hash::check('password', $customer->password));
+    }
 }

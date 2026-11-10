@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import '../core/config/api_config.dart';
 import '../core/theme/app_palette.dart';
 
-/// Foto produk dari server. Bila foto kosong atau gagal dimuat, tampil
-/// placeholder netral (bukan foto produk lain). Mengisi ruang yang diberikan induknya.
+/// Foto produk dari backend Laravel. Hanya memuat gambar jaringan —
+/// tidak ada fallback ikon atau placeholder gambar. Bila URL kosong
+/// atau gagal muat, area kosong (tidak ada gambar) ditampilkan.
 class ProductImage extends StatelessWidget {
   const ProductImage({
     super.key,
@@ -13,51 +14,47 @@ class ProductImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.borderRadius,
     this.cacheWidth = 480,
-    this.iconSize = 32,
+    this.height,
+    this.width,
   });
 
   final String? url;
   final BoxFit fit;
   final BorderRadius? borderRadius;
   final int cacheWidth;
-  final double iconSize;
+  final double? height;
+  final double? width;
 
   @override
   Widget build(BuildContext context) {
-    final resolved = ApiConfig.resolveMediaUrl(url);
-    debugPrint('PRODUCT IMAGE RAW: $url');
-    debugPrint('PRODUCT IMAGE URL: $resolved');
-    final Widget image = resolved == null
-        ? _Placeholder(iconSize: iconSize)
-        : CachedNetworkImage(
-            imageUrl: resolved,
-            fit: fit,
-            width: double.infinity,
-            height: double.infinity,
-            memCacheWidth: cacheWidth,
-            fadeInDuration: const Duration(milliseconds: 150),
-            placeholder: (context, _) =>
-                ColoredBox(color: context.colors.surfaceContainerHighest),
-            errorWidget: (context, _, _) => _Placeholder(iconSize: iconSize),
-          );
-    if (borderRadius == null) return image;
-    return ClipRRect(borderRadius: borderRadius!, child: image);
-  }
-}
+    final resolved = ApiConfig.resolveMedia(url);
 
-class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.iconSize});
+    if (resolved == null || resolved.isEmpty) {
+      return _empty(context);
+    }
 
-  final double iconSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return ColoredBox(
-      color: p.brandSoft,
-      child: Center(
-        child: Icon(Icons.eco_outlined, size: iconSize, color: p.brandText),
-      ),
+    final widget = CachedNetworkImage(
+      imageUrl: resolved,
+      fit: fit,
+      width: width,
+      height: height,
+      memCacheWidth: cacheWidth,
+      fadeInDuration: const Duration(milliseconds: 150),
+      placeholder: (context, _) => _skeleton(context),
+      errorWidget: (context, _, _) => _empty(context),
     );
+
+    if (borderRadius == null) return widget;
+    return ClipRRect(borderRadius: borderRadius!, child: widget);
+  }
+
+  Widget _skeleton(BuildContext context) {
+    final p = context.palette;
+    return ColoredBox(color: p.neutralSoft);
+  }
+
+  Widget _empty(BuildContext context) {
+    final p = context.palette;
+    return ColoredBox(color: p.neutralSoft);
   }
 }

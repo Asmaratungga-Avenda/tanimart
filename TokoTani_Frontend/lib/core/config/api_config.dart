@@ -43,12 +43,13 @@ class ApiConfig {
   static bool _isLoopback(String host) =>
       host == 'localhost' || host == '127.0.0.1' || host == '::1';
 
-  /// Mengubah nilai `foto` dari API menjadi URL yang dapat dibuka perangkat.
+  /// Mengubah nilai `gambar` / `foto` dari API menjadi URL yang dapat dibuka perangkat.
   ///
   /// * URL absolut dipakai apa adanya. Bila Laravel mengirim host loopback
   ///   (localhost / 127.0.0.1) padahal API diakses lewat alamat lain (misalnya
   ///   10.0.2.2 pada emulator), host diganti dengan host API.
-  /// * Path relatif dianggap berada di `<server>/storage/<path>`.
+  /// * Path relatif dianggap berada di `<origin>/storage/<path>`.
+  /// * Mengembalikan null bila input kosong (tidak ada placeholder/icon).
   static String? resolveMediaUrl(String? raw) {
     final value = raw?.trim();
     if (value == null || value.isEmpty) return null;
@@ -60,8 +61,6 @@ class ApiConfig {
       final uri = Uri.tryParse(value);
       final api = Uri.tryParse(baseUrl);
       if (uri != null && api != null && _isLoopback(uri.host)) {
-        // Ganti host loopback dengan host API agar bisa diakses dari perangkat luar/emulator.
-        // Pastikan port juga ikut disesuaikan jika API menggunakan port khusus.
         return Uri(
           scheme: uri.scheme,
           host: api.host,
@@ -73,11 +72,17 @@ class ApiConfig {
       return value;
     }
 
-    // Untuk path relatif, pastikan mengarah ke direktori storage Laravel yang benar.
     var path = value.startsWith('/') ? value.substring(1) : value;
     if (!path.startsWith('storage/')) {
       path = 'storage/$path';
     }
     return '$origin/$path';
   }
+
+  /// Alias konsisten untuk resolveMediaUrl, dipakai di seluruh aplikasi
+  /// agar logika URL gambar tidak menduplikasi di banyak halaman.
+  static String? resolveMedia(String? raw) => resolveMediaUrl(raw);
+
+  /// URL basis untuk berkas media (storage) tanpa path spesifik.
+  static String get mediaOrigin => origin;
 }

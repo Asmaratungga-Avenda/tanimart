@@ -212,16 +212,15 @@ class _OrderCard extends StatelessWidget {
                 for (final item in thumbs)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: ProductImage(
-                        url: item.product?.foto ?? item.fotoProduk,
-                        cacheWidth: 160,
-                        iconSize: 20,
-                        borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: ProductImage(
+                          url: item.product?.foto ?? item.fotoProduk,
+                          cacheWidth: 160,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                    ),
                   ),
                 if (extra > 0)
                   Text(

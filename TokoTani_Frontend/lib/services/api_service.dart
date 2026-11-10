@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
 import '../core/config/api_config.dart';
 import '../models/cart_item.dart';
+import '../models/category.dart' as category_model;
 import '../models/courier.dart';
 import '../models/order.dart';
 import '../models/payment_method.dart';
@@ -14,19 +15,18 @@ import '../models/product.dart';
 /// Empat keadaan layar wajib sesuai ketentuan Rubrik Kriteria 7.
 enum KeadaanMuat { memuat, berhasil, kosong, galat }
 
-/// Klasifikasi jenis galat wajib sesuai ketentuan Rubrik Kriteria 6.
+/// Klasifikasi jenis galat API wajib sesuai ketentuan Rubrik Kriteria 6.
 enum ApiErrorType {
-  connection, // Tidak ada sambungan (server mati / mode pesawat)
-  timeout, // Batas waktu terlampaui (.timeout terpicu)
-  validation, // 422 Validasi formulir gagal
-  conflict, // 409 Bentrok keadaan (stok tidak cukup / produk terpakai pada pesanan)
-  server, // 500 Galat internal di sisi server
-  notFound, // 404 Data tidak ditemukan
-  other, // Galat lainnya
+  connection,
+  timeout,
+  validation,
+  conflict,
+  server,
+  notFound,
+  other,
 }
 
 /// Kelas representasi galat API terstruktur.
-/// Tidak membocorkan jejak teknis e.toString() kepada pengguna akhir.
 class ApiException implements Exception {
   final int statusCode;
   final String message;
@@ -40,7 +40,6 @@ class ApiException implements Exception {
     this.errors = const {},
   });
 
-  /// Mengambil pemetaan pesan galat per kolom untuk validasi HTTP 422.
   Map<String, String> get fieldErrors {
     final result = <String, String>{};
     errors.forEach((key, val) {
@@ -58,7 +57,6 @@ class ApiException implements Exception {
 }
 
 /// Respons keranjang belanja dari server.
-/// Subtotal wajib berasal dari respons server, bukan dihitung ulang di Flutter.
 class CartResponse {
   final List<CartItem> items;
   final int subtotal;
@@ -66,8 +64,24 @@ class CartResponse {
   const CartResponse({required this.items, required this.subtotal});
 }
 
+/// Respons produk berhalaman (pagination).
+class ProductPage {
+  final List<Product> products;
+  final int currentPage;
+  final int lastPage;
+  final int total;
+  final bool hasMore;
+
+  const ProductPage({
+    required this.products,
+    required this.currentPage,
+    required this.lastPage,
+    required this.total,
+    required this.hasMore,
+  });
+}
+
 class ApiService {
-  /// Dipanggil saat server menjawab 401 (token tidak berlaku lagi).
   static void Function()? onUnauthorized;
 
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
@@ -77,11 +91,6 @@ class ApiService {
   @visibleForTesting
   static Future<String?> Function()? authTokenReader;
 
-  static const Map<String, String> _baseHeaders = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-  };
-
   static Future<String?> readAuthToken() =>
       authTokenReader?.call() ?? _secureStorage.read(key: _tokenKey);
 
@@ -89,21 +98,23 @@ class ApiService {
 
   static Future<Map<String, String>> _headers({
     Map<String, String>? extraHeaders,
+    bool multipart = false,
   }) async {
     final token = await readAuthToken();
-    return {
-      ..._baseHeaders,
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-      ...?extraHeaders,
-    };
+    final headers = <String, String>{};
+    if (!multipart) {
+      headers['Content-Type'] = 'application/json';
+    }
+    headers.addAll({'Accept': 'application/json', ...?extraHeaders});
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
   }
 
-  // -------------------------------------------------------------
-  // HELPER URI & RESPONSE DECODING
-  // -------------------------------------------------------------
-
   static Uri _uri(String path, [Map<String, String>? query]) {
-    return Uri.parse('${ApiConfig.baseUrl}$path').replace(queryParameters: query);
+    return Uri.parse('${ApiConfig.baseUrl}$path')
+        .replace(queryParameters: query);
   }
 
   static Map<String, dynamic> _decodeResponse(http.Response response) {
@@ -281,12 +292,10 @@ class ApiService {
     );
   }
 
-  // -------------------------------------------------------------
-  // ENDPOINT KERANJANG BELANJA (Anggota 5)
-  // -------------------------------------------------------------
+  // =========================================================================
+  // KERANJANG BELANJA
+  // =========================================================================
 
-  /// GET /api/keranjang
-  /// Mengambil isi keranjang belanja beserta subtotal yang dihitung oleh server.
   static Future<CartResponse> getCart() async {
     try {
       final response = await httpClient
@@ -321,8 +330,6 @@ class ApiService {
     }
   }
 
-  /// POST /api/keranjang
-  /// Menambah item baru ke keranjang belanja.
   static Future<void> addCart(int produkId, int jumlah) async {
     await _send('POST', '/keranjang', {
       'produk_id': produkId,
@@ -330,74 +337,275 @@ class ApiService {
     });
   }
 
-  /// PUT /api/keranjang/{id}
-  /// Mengubah jumlah item keranjang.
-  /// Server mengembalikan kode 409 bila stok tidak mencukupi,
-  /// dan kode 422 bila jumlah <= 0.
   static Future<void> updateCart(int cartId, int jumlah) async {
     await _send('PUT', '/keranjang/$cartId', {'jumlah': jumlah});
   }
 
-  /// DELETE /api/keranjang/{id}
-  /// Menghapus satu item dari keranjang belanja.
   static Future<void> deleteCart(int cartId) async {
     await _send('DELETE', '/keranjang/$cartId');
   }
 
-  /// DELETE /api/keranjang
-  /// Mengosongkan keranjang melalui API.
   static Future<void> clearCart() async {
     await _send('DELETE', '/keranjang');
   }
 
-  // -------------------------------------------------------------
-  // ENDPOINT PRODUK
-  // -------------------------------------------------------------
+  // =========================================================================
+  // PRODUK (pagination + upload)
+  // =========================================================================
 
-  /// GET /api/produk
-  /// Mengambil seluruh produk. Bila Laravel mengirim respons berhalaman
-  /// (`current_page` / `last_page`), halaman berikutnya diambil otomatis.
-  static Future<List<Product>> getProducts() async {
+  /// Ambil produk berhalaman.
+  ///
+  /// [page] halaman (awal 1), [perPage] jumlah per halaman,
+  /// [kategori] filter kategori, [cari] kata kunci pencarian.
+  static Future<ProductPage> getProductsPage({
+    int page = 1,
+    int perPage = 15,
+    String? kategori,
+    String? cari,
+  }) async {
     try {
-      final products = <Product>[];
-      var page = 1;
-      var lastPage = 1;
-      do {
-        final response = await httpClient
-            .get(
-              _uri('/produk', page > 1 ? {'page': '$page'} : null),
-              headers: await _headers(),
-            )
-            .timeout(ApiConfig.timeout);
-        final body = _decodeResponse(response);
-        final data = _extractData(body);
+      final query = <String, String>{
+        'page': page.toString(),
+        'per_page': perPage.toString(),
+        if (kategori != null && kategori.isNotEmpty) 'kategori': kategori,
+        if (cari != null && cari.isNotEmpty) 'cari': cari,
+      };
+      final response = await httpClient
+          .get(
+            _uri('/produk', query),
+            headers: await _headers(),
+          )
+          .timeout(ApiConfig.timeout);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final meta = body['meta'] is Map ? Map<String, dynamic>.from(body['meta']) : <String, dynamic>{};
 
-        final List<dynamic> list;
-        if (data is Map) {
-          list = _requireList(data['data'], 'produk');
-          final last = int.tryParse('${data['last_page'] ?? 1}') ?? 1;
-          lastPage = last.clamp(1, _maxProductPages);
-        } else {
-          list = _requireList(data, 'produk');
-        }
-        products.addAll(
-          list.map((e) => Product.fromJson(_requireMap(e, 'produk'))),
-        );
-        page++;
-      } while (page <= lastPage);
-      return products;
+      List<dynamic> rawList;
+      int currentPage = 1;
+      int lastPage = 1;
+      int total = 0;
+
+      if (data is Map) {
+        rawList = _requireList(data['data'], 'produk');
+        currentPage = int.tryParse('${data['current_page'] ?? 1}') ?? 1;
+        lastPage = int.tryParse('${data['last_page'] ?? 1}') ?? 1;
+        total = int.tryParse('${data['total'] ?? 0}') ?? 0;
+      } else if (data is List) {
+        rawList = data;
+        // Ambil pagination dari meta bila tersedia
+        currentPage = int.tryParse('${meta['current_page'] ?? 1}') ?? 1;
+        lastPage = int.tryParse('${meta['last_page'] ?? 1}') ?? 1;
+        total = int.tryParse('${meta['total'] ?? rawList.length}') ?? rawList.length;
+      } else {
+        throw _invalidResponse('produk');
+      }
+
+      final products = rawList
+          .map((e) => Product.fromJson(_requireMap(e, 'produk')))
+          .toList();
+
+      return ProductPage(
+        products: products,
+        currentPage: currentPage,
+        lastPage: lastPage.clamp(1, 100),
+        total: total,
+        hasMore: currentPage < lastPage,
+      );
     } catch (e) {
       throw _handleNetworkError(e);
     }
   }
 
-  static const int _maxProductPages = 20;
+  /// Ambil semua produk (kompatibilitas lama, muat semua halaman).
+  static Future<List<Product>> getProducts() async {
+    final products = <Product>[];
+    var page = 1;
+    var lastPage = 1;
+    do {
+      final pageResult = await getProductsPage(page: page, perPage: 50);
+      products.addAll(pageResult.products);
+      lastPage = pageResult.lastPage;
+      page++;
+    } while (page <= lastPage && page <= 20);
+    return products;
+  }
 
-  // -------------------------------------------------------------
-  // ENDPOINT CHECKOUT & PENGIRIMAN
-  // -------------------------------------------------------------
+  /// Detail produk berdasarkan ID.
+  static Future<Product> getProduct(int id) async {
+    try {
+      final response = await httpClient
+          .get(_uri('/produk/$id'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      return Product.fromJson(_requireMap(data, 'produk'));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
 
-  /// GET /api/kurir
+  /// Daftar kategori.
+  static Future<List<category_model.ProductCategory>> getCategories() async {
+    try {
+      final response = await httpClient
+          .get(_uri('/kategori'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final list = _requireList(data, 'kategori');
+      final names = <category_model.ProductCategory>[];
+      for (final item in list) {
+        final category = category_model.ProductCategory.fromJson(
+          _requireMap(item, 'kategori'),
+        );
+        if (category.nama.trim().isNotEmpty &&
+            !names.any((c) => c.nama.toLowerCase() == category.nama.toLowerCase())) {
+          names.add(category);
+        }
+      }
+      return names;
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// Daftar banner.
+  static Future<List<Map<String, dynamic>>> getBanners() async {
+    try {
+      final response = await httpClient
+          .get(_uri('/banners'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final list = _requireList(data, 'banner');
+      return list.cast<Map<String, dynamic>>();
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  // =========================================================================
+  // PRODUK CRUD (admin) + upload gambar multipart
+  // =========================================================================
+
+  /// Upload satu file gambar produk ke endpoint admin /api/produk (multipart).
+  /// Field gambar sesuai backend: `gambar`.
+  static Future<Map<String, dynamic>> uploadProduct({
+    required File image,
+    required String nama,
+    required int harga,
+    required int stok,
+    required String kategori,
+    required String satuanJual,
+    required bool tersedia,
+    required bool mudahRusak,
+    String? deskripsi,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiConfig.baseUrl}/produk'),
+    );
+
+    final token = await readAuthToken();
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.headers['Accept'] = 'application/json';
+
+    final stream = http.ByteStream(image.openRead());
+    final length = await image.length();
+    request.files.add(http.MultipartFile('gambar', stream, length,
+        filename: image.path.split('/').last));
+
+    request.fields['nama'] = nama;
+    request.fields['harga'] = harga.toString();
+    request.fields['kategori'] = kategori;
+    request.fields['stok'] = stok.toString();
+    request.fields['tersedia'] = tersedia ? '1' : '0';
+    request.fields['deskripsi'] = deskripsi ?? '';
+    request.fields['satuan_jual'] = satuanJual;
+    request.fields['mudah_rusak'] = mudahRusak ? '1' : '0';
+
+    try {
+      final streamedResponse = await request.send().timeout(ApiConfig.timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+      final body = _decodeResponse(response);
+      return body;
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// Perbarui produk (admin) dengan optional upload gambar baru.
+  static Future<Map<String, dynamic>> updateProduct({
+    required int id,
+    required String nama,
+    required int harga,
+    required int stok,
+    required String kategori,
+    required String satuanJual,
+    required bool tersedia,
+    required bool mudahRusak,
+    String? deskripsi,
+    File? image,
+  }) async {
+    if (image != null) {
+      final request = http.MultipartRequest(
+        'PUT',
+        Uri.parse('${ApiConfig.baseUrl}/produk/$id'),
+      );
+      final token = await readAuthToken();
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['Accept'] = 'application/json';
+
+      final stream = http.ByteStream(image.openRead());
+      final length = await image.length();
+      request.files.add(http.MultipartFile('gambar', stream, length,
+          filename: image.path.split('/').last));
+
+      request.fields['nama'] = nama;
+      request.fields['harga'] = harga.toString();
+      request.fields['kategori'] = kategori;
+      request.fields['stok'] = stok.toString();
+      request.fields['tersedia'] = tersedia ? '1' : '0';
+      request.fields['deskripsi'] = deskripsi ?? '';
+      request.fields['satuan_jual'] = satuanJual;
+      request.fields['mudah_rusak'] = mudahRusak ? '1' : '0';
+      request.fields['_method'] = 'PUT';
+
+      try {
+        final streamedResponse = await request.send().timeout(ApiConfig.timeout);
+        final response = await http.Response.fromStream(streamedResponse);
+        final body = _decodeResponse(response);
+        return body;
+      } catch (e) {
+        throw _handleNetworkError(e);
+      }
+    }
+
+    return _send('PUT', '/produk/$id', {
+      'nama': nama,
+      'harga': harga,
+      'kategori': kategori,
+      'stok': stok,
+      'tersedia': tersedia,
+      'deskripsi': deskripsi,
+      'satuan_jual': satuanJual,
+      'mudah_rusak': mudahRusak,
+    });
+  }
+
+  /// Hapus produk (admin).
+  static Future<void> deleteProduct(int id) async {
+    await _send('DELETE', '/produk/$id');
+  }
+
+  // =========================================================================
+  // CHECKOUT & PENGIRIMAN
+  // =========================================================================
+
   static Future<List<Courier>> getCouriers() async {
     try {
       final response = await httpClient
@@ -414,7 +622,6 @@ class ApiService {
     }
   }
 
-  /// GET /api/metode-pembayaran
   static Future<List<PaymentMethod>> getPaymentMethods() async {
     try {
       final response = await httpClient
@@ -425,7 +632,9 @@ class ApiService {
       final list = _requireList(data, 'metode pembayaran');
       return list
           .map(
-            (e) => PaymentMethod.fromJson(_requireMap(e, 'metode pembayaran')),
+            (e) => PaymentMethod.fromJson(
+              _requireMap(e, 'metode pembayaran'),
+            ),
           )
           .toList();
     } catch (e) {
@@ -433,46 +642,6 @@ class ApiService {
     }
   }
 
-  /// GET /api/produk/{id}
-  static Future<Product> getProduct(int id) async {
-    try {
-      final response = await httpClient
-          .get(_uri('/produk/$id'), headers: await _headers())
-          .timeout(ApiConfig.timeout);
-      final body = _decodeResponse(response);
-      final data = _extractData(body);
-      return Product.fromJson(_requireMap(data, 'produk'));
-    } catch (e) {
-      throw _handleNetworkError(e);
-    }
-  }
-
-  /// GET /api/kategori
-  static Future<List<String>> getCategories() async {
-    try {
-      final response = await httpClient
-          .get(_uri('/kategori'), headers: await _headers())
-          .timeout(ApiConfig.timeout);
-      final body = _decodeResponse(response);
-      final data = _extractData(body);
-      final list = _requireList(data, 'kategori');
-      final names = <String>[];
-      for (final item in list) {
-        final name = item is Map
-            ? (item['nama'] ?? item['name'] ?? item['kategori'])?.toString()
-            : item?.toString();
-        if (name != null && name.trim().isNotEmpty && !names.contains(name)) {
-          names.add(name);
-        }
-      }
-      return names;
-    } catch (e) {
-      throw _handleNetworkError(e);
-    }
-  }
-
-  /// POST /api/checkout
-  /// Menyertakan header X-Kunci-Idempoten (idempotency key) untuk mencegah duplikasi pesanan.
   static Future<Map<String, dynamic>> checkout(
     Map<String, dynamic> payload, {
     String? idempotencyKey,
@@ -494,7 +663,6 @@ class ApiService {
     }
   }
 
-  /// GET /api/pesanan (Riwayat Pesanan)
   static Future<List<OrderModel>> getOrders() async {
     try {
       final response = await httpClient
@@ -511,7 +679,6 @@ class ApiService {
     }
   }
 
-  /// GET /api/pesanan/{id} (Rincian Pesanan)
   static Future<OrderModel> getOrder(int id) async {
     try {
       final response = await httpClient
@@ -525,7 +692,6 @@ class ApiService {
     }
   }
 
-  /// PATCH /api/pesanan/{id}/status
   static Future<OrderModel> updateOrderStatus(int id, String status) async {
     try {
       final res = await _send('PATCH', '/pesanan/$id/status', {
@@ -551,7 +717,6 @@ class ApiService {
   }
 
   /// POST /api/pesanan/{id}/pembayaran
-  /// Meminta backend mengonfirmasi pembayaran pesanan.
   static Future<OrderModel> confirmPayment(int id, int paymentMethodId) async {
     try {
       final response = await _send('POST', '/pesanan/$id/pembayaran', {
@@ -571,9 +736,9 @@ class ApiService {
     }
   }
 
-  // -------------------------------------------------------------
+  // =========================================================================
   // GENERIC HTTP REQUEST DISPATCHER
-  // -------------------------------------------------------------
+  // =========================================================================
 
   static Future<Map<String, dynamic>> _send(
     String method,
@@ -623,6 +788,4 @@ class ApiService {
       throw _handleNetworkError(e);
     }
   }
-
-  // -------------------------------------------------------------
 }

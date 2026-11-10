@@ -71,13 +71,23 @@ class ProductController extends Controller
             $query->where('nama', 'like', '%' . $request->cari . '%');
         }
 
-        $products = $query->get();
+        $perPage = $request->integer('per_page', 15);
+        $page = $request->integer('page', 1);
+
+        $products = $query->paginate($perPage, ['*'], 'page', $page);
 
         return $this->jsonResponse(
             'sukses',
             200,
             'Daftar produk berhasil diambil',
-            $products
+            $products->items(),
+            null,
+            [
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'total' => $products->total(),
+                'per_page' => $products->perPage(),
+            ]
         );
     }
 

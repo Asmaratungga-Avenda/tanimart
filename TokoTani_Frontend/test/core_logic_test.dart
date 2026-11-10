@@ -6,10 +6,12 @@ import 'package:http/testing.dart';
 import 'package:tokotani/core/config/api_config.dart';
 import 'package:tokotani/core/utils/formatters.dart';
 import 'package:tokotani/core/utils/order_status.dart';
+import 'package:tokotani/models/category.dart';
 import 'package:tokotani/providers/product_provider.dart';
 import 'package:tokotani/services/api_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('formatters', () {
     test('formatRupiah memakai pemisah ribuan', () {
       expect(formatRupiah(0), 'Rp 0');
@@ -45,6 +47,19 @@ void main() {
       expect(url, '${ApiConfig.origin}/storage/produk/tomat.jpg');
     });
 
+    test('category image paths from Laravel resolve to public storage', () {
+      final category = ProductCategory.fromJson({
+        'id': 8,
+        'nama_kategori': 'Sayuran Segar',
+        'gambar': 'categories/sayuranSegar/sayuran.jpg',
+      });
+
+      expect(
+        ApiConfig.resolveMedia(category.gambar),
+        '${ApiConfig.origin}/storage/categories/sayuranSegar/sayuran.jpg',
+      );
+    });
+
     test('foto kosong menghasilkan null (tanpa foto pengganti)', () {
       expect(ApiConfig.resolveMediaUrl(null), isNull);
       expect(ApiConfig.resolveMediaUrl('  '), isNull);
@@ -63,18 +78,42 @@ void main() {
       ApiService.authTokenReader = () async => null;
       ApiService.httpClient = MockClient((request) async {
         final path = request.url.path;
-        final body = path.endsWith('/kategori')
-            ? {'status': 'sukses', 'code': 200, 'data': ['Sayuran', 'Buah']}
-            : {
-                'status': 'sukses',
-                'code': 200,
-                'data': [
-                  {'id': 1, 'nama': 'Tomat', 'harga': 9000, 'kategori': 'Sayuran', 'stok': 5, 'tersedia': true, 'satuan_jual': 'kg'},
-                  {'id': 2, 'nama': 'Apel', 'harga': 30000, 'kategori': 'Buah', 'stok': 0, 'tersedia': true, 'satuan_jual': 'kg'},
-                ],
-              };
+        final query = request.url.queryParameters;
+        final page = int.tryParse(query['page'] ?? '1') ?? 1;
+
+        if (path.endsWith('/kategori')) {
+          return http.Response(
+            jsonEncode({
+              'status': 'sukses',
+              'code': 200,
+              'data': [
+                {'id': 1, 'nama': 'Sayuran', 'gambar': null},
+                {'id': 2, 'nama': 'Buah', 'gambar': null},
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+
+        // Paginated produk response
+        final allProducts = [
+          {'id': 1, 'nama': 'Tomat', 'harga': 9000, 'kategori': 'Sayuran', 'stok': 5, 'tersedia': true, 'satuan_jual': 'kg', 'foto': null},
+          {'id': 2, 'nama': 'Apel', 'harga': 30000, 'kategori': 'Buah', 'stok': 0, 'tersedia': true, 'satuan_jual': 'kg', 'foto': null},
+        ];
+
+        final start = (page - 1) * 15;
+        final pageProducts = allProducts.skip(start).take(15).toList();
+
         return http.Response(
-          jsonEncode(body),
+          jsonEncode({
+            'status': 'sukses',
+            'code': 200,
+            'data': pageProducts,
+            'current_page': page,
+            'last_page': 1,
+            'total': allProducts.length,
+          }),
           200,
           headers: {'content-type': 'application/json'},
         );
@@ -83,25 +122,34 @@ void main() {
 
     test('memuat sekali lalu memfilter di perangkat', () async {
       final provider = ProductProvider();
-      final error = await provider.load();
-      expect(error, isNull);
+      await provider.ensureLoaded();
       expect(provider.all.length, 2);
-      expect(provider.categories, ['Sayuran', 'Buah']);
+      expect(provider.categories.map((c) => c.nama), ['Sayuran', 'Buah']);
 
       provider.setCategory('Buah');
+      // Tunggu pemuatan ulang kategori selesai (async).
+      while (provider.isLoading) {
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
       expect(provider.filtered.map((p) => p.nama), ['Apel']);
 
       provider.setFilter(query: 'tom');
+      while (provider.isLoading) {
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
       expect(provider.filtered.map((p) => p.nama), ['Tomat']);
 
       provider.setSort(ProductSort.priceDesc);
       provider.clearFilter();
+      while (provider.isLoading) {
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
       expect(provider.filtered.first.nama, 'Apel');
     });
 
     test('produk stok 0 tidak dianggap tersedia', () async {
       final provider = ProductProvider();
-      await provider.load();
+      await provider.ensureLoaded();
       expect(provider.all.firstWhere((p) => p.id == 2).isAvailable, isFalse);
       expect(provider.latest().map((p) => p.id), [1]);
     });

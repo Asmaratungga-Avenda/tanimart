@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_palette.dart';
 import '../core/utils/cart_actions.dart';
 import '../core/utils/ui.dart';
+import '../models/category.dart' as category_model;
 import '../models/product.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
@@ -16,7 +17,7 @@ import '../widgets/section_header.dart';
 import '../widgets/state_views.dart';
 import 'product_detail_page.dart';
 
-/// Beranda: sapaan, pencarian, kategori, banner, dan produk dari API.
+/// Beranda: sapaan, pencarian, kategori, produk terbaru, dan semuanya.
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -30,8 +31,8 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<ProductProvider>().ensureLoaded();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (mounted) await context.read<ProductProvider>().ensureLoaded();
     });
   }
 
@@ -47,10 +48,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _refresh() async {
-    final cart = context.read<CartProvider>();
-    final error = await context.read<ProductProvider>().load();
-    cart.loadIfStale();
-    if (error != null && mounted) showAppSnack(context, error, error: true);
+    final error = await context.read<ProductProvider>().refresh();
+    if (!mounted) return;
+    context.read<CartProvider>().loadIfStale();
+    if (error != null) showAppSnack(context, error, error: true);
   }
 
   void _open(Product product) {
@@ -67,17 +68,17 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final products = context.select<ProductProvider, List<Product>>((p) => p.all);
-    final categories = context.select<ProductProvider, List<String>>(
+    final categories = context.select<ProductProvider, List<category_model.ProductCategory>>(
       (p) => p.categories,
     );
     final isLoading = context.select<ProductProvider, bool>((p) => p.isLoading);
     final hasLoaded = context.select<ProductProvider, bool>((p) => p.hasLoaded);
     final error = context.select<ProductProvider, String?>((p) => p.errorMessage);
+    final isOffline = context.select<ProductProvider, bool>((p) => p.isOffline);
     final firstName = context.select<AuthProvider, String>((a) => a.firstName);
     final cart = context.watch<CartProvider>();
     final p = context.palette;
     final text = Theme.of(context).textTheme;
-    final scale = MediaQuery.textScalerOf(context).scale(1);
 
     final latest = products.where((e) => e.isAvailable).toList()
       ..sort((a, b) => b.id.compareTo(a.id));
@@ -85,7 +86,7 @@ class _HomePageState extends State<HomePage> {
     final gridProducts = products.take(8).toList();
 
     Widget content;
-    if (products.isEmpty && isLoading) {
+    if (!_hasLoaded(products, isLoading, hasLoaded, error)) {
       content = const SliverFillRemaining(
         hasScrollBody: false,
         child: LoadingView(),
@@ -96,7 +97,7 @@ class _HomePageState extends State<HomePage> {
         child: ErrorView(
           message: error,
           scrollable: false,
-          onRetry: () => context.read<ProductProvider>().load(),
+          onRetry: () => context.read<ProductProvider>().refresh(),
         ),
       );
     } else if (products.isEmpty && hasLoaded) {
@@ -120,7 +121,7 @@ class _HomePageState extends State<HomePage> {
           ),
           SliverToBoxAdapter(
             child: SizedBox(
-              height: ProductCard.extentFor(158, scale),
+              height: ProductCard.extentFor(158, 1),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -161,6 +162,27 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
+    final offlineBanner = isOffline
+        ? SliverToBoxAdapter(
+            child: Container(
+              color: p.warningSoft,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.wifi_off_rounded, size: 16, color: p.warning),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mode offline — menampilkan data tersimpan terakhir.',
+                      style: text.bodySmall?.copyWith(color: p.warning),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : const SliverToBoxAdapter(child: SizedBox.shrink());
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -169,6 +191,7 @@ class _HomePageState extends State<HomePage> {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
+              offlineBanner,
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -202,16 +225,20 @@ class _HomePageState extends State<HomePage> {
                   child: Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: SizedBox(
-                      height: 92 * scale.clamp(1.0, 1.2),
+                      height: 104,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: categories.length,
                         separatorBuilder: (_, _) => const SizedBox(width: 14),
-                        itemBuilder: (context, index) => _CategoryItem(
-                          name: categories[index],
-                          onTap: () => _openCatalog(category: categories[index]),
-                        ),
+                        itemBuilder: (context, index) {
+                          final category = categories[index];
+                          return _CategoryItem(
+                            category: category,
+                            onTap: () =>
+                                _openCatalog(category: category.nama),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -223,6 +250,14 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  bool _hasLoaded(List<Product> products, bool isLoading, bool hasLoaded, String? error) {
+    if (!hasLoaded && isLoading) return false;
+    if (products.isNotEmpty) return true;
+    if (hasLoaded) return true;
+    if (error != null) return true;
+    return false;
+  }
 }
 
 class _PromoBanner extends StatelessWidget {
@@ -232,90 +267,18 @@ class _PromoBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
-    final text = Theme.of(context).textTheme;
     return Material(
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [p.brand, BrandColors.deep],
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -24,
-                top: -24,
-                child: Icon(
-                  Icons.eco_rounded,
-                  size: 140,
-                  color: p.onBrand.withValues(alpha: 0.14),
-                ),
-              ),
-              Positioned(
-                right: 18,
-                bottom: 14,
-                child: Icon(
-                  Icons.shopping_basket_rounded,
-                  size: 54,
-                  color: p.onBrand.withValues(alpha: 0.9),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Segar dari Petani\nLangsung ke Rumah',
-                      style: text.titleLarge?.copyWith(color: p.onBrand),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Sayur, buah, dan kebutuhan harian',
-                      style: text.bodySmall?.copyWith(
-                        color: p.onBrand.withValues(alpha: 0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.onBrand,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Belanja Sekarang',
-                            style: text.labelMedium?.copyWith(
-                              color: BrandColors.deep,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 14,
-                            color: BrandColors.deep,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        child: AspectRatio(
+          aspectRatio: 2,
+          child: Image.asset(
+            'assets/images/banners/tanimart_banner.png',
+            width: double.infinity,
+            fit: BoxFit.cover,
+            semanticLabel: 'Banner TaniMart',
           ),
         ),
       ),
@@ -324,9 +287,9 @@ class _PromoBanner extends StatelessWidget {
 }
 
 class _CategoryItem extends StatelessWidget {
-  const _CategoryItem({required this.name, required this.onTap});
+  const _CategoryItem({required this.category, required this.onTap});
 
-  final String name;
+  final category_model.ProductCategory category;
   final VoidCallback onTap;
 
   static IconData iconFor(String name) {
@@ -345,12 +308,15 @@ class _CategoryItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final icon = iconFor(category.nama);
+
     return SizedBox(
-      width: 66,
+      width: 72,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 56,
@@ -360,11 +326,11 @@ class _CategoryItem extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: p.border),
               ),
-              child: Icon(iconFor(name), color: p.brandText, size: 26),
+              child: Icon(icon, color: p.brandText, size: 26),
             ),
             const SizedBox(height: 6),
             Text(
-              name,
+              category.nama,
               maxLines: 2,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,

@@ -13,7 +13,7 @@ import '../widgets/product_card.dart';
 import '../widgets/state_views.dart';
 import 'product_detail_page.dart';
 
-/// Katalog: pencarian, filter kategori, urutan, dan grid dua kolom.
+/// Katalog: pencarian, filter kategori, urutan, dan grid produk dengan infinite scroll.
 class ProductCatalogPage extends StatefulWidget {
   const ProductCatalogPage({super.key, this.showBackButton = false});
 
@@ -26,6 +26,7 @@ class ProductCatalogPage extends StatefulWidget {
 class _ProductCatalogPageState extends State<ProductCatalogPage> {
   late final ProductProvider _provider;
   late final TextEditingController _search;
+  bool _hasInitListener = false;
 
   @override
   void initState() {
@@ -33,6 +34,7 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     _provider = context.read<ProductProvider>();
     _search = TextEditingController(text: _provider.query);
     _provider.addListener(_syncQuery);
+    _hasInitListener = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _provider.ensureLoaded();
     });
@@ -40,18 +42,17 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
 
   @override
   void dispose() {
-    _provider.removeListener(_syncQuery);
+    if (_hasInitListener) _provider.removeListener(_syncQuery);
     _search.dispose();
     super.dispose();
   }
 
-  /// Filter bisa diubah dari Beranda; samakan kolom pencarian.
   void _syncQuery() {
     if (_search.text != _provider.query) _search.text = _provider.query;
   }
 
   Future<void> _refresh() async {
-    final error = await _provider.load();
+    final error = await _provider.refresh();
     if (error != null && mounted) showAppSnack(context, error, error: true);
   }
 
@@ -119,6 +120,22 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                 isAdding: cart.isAdding,
               ),
             ),
+            if (provider.isLoadingMore)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+            if (!provider.hasMore && provider.all.isNotEmpty)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: Text('Semua produk telah dimuat'),
+                  ),
+                ),
+              ),
           ],
         ),
       );
@@ -176,12 +193,12 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
                       onTap: () => provider.setCategory(null),
                     );
                   }
-                  final name = categories[index - 1];
+                  final category = categories[index - 1];
                   return FilterPill(
-                    label: name,
+                    label: category.nama,
                     selected: provider.category?.toLowerCase() ==
-                        name.toLowerCase(),
-                    onTap: () => provider.setCategory(name),
+                        category.nama.toLowerCase(),
+                    onTap: () => provider.setCategory(category.nama),
                   );
                 },
               ),
@@ -196,6 +213,23 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
               ),
             ),
           ),
+          if (provider.isOffline)
+            Container(
+              color: p.warningSoft,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.wifi_off_rounded, size: 16, color: p.warning),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mode offline — data dari cache terakhir.',
+                      style: text.bodySmall?.copyWith(color: p.warning),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(child: body),
         ],
       ),

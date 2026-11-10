@@ -33,10 +33,15 @@ class ProductCard extends StatelessWidget {
     final p = context.palette;
     final text = Theme.of(context).textTheme;
     final available = product.isAvailable;
+    final scale = MediaQuery.textScalerOf(context).scale(1.0);
+    final screenWidth = MediaQuery.of(context).size.width;
 
     final stockLabel = !available
         ? 'Stok habis'
         : '/${product.satuanJual} · Stok ${product.stok}';
+
+    // Ukuran gambar responsif: menyesuaikan dengan lebar layar
+    final imageCacheWidth = (screenWidth * 0.45).round().clamp(240, 720);
 
     return Material(
       color: p.card,
@@ -55,7 +60,10 @@ class ProductCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ProductImage(url: product.foto, cacheWidth: 360),
+                  ProductImage(
+                    url: product.foto,
+                    cacheWidth: imageCacheWidth,
+                  ),
                   if (!available)
                     ColoredBox(color: p.background.withValues(alpha: 0.6)),
                   if (!available)
@@ -91,7 +99,10 @@ class ProductCard extends StatelessWidget {
                       product.nama,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: text.titleSmall,
+                      style: text.titleSmall?.copyWith(
+                        fontSize: (14 * scale).clamp(12, 18),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const Spacer(),
                     Row(
@@ -109,6 +120,7 @@ class ProductCard extends StatelessWidget {
                                 style: text.titleSmall?.copyWith(
                                   color: p.brandText,
                                   fontWeight: FontWeight.w700,
+                                  fontSize: (14 * scale).clamp(12, 18),
                                 ),
                               ),
                               Text(
@@ -117,6 +129,7 @@ class ProductCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: text.labelSmall?.copyWith(
                                   color: p.textSecondary,
+                                  fontSize: (11 * scale).clamp(10, 14),
                                 ),
                               ),
                             ],
