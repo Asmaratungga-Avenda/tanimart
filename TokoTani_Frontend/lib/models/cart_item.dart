@@ -33,6 +33,16 @@ class CartItem {
         '$rawMudahRusak' == '1' ||
         '$rawMudahRusak'.toLowerCase() == 'true';
 
+    final foto = (produk['foto'] ??
+            produk['gambar_url'] ??
+            produk['image_url'] ??
+            produk['gambar'] ??
+            json['foto'] ??
+            json['gambar_url'] ??
+            json['image_url'] ??
+            json['gambar'])
+        ?.toString();
+
     return CartItem(
       id: int.tryParse('${json['id']}') ?? 0,
       produkId: int.tryParse('${json['produk_id'] ?? produk['id']}') ?? 0,
@@ -42,12 +52,7 @@ class CartItem {
       stok: int.tryParse('${produk['stok'] ?? json['stok'] ?? 0}') ?? 0,
       satuanJual: '${produk['satuan_jual'] ?? json['satuan_jual'] ?? 'kg'}',
       mudahRusak: isMudahRusak,
-      foto: produk['gambar_url']?.toString() ??
-          produk['image_url']?.toString() ??
-          produk['foto']?.toString() ??
-          produk['image']?.toString() ??
-          produk['gambar']?.toString() ??
-          json['foto']?.toString(),
+      foto: foto,
     );
   }
 

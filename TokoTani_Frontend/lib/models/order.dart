@@ -19,8 +19,6 @@ class OrderModel {
   final String? idempotencyKey;
   final List<OrderItemModel> items;
 
-  String get nomorPesanan => '#TRX${id.toString().padLeft(10, '0')}';
-
   const OrderModel({
     required this.id,
     required this.namaPenerima,
@@ -88,6 +86,7 @@ class OrderModel {
     final rawItems = json['items'] ?? json['order_items'] ?? [];
     final itemsList = rawItems is List
         ? rawItems
+            .whereType<Map>()
             .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
             .toList()
         : <OrderItemModel>[];
@@ -107,7 +106,7 @@ class OrderModel {
       subtotal: int.tryParse('${json['subtotal'] ?? 0}') ?? 0,
       ongkir: int.tryParse('${json['ongkir'] ?? 0}') ?? 0,
       totalHarga: int.tryParse('${json['total_harga'] ?? 0}') ?? 0,
-      status: '${json['status'] ?? 'menunggu_pembayaran'}',
+      status: '${json['status'] ?? ''}'.trim().toLowerCase(),
       tanggalAntar: '${json['tanggal_antar'] ?? ''}',
       createdAt: json['created_at']?.toString(),
       idempotencyKey: json['idempotency_key']?.toString(),
@@ -126,8 +125,6 @@ class OrderItemModel {
   final int subtotal;
   final String? fotoProduk;
   final Product? product;
-
-  int get jumlah => quantity;
 
   const OrderItemModel({
     required this.id,
@@ -154,16 +151,17 @@ class OrderItemModel {
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     final produk = json['product'] ?? json['produk'];
-    final namaProduk = json['nama_produk'] ?? (produk is Map
+    final namaProduk = produk is Map
         ? '${produk['nama'] ?? json['nama'] ?? 'Produk'}'
-        : '${json['nama'] ?? 'Produk'}');
+        : '${json['nama'] ?? 'Produk'}';
     final foto = produk is Map
-        ? (produk['gambar_url']?.toString() ??
-            produk['image_url']?.toString() ??
-            produk['foto']?.toString() ??
-            produk['image']?.toString() ??
-            produk['gambar']?.toString())
-        : null;
+        ? (produk['foto'] ??
+                produk['gambar_url'] ??
+                produk['image_url'] ??
+                produk['gambar'] ??
+                json['foto_produk'])
+            ?.toString()
+        : json['foto_produk']?.toString();
 
     return OrderItemModel(
       id: int.tryParse('${json['id']}') ?? 0,

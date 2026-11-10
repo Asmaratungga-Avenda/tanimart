@@ -12,14 +12,14 @@ void main() {
     await tester.pumpWidget(testApp(const LoginPage()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Masuk ke TokoTani'), findsOneWidget);
+    expect(find.text('Masuk ke TaniMart'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Kata sandi'), findsOneWidget);
 
     await tester.tap(find.text('Belum punya akun? Daftar'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Buat Akun TokoTani'), findsOneWidget);
+    expect(find.text('Buat Akun TaniMart'), findsOneWidget);
     expect(find.text('Nama'), findsOneWidget);
     expect(find.text('Ulangi kata sandi'), findsOneWidget);
   });

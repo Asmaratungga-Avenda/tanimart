@@ -10,7 +10,7 @@ void main() {
     await tester.pumpWidget(testApp(const CheckoutPage()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Checkout Pesanan'), findsOneWidget);
+    expect(find.text('Checkout'), findsOneWidget);
     expect(find.text('Server API tidak tersedia untuk pengujian.'), findsOneWidget);
     expect(find.text('Buat Pesanan'), findsNothing);
   });

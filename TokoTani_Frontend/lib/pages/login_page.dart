@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
 
+import '../core/theme/app_palette.dart';
+import '../providers/auth_provider.dart';
+import '../widgets/app_button.dart';
+import '../widgets/app_logo.dart';
+import '../widgets/inline_banner.dart';
+
+/// Masuk / daftar. Formulir tidak pernah hilang saat proses berjalan atau gagal.
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -11,191 +17,193 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmationController = TextEditingController();
-  bool _registering = false;
-  bool _obscurePassword = true;
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+
+  bool _registerMode = false;
+  bool _obscure = true;
+
+  static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmationController.dispose();
+    _name.dispose();
+    _email.dispose();
+    _password.dispose();
+    _confirm.dispose();
     super.dispose();
   }
 
+  void _toggleMode() {
+    context.read<AuthProvider>().clearError();
+    setState(() => _registerMode = !_registerMode);
+  }
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
     final auth = context.read<AuthProvider>();
-    final success = _registering
-        ? await auth.register(
-            _nameController.text,
-            _emailController.text,
-            _passwordController.text,
-          )
-        : await auth.signIn(_emailController.text, _passwordController.text);
-
-    if (!mounted || success) return;
-    final error = auth.errorMessage;
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+    if (auth.isSubmitting) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    FocusScope.of(context).unfocus();
+    final email = _email.text.trim();
+    if (_registerMode) {
+      await auth.register(_name.text.trim(), email, _password.text);
+    } else {
+      await auth.signIn(email, _password.text);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final auth = context.watch<AuthProvider>();
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final fieldErrors = auth.fieldErrors;
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              Center(
-                child: Image.asset(
-                  'assets/images/logo/agrimart_logo.png',
-                  height: 60,
-                  errorBuilder: (_, __, ___) => Icon(
-                    Icons.eco_rounded,
-                    size: 60,
-                    color: colors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-              Text(
-                _registering ? 'Buat Akun Baru' : 'Selamat Datang Kembali',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colors.onSurface,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _registering
-                    ? 'Daftar sekarang untuk mulai belanja produk segar.'
-                    : 'Masuk untuk melanjutkan pengalaman belanja Anda.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 40),
-              Form(
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.center,
+            colors: [p.brandSoft, p.background],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Form(
                 key: _formKey,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_registering) ...[
+                    const Center(child: AppLogo(full: true, size: 96)),
+                    const SizedBox(height: 20),
+                    Text(
+                      _registerMode ? 'Buat Akun TaniMart' : 'Masuk ke TaniMart',
+                      textAlign: TextAlign.center,
+                      style: text.headlineSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Belanja Mudah, Hasil Bumi Berkualitas',
+                      textAlign: TextAlign.center,
+                      style: text.bodyMedium?.copyWith(color: p.textSecondary),
+                    ),
+                    const SizedBox(height: 24),
+                    if (auth.errorMessage != null) ...[
+                      InlineBanner(message: auth.errorMessage!),
+                      const SizedBox(height: 14),
+                    ],
+                    if (_registerMode) ...[
                       TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Nama Lengkap',
-                          hintText: 'Masukkan nama lengkap Anda',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
+                        controller: _name,
+                        textInputAction: TextInputAction.next,
+                        textCapitalization: TextCapitalization.words,
+                        autofillHints: const [AutofillHints.name],
+                        decoration: InputDecoration(
+                          labelText: 'Nama',
+                          prefixIcon: const Icon(Icons.person_outline_rounded),
+                          errorText: fieldErrors['name'],
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty
-                            ? 'Nama wajib diisi.'
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Nama wajib diisi'
                             : null,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 14),
                     ],
                     TextFormField(
-                      controller: _emailController,
+                      controller: _email,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.email],
+                      decoration: InputDecoration(
                         labelText: 'Email',
-                        hintText: 'nama@email.com',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        prefixIcon: const Icon(Icons.mail_outline_rounded),
+                        errorText: fieldErrors['email'],
                       ),
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
-                        return email.contains('@') ? null : 'Masukkan email yang valid.';
+                      validator: (v) {
+                        final value = v?.trim() ?? '';
+                        if (value.isEmpty) return 'Email wajib diisi';
+                        if (!_emailPattern.hasMatch(value)) {
+                          return 'Format email tidak valid';
+                        }
+                        return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 14),
                     TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
+                      controller: _password,
+                      obscureText: _obscure,
+                      textInputAction: _registerMode
+                          ? TextInputAction.next
+                          : TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!_registerMode) _submit();
+                      },
+                      autofillHints: const [AutofillHints.password],
                       decoration: InputDecoration(
-                        labelText: 'Kata Sandi',
-                        hintText: 'Minimal 8 karakter',
+                        labelText: 'Kata sandi',
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        errorText: fieldErrors['password'],
                         suffixIcon: IconButton(
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          tooltip: _obscure
+                              ? 'Tampilkan kata sandi'
+                              : 'Sembunyikan kata sandi',
                           icon: Icon(
-                            _obscurePassword
+                            _obscure
                                 ? Icons.visibility_outlined
                                 : Icons.visibility_off_outlined,
                           ),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
-                      validator: (value) =>
-                          value == null || value.length < 8 ? 'Kata sandi minimal 8 karakter.' : null,
+                      validator: (v) {
+                        final value = v ?? '';
+                        if (value.isEmpty) return 'Kata sandi wajib diisi';
+                        if (_registerMode && value.length < 8) {
+                          return 'Kata sandi minimal 8 karakter';
+                        }
+                        return null;
+                      },
                     ),
-                    if (_registering) ...[
-                      const SizedBox(height: 20),
+                    if (_registerMode) ...[
+                      const SizedBox(height: 14),
                       TextFormField(
-                        controller: _confirmationController,
-                        obscureText: _obscurePassword,
+                        controller: _confirm,
+                        obscureText: _obscure,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _submit(),
                         decoration: const InputDecoration(
-                          labelText: 'Konfirmasi Kata Sandi',
+                          labelText: 'Ulangi kata sandi',
                           prefixIcon: Icon(Icons.lock_outline_rounded),
                         ),
-                        validator: (value) => value != _passwordController.text
-                            ? 'Konfirmasi kata sandi tidak cocok.'
+                        validator: (v) => v != _password.text
+                            ? 'Kata sandi tidak sama'
                             : null,
                       ),
                     ],
-                    const SizedBox(height: 40),
-                    Consumer<AuthProvider>(
-                      builder: (context, auth, _) => SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: auth.isLoading ? null : _submit,
-                          child: auth.isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : Text(_registering ? 'Daftar Sekarang' : 'Masuk'),
-                        ),
-                      ),
+                    const SizedBox(height: 22),
+                    PrimaryButton(
+                      label: _registerMode ? 'Daftar' : 'Masuk',
+                      loading: auth.isSubmitting,
+                      onPressed: _submit,
                     ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _registering ? 'Sudah punya akun?' : 'Belum punya akun?',
-                          style: TextStyle(color: colors.onSurfaceVariant),
-                        ),
-                        TextButton(
-                          onPressed: () => setState(() {
-                            _registering = !_registering;
-                            context.read<AuthProvider>().clearError();
-                          }),
-                          child: Text(_registering ? 'Masuk' : 'Daftar'),
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: auth.isSubmitting ? null : _toggleMode,
+                      child: Text(
+                        _registerMode
+                            ? 'Sudah punya akun? Masuk'
+                            : 'Belum punya akun? Daftar',
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

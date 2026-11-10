@@ -1,456 +1,204 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../core/widgets/product_image.dart';
+
+import '../core/theme/app_palette.dart';
+import '../core/utils/cart_actions.dart';
+import '../core/utils/ui.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
-import '../services/notification_service.dart';
+import '../widgets/app_search_field.dart';
+import '../widgets/filter_pill.dart';
+import '../widgets/product_card.dart';
+import '../widgets/state_views.dart';
 import 'product_detail_page.dart';
 
+/// Katalog: pencarian, filter kategori, urutan, dan grid dua kolom.
 class ProductCatalogPage extends StatefulWidget {
-  final String? initialCategory;
-  final String? initialQuery;
-  final bool showBackButton;
+  const ProductCatalogPage({super.key, this.showBackButton = false});
 
-  const ProductCatalogPage({
-    super.key,
-    this.initialCategory,
-    this.initialQuery,
-    this.showBackButton = false,
-  });
+  final bool showBackButton;
 
   @override
   State<ProductCatalogPage> createState() => _ProductCatalogPageState();
 }
 
 class _ProductCatalogPageState extends State<ProductCatalogPage> {
-  String _searchQuery = '';
-  late final TextEditingController _searchController;
-  bool _isSearching = false;
-
-  List<String> get _categories {
-    final values = context.read<ProductProvider>().products
-        .map((product) => product.kategori.trim())
-        .where((category) => category.isNotEmpty)
-        .toSet()
-        .toList()..sort();
-    return ['Semua', ...values];
-  }
+  late final ProductProvider _provider;
+  late final TextEditingController _search;
 
   @override
   void initState() {
     super.initState();
-    _searchQuery = widget.initialQuery ?? '';
-    _searchController = TextEditingController(text: _searchQuery);
-    _isSearching = _searchQuery.isNotEmpty;
-
+    _provider = context.read<ProductProvider>();
+    _search = TextEditingController(text: _provider.query);
+    _provider.addListener(_syncQuery);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (widget.initialCategory != null) {
-        final match = _categories.firstWhere(
-          (category) => category.toLowerCase().contains(
-            widget.initialCategory!.toLowerCase().replaceAll(' & ', ' '),
-          ),
-          orElse: () => 'Semua',
-        );
-        context.read<ProductProvider>().setCategory(match);
-      }
-      _loadProducts();
+      if (mounted) _provider.ensureLoaded();
     });
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _provider.removeListener(_syncQuery);
+    _search.dispose();
     super.dispose();
   }
 
-  Future<void> _loadProducts({String? sortBy}) async {
-    final provider = context.read<ProductProvider>();
-    await provider.loadProducts(
-      kategori: provider.selectedCategory == 'Semua'
-          ? null
-          : provider.selectedCategory,
-      cari: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
-      sortBy: sortBy,
+  /// Filter bisa diubah dari Beranda; samakan kolom pencarian.
+  void _syncQuery() {
+    if (_search.text != _provider.query) _search.text = _provider.query;
+  }
+
+  Future<void> _refresh() async {
+    final error = await _provider.load();
+    if (error != null && mounted) showAppSnack(context, error, error: true);
+  }
+
+  void _open(Product product) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProductDetailPage(
+          productId: product.id,
+          initialProduct: product,
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     final provider = context.watch<ProductProvider>();
-    final selectedCategory = provider.selectedCategory ?? 'Semua';
-    final products = provider.products;
+    final cart = context.watch<CartProvider>();
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final items = provider.filtered;
+    final categories = provider.categories;
+
+    Widget body;
+    if (provider.all.isEmpty && provider.isLoading) {
+      body = const LoadingView();
+    } else if (provider.all.isEmpty && provider.errorMessage != null) {
+      body = RefreshIndicator(
+        onRefresh: _refresh,
+        child: ErrorView(message: provider.errorMessage!, onRetry: _refresh),
+      );
+    } else if (provider.all.isEmpty) {
+      body = RefreshIndicator(
+        onRefresh: _refresh,
+        child: const EmptyView(
+          icon: Icons.storefront_outlined,
+          title: 'Belum ada produk',
+          message: 'Produk akan tampil di sini setelah ditambahkan oleh toko.',
+        ),
+      );
+    } else if (items.isEmpty) {
+      body = RefreshIndicator(
+        onRefresh: _refresh,
+        child: EmptyView(
+          icon: Icons.search_off_rounded,
+          title: 'Produk tidak ditemukan',
+          message: 'Coba kata kunci lain atau hapus filter kategori.',
+          actionLabel: 'Hapus Filter',
+          onAction: provider.clearFilter,
+        ),
+      );
+    } else {
+      body = RefreshIndicator(
+        onRefresh: _refresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              sliver: SliverProductGrid(
+                products: items,
+                onOpen: _open,
+                onAdd: (product) => addProductToCart(context, product),
+                isAdding: cart.isAdding,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        leading: widget.showBackButton
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                onPressed: () => Navigator.pop(context),
-              )
-            : null,
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                style: theme.textTheme.bodyLarge,
-                decoration: InputDecoration(
-                  hintText: 'Cari produk...',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(color: colors.onSurfaceVariant.withOpacity(0.6)),
-                ),
-                onSubmitted: (val) {
-                  setState(() => _searchQuery = val);
-                  _loadProducts();
-                },
-              )
-            : Text(
-                'Semua Produk',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
+        automaticallyImplyLeading: widget.showBackButton,
+        titleSpacing: widget.showBackButton ? 0 : 16,
+        title: const Text('Semua Produk'),
         actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
-            onPressed: () {
-              setState(() {
-                if (_isSearching) {
-                  _isSearching = false;
-                  _searchController.clear();
-                  _searchQuery = '';
-                  _loadProducts();
-                } else {
-                  _isSearching = true;
-                }
-              });
-            },
+          PopupMenuButton<ProductSort>(
+            tooltip: 'Urutkan',
+            icon: const Icon(Icons.swap_vert_rounded),
+            initialValue: provider.sort,
+            onSelected: provider.setSort,
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: ProductSort.none, child: Text('Bawaan')),
+              PopupMenuItem(
+                value: ProductSort.priceAsc,
+                child: Text('Harga terendah'),
+              ),
+              PopupMenuItem(
+                value: ProductSort.priceDesc,
+                child: Text('Harga tertinggi'),
+              ),
+              PopupMenuItem(value: ProductSort.name, child: Text('Nama A-Z')),
+            ],
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
         children: [
-          _buildCategoryChips(colors, selectedCategory),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => _loadProducts(),
-              child: _buildBody(provider, products, colors, theme),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            child: AppSearchField(
+              controller: _search,
+              onChanged: provider.setQuery,
             ),
           ),
+          if (categories.isNotEmpty)
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: categories.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return FilterPill(
+                      label: 'Semua',
+                      selected: provider.category == null,
+                      onTap: () => provider.setCategory(null),
+                    );
+                  }
+                  final name = categories[index - 1];
+                  return FilterPill(
+                    label: name,
+                    selected: provider.category?.toLowerCase() ==
+                        name.toLowerCase(),
+                    onTap: () => provider.setCategory(name),
+                  );
+                },
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${items.length} produk',
+                style: text.bodySmall?.copyWith(color: p.textSecondary),
+              ),
+            ),
+          ),
+          Expanded(child: body),
         ],
       ),
     );
   }
-
-  Widget _buildCategoryChips(ColorScheme colors, String selectedCategory) {
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _categories.length,
-        itemBuilder: (ctx, i) {
-          final cat = _categories[i];
-          final isSelected = selectedCategory == cat;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(cat),
-              selected: isSelected,
-              onSelected: (_) async {
-                context.read<ProductProvider>().setCategory(cat);
-                await _loadProducts();
-              },
-              selectedColor: colors.primary,
-              labelStyle: GoogleFonts.poppins(
-                color: isSelected ? Colors.white : colors.onSurface,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 13,
-              ),
-              showCheckmark: false,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isSelected ? colors.primary : colors.outlineVariant,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildBody(ProductProvider provider, List<Product> products, ColorScheme colors, ThemeData theme) {
-    if (provider.isLoading && products.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (provider.errorMessage != null && products.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: colors.error),
-            const SizedBox(height: 16),
-            Text(
-              provider.errorMessage!,
-              style: GoogleFonts.poppins(),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () => _loadProducts(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Coba Lagi'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (products.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('🌿', style: TextStyle(fontSize: 60)),
-            const SizedBox(height: 16),
-            Text(
-              'Produk tidak ditemukan',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              'Coba kata kunci atau kategori lain',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 0.65,
-      ),
-      itemCount: products.length,
-      itemBuilder: (ctx, i) {
-        final product = products[i];
-        return _ProductCard(
-          product: product,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProductDetailPage(
-                productId: product.id,
-                initialProduct: product,
-              ),
-            ),
-          ),
-          onAdd: () async {
-            final ok = await context.read<CartProvider>().addItem(product.id, 1);
-            if (!mounted) return;
-            if (ok) {
-              NotificationService.cartCountNotifier.value++;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${product.nama} ditambahkan ke keranjang 🛒'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: colors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
-            }
-          },
-        );
-      },
-    );
-  }
-}
-
-class _ProductCard extends StatelessWidget {
-  final Product product;
-  final VoidCallback onTap;
-  final VoidCallback onAdd;
-
-  const _ProductCard({
-    required this.product,
-    required this.onTap,
-    required this.onAdd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final isAvailable = product.tersedia && product.stok > 0;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outlineVariant.withOpacity(0.5)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: ProductImage(
-                      imageUrl: product.foto,
-                      productName: product.nama,
-                      category: product.kategori,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
-                  ),
-                  if (!isAvailable)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Stok Habis',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (product.mudahRusak)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Segar',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.kategori,
-                    style: GoogleFonts.poppins(
-                      fontSize: 10,
-                      color: colors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    product.nama,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Rp ${_rupiah(product.harga)}',
-                              style: GoogleFonts.poppins(
-                                color: colors.primary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            Text(
-                              '/${product.satuanJual}',
-                              style: GoogleFonts.poppins(
-                                color: colors.onSurfaceVariant,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: isAvailable ? onAdd : null,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: isAvailable ? colors.primary : colors.outlineVariant,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            isAvailable ? Icons.add : Icons.block,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _rupiah(int value) => value.toString().replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+(?!\d))'),
-        (_) => '.',
-      );
 }

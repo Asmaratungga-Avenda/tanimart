@@ -1,288 +1,263 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../core/theme/app_palette.dart';
+import '../core/utils/formatters.dart';
+import '../core/utils/order_status.dart';
 import '../models/order.dart';
+import '../providers/navigation_provider.dart';
 import '../providers/order_provider.dart';
+import '../widgets/app_button.dart';
+import '../widgets/app_card.dart';
+import '../widgets/filter_pill.dart';
+import '../widgets/inline_banner.dart';
+import '../widgets/product_image.dart';
+import '../widgets/state_views.dart';
+import '../widgets/status_badge.dart';
 import 'order_detail_page.dart';
 
-class OrderHistoryPage extends StatefulWidget {
-  final bool showBackButton;
-  final VoidCallback? onGoToCatalog;
+enum _OrderFilter { all, waiting, processing, shipping, done }
 
-  const OrderHistoryPage({
-    super.key,
-    this.showBackButton = false,
-    this.onGoToCatalog,
-  });
+extension on _OrderFilter {
+  String get label => switch (this) {
+    _OrderFilter.all => 'Semua',
+    _OrderFilter.waiting => 'Menunggu',
+    _OrderFilter.processing => 'Diproses',
+    _OrderFilter.shipping => 'Dikirim',
+    _OrderFilter.done => 'Selesai',
+  };
+
+  bool matches(String status) {
+    final rank = OrderStatus.rank(status);
+    return switch (this) {
+      _OrderFilter.all => true,
+      _OrderFilter.waiting => rank == 0 || rank == 1,
+      _OrderFilter.processing => rank == 2 || rank == 3,
+      _OrderFilter.shipping => rank == 4 || rank == 5,
+      _OrderFilter.done => rank == 6,
+    };
+  }
+}
+
+/// Riwayat pesanan pelanggan dari server.
+class OrderHistoryPage extends StatefulWidget {
+  const OrderHistoryPage({super.key, this.showBackButton = false});
+
+  final bool showBackButton;
 
   @override
   State<OrderHistoryPage> createState() => _OrderHistoryPageState();
 }
 
 class _OrderHistoryPageState extends State<OrderHistoryPage> {
-  String _selectedFilter = 'Semua';
+  _OrderFilter _filter = _OrderFilter.all;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<OrderProvider>().loadOrders();
+      if (mounted) context.read<OrderProvider>().loadIfStale();
     });
   }
 
-  String _rupiah(int value) => value.toString().replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+(?!\d))'),
-        (_) => '.',
-      );
-
-  String _getStatusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'menunggu_pembayaran':
-        return 'Menunggu Pembayaran';
-      case 'menunggu_konfirmasi':
-        return 'Menunggu Konfirmasi';
-      case 'dibayar':
-        return 'Dibayar';
-      case 'diproses':
-        return 'Diproses';
-      case 'dikirim':
-        return 'Dikirim';
-      case 'tiba':
-        return 'Tiba';
-      case 'selesai':
-        return 'Selesai';
-      case 'dibatalkan':
-        return 'Dibatalkan';
-      default:
-        return status;
-    }
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'dibayar':
-      case 'selesai':
-        return Colors.green;
-      case 'menunggu_pembayaran':
-      case 'menunggu_konfirmasi':
-      case 'diproses':
-        return Colors.orange;
-      case 'dikirim':
-      case 'tiba':
-        return Colors.blue;
-      case 'dibatalkan':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+  void _open(OrderModel order) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OrderDetailPage(orderId: order.id, initialOrder: order),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     final provider = context.watch<OrderProvider>();
-    
-    List<OrderModel> orders = provider.orders;
-    if (_selectedFilter != 'Semua') {
-      orders = orders.where((o) => _getStatusLabel(o.status).contains(_selectedFilter)).toList();
+    final orders = provider.orders.where((o) => _filter.matches(o.status)).toList();
+
+    Widget body;
+    if (!provider.hasLoaded && provider.isLoading) {
+      body = const LoadingView();
+    } else if (!provider.hasLoaded && provider.errorMessage != null) {
+      body = RefreshIndicator(
+        onRefresh: provider.loadOrders,
+        child: ErrorView(
+          message: provider.errorMessage!,
+          onRetry: provider.loadOrders,
+        ),
+      );
+    } else if (provider.orders.isEmpty) {
+      body = RefreshIndicator(
+        onRefresh: provider.loadOrders,
+        child: EmptyView(
+          icon: Icons.receipt_long_outlined,
+          title: 'Belum ada pesanan',
+          message: 'Pesanan yang Anda buat akan muncul di sini.',
+          actionLabel: 'Mulai Belanja',
+          onAction: () {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            context.read<NavigationProvider>().select(AppTab.products);
+          },
+        ),
+      );
+    } else if (orders.isEmpty) {
+      body = RefreshIndicator(
+        onRefresh: provider.loadOrders,
+        child: EmptyView(
+          icon: Icons.filter_list_off_rounded,
+          title: 'Tidak ada pesanan "${_filter.label}"',
+          actionLabel: 'Lihat Semua',
+          onAction: () => setState(() => _filter = _OrderFilter.all),
+        ),
+      );
+    } else {
+      final hasBanner = provider.errorMessage != null;
+      body = RefreshIndicator(
+        onRefresh: provider.loadOrders,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          itemCount: orders.length + (hasBanner ? 1 : 0),
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          itemBuilder: (context, index) {
+            if (hasBanner) {
+              if (index == 0) {
+                return InlineBanner(
+                  message: provider.errorMessage!,
+                  icon: Icons.info_outline_rounded,
+                  actionLabel: 'Muat ulang',
+                  onAction: provider.loadOrders,
+                );
+              }
+              index -= 1;
+            }
+            final order = orders[index];
+            return _OrderCard(
+              key: ValueKey<int>(order.id),
+              order: order,
+              onTap: () => _open(order),
+            );
+          },
+        ),
+      );
     }
 
     return Scaffold(
       appBar: AppBar(
-        leading: widget.showBackButton
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                onPressed: () => Navigator.pop(context),
-              )
-            : null,
-        title: const Text('Pesanan Saya', style: TextStyle(fontWeight: FontWeight.bold)),
+        automaticallyImplyLeading: widget.showBackButton,
+        titleSpacing: widget.showBackButton ? 0 : 16,
+        title: const Text('Pesanan Saya'),
       ),
       body: Column(
         children: [
-          _buildFilters(colors),
-          Expanded(
-            child: provider.isLoading && provider.orders.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : orders.isEmpty
-                    ? _buildEmptyState(colors)
-                    : RefreshIndicator(
-                        onRefresh: () => provider.loadOrders(),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(20),
-                          itemCount: orders.length,
-                          itemBuilder: (context, index) {
-                            final order = orders[index];
-                            return _buildOrderCard(order, colors, theme);
-                          },
-                        ),
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilters(ColorScheme colors) {
-    final filters = ['Semua', 'Diproses', 'Dikirim', 'Selesai'];
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: filters.length,
-        itemBuilder: (context, i) {
-          final filter = filters[i];
-          final isSelected = _selectedFilter == filter;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(filter),
-              selected: isSelected,
-              onSelected: (_) => setState(() => _selectedFilter = filter),
-              selectedColor: colors.primary,
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.white : colors.onSurface,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-              showCheckmark: false,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isSelected ? colors.primary : colors.outlineVariant,
-                ),
+          if (provider.orders.isNotEmpty)
+            SizedBox(
+              height: 44,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                itemCount: _OrderFilter.values.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final value = _OrderFilter.values[index];
+                  return FilterPill(
+                    label: value.label,
+                    selected: _filter == value,
+                    onTap: () => setState(() => _filter = value),
+                  );
+                },
               ),
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(ColorScheme colors) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 80, color: colors.outlineVariant),
-          const SizedBox(height: 16),
-          const Text(
-            'Belum ada pesanan',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          const SizedBox(height: 8),
-          const Text('Ayo mulai belanja kebutuhanmu!'),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: () {
-              if (widget.onGoToCatalog != null) {
-                widget.onGoToCatalog!();
-              } else {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              }
-            },
-            child: const Text('Belanja Sekarang'),
-          ),
+          Expanded(child: body),
         ],
       ),
     );
   }
+}
 
-  Widget _buildOrderCard(OrderModel order, ColorScheme colors, ThemeData theme) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => OrderDetailPage(orderId: order.id, initialOrder: order)),
-        ),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({super.key, required this.order, required this.onTap});
+
+  final OrderModel order;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final items = order.items;
+    final thumbs = items.take(3).toList();
+    final extra = items.length - thumbs.length;
+
+    return AppCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+              Expanded(
+                child: Text('Pesanan #${order.id}', style: text.titleSmall),
+              ),
+              StatusBadge.order(order.status),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            formatDateTime(order.createdAt),
+            style: text.bodySmall?.copyWith(color: p.textSecondary),
+          ),
+          if (items.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                for (final item in thumbs)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: ProductImage(
+                        url: item.product?.foto ?? item.fotoProduk,
+                        cacheWidth: 160,
+                        iconSize: 20,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                if (extra > 0)
                   Text(
-                    order.nomorPesanan,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    '+$extra',
+                    style: text.labelMedium?.copyWith(color: p.textSecondary),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(order.status).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _getStatusLabel(order.status),
-                      style: TextStyle(
-                        color: _getStatusColor(order.status),
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              items.map((i) => i.namaProduk).take(2).join(', ') +
+                  (items.length > 2 ? ', dan ${items.length - 2} lainnya' : ''),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: text.bodySmall?.copyWith(color: p.textSecondary),
+            ),
+          ],
+          const Divider(height: 22),
+          Row(
+            children: [
+              Text('Total', style: text.bodySmall),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  formatRupiah(order.totalHarga),
+                  style: text.titleSmall?.copyWith(color: p.brandText),
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                order.createdAt.toString().substring(0, 16), // Simplified date
-                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-              ),
-              const Divider(height: 24),
-              Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.shopping_basket_outlined),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${order.items.length} Produk',
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        Text(
-                          'Total Pembayaran',
-                          style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Rp ${_rupiah(order.totalHarga)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: colors.primary,
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, size: 20),
-                    ],
-                  ),
-                ],
+              SecondaryButton(
+                label: 'Lihat Detail',
+                expanded: false,
+                onPressed: onTap,
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }

@@ -419,13 +419,13 @@ class CheckoutController extends Controller
                         ));
                     }
 
-                    if ($item['quantity'] > 5) {
+                    if ($item['quantity'] > 20) {
                         abort($this->jsonResponse(
                             'gagal',
                             422,
-                            "Kuantitas maksimal 5 untuk produk '{$product->nama}'",
+                            "Kuantitas maksimal 20 untuk produk '{$product->nama}'",
                             null,
-                            ['checkout' => ["Kuantitas maksimal 5 untuk produk '{$product->nama}'"]]
+                            ['checkout' => ["Kuantitas maksimal 20 untuk produk '{$product->nama}'"]]
                         ));
                     }
 

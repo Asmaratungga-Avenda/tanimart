@@ -1,222 +1,173 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
-import '../providers/theme_provider.dart';
-import 'order_history_page.dart';
 
+import '../core/theme/app_palette.dart';
+import '../core/utils/ui.dart';
+import '../providers/auth_provider.dart';
+import '../providers/navigation_provider.dart';
+import '../providers/theme_provider.dart';
+import '../widgets/app_card.dart';
+
+/// Akun: profil pelanggan, pintasan pesanan, pilihan tema, dan keluar.
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
+  Future<void> _logout(BuildContext context) async {
+    final auth = context.read<AuthProvider>();
+    final nav = context.read<NavigationProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await confirmDialog(
+      context,
+      title: 'Keluar dari akun?',
+      message: 'Anda perlu masuk lagi untuk berbelanja.',
+      confirmLabel: 'Keluar',
+      destructive: true,
+    );
+    if (!ok) return;
+    final revoked = await auth.signOut();
+    nav.reset();
+    if (!revoked) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Anda sudah keluar di perangkat ini, tetapi server belum dapat dihubungi.',
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     final auth = context.watch<AuthProvider>();
-    final themeProvider = context.watch<ThemeProvider>();
-    final user = auth.user;
+    final themeMode = context.select<ThemeProvider, ThemeMode>((t) => t.mode);
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final name = auth.displayName;
+    final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header Section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [colors.primary, colors.secondary],
+      body: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [p.brand, BrandColors.deep],
+              ),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(28),
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 32,
+                      backgroundColor: p.onBrand,
+                      child: Text(
+                        initial,
+                        style: text.headlineSmall?.copyWith(
+                          color: BrandColors.deep,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.titleLarge?.copyWith(color: p.onBrand),
+                          ),
+                          if (auth.email.isNotEmpty)
+                            Text(
+                              auth.email,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: text.bodySmall?.copyWith(
+                                color: p.onBrand.withValues(alpha: 0.9),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
               ),
-              child: Column(
-                children: [
-                  const CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person_rounded, size: 60, color: Colors.grey),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppCard(
+                  padding: EdgeInsets.zero,
+                  onTap: () =>
+                      context.read<NavigationProvider>().select(AppTab.orders),
+                  child: ListTile(
+                    leading: Icon(Icons.receipt_long_outlined, color: p.brandText),
+                    title: Text('Pesanan Saya', style: text.titleSmall),
+                    trailing: const Icon(Icons.chevron_right_rounded),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    user?['name']?.toString() ?? 'Pelanggan TaniMart',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    user?['email']?.toString() ?? 'pelanggan@email.com',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withValues(alpha: 0.2),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: const BorderSide(color: Colors.white),
+                ),
+                const SizedBox(height: 20),
+                Text('Tampilan', style: text.titleMedium),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<ThemeMode>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(
+                        value: ThemeMode.light,
+                        icon: Icon(Icons.light_mode_outlined),
+                        label: Text('Terang'),
                       ),
-                    ),
-                    child: const Text('Ubah Profil'),
-                  ),
-                ],
-              ),
-            ),
-
-            // Menu Section
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  _menuItem(
-                    context,
-                    icon: Icons.receipt_long_rounded,
-                    title: 'Pesanan Saya',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const OrderHistoryPage(showBackButton: true)),
-                    ),
-                  ),
-                  _menuItem(
-                    context,
-                    icon: Icons.location_on_rounded,
-                    title: 'Alamat Saya',
-                    onTap: () {},
-                  ),
-                  _menuItem(
-                    context,
-                    icon: Icons.account_balance_wallet_rounded,
-                    title: 'Metode Pembayaran',
-                    onTap: () {},
-                  ),
-                  const Divider(height: 32),
-                  _menuItem(
-                    context,
-                    icon: Icons.settings_rounded,
-                    title: 'Pengaturan Aplikasi',
-                    onTap: () => _showThemePicker(context, themeProvider),
-                  ),
-                  _menuItem(
-                    context,
-                    icon: Icons.help_outline_rounded,
-                    title: 'Bantuan & FAQ',
-                    onTap: () {},
-                  ),
-                  _menuItem(
-                    context,
-                    icon: Icons.info_outline_rounded,
-                    title: 'Tentang TaniMart',
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () => _confirmSignOut(context, auth),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ButtonSegment(
+                        value: ThemeMode.dark,
+                        icon: Icon(Icons.dark_mode_outlined),
+                        label: Text('Gelap'),
                       ),
-                      child: const Text('Keluar'),
-                    ),
+                      ButtonSegment(
+                        value: ThemeMode.system,
+                        icon: Icon(Icons.settings_suggest_outlined),
+                        label: Text('Sistem'),
+                      ),
+                    ],
+                    selected: {themeMode},
+                    onSelectionChanged: (selection) => context
+                        .read<ThemeProvider>()
+                        .setMode(selection.first),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _logout(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: p.danger,
+                      side: BorderSide(color: p.danger),
+                    ),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Keluar'),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _menuItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    final colors = Theme.of(context).colorScheme;
-    return ListTile(
-      leading: Icon(icon, color: colors.primary),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: onTap,
-      contentPadding: EdgeInsets.zero,
-    );
-  }
-
-  void _showThemePicker(BuildContext context, ThemeProvider provider) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Pengaturan Tema', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.light_mode_outlined),
-              title: const Text('Terang'),
-              trailing: provider.mode == ThemeMode.light ? const Icon(Icons.check, color: Colors.green) : null,
-              onTap: () {
-                provider.setTheme(ThemeMode.light);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.dark_mode_outlined),
-              title: const Text('Gelap'),
-              trailing: provider.mode == ThemeMode.dark ? const Icon(Icons.check, color: Colors.green) : null,
-              onTap: () {
-                provider.setTheme(ThemeMode.dark);
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings_brightness_outlined),
-              title: const Text('Ikuti Sistem'),
-              trailing: provider.mode == ThemeMode.system ? const Icon(Icons.check, color: Colors.green) : null,
-              onTap: () {
-                provider.setTheme(ThemeMode.system);
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmSignOut(BuildContext context, AuthProvider auth) async {
-    final shouldSignOut = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Keluar?'),
-        content: const Text('Apakah Anda yakin ingin keluar dari akun?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Keluar', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-
-    if (shouldSignOut == true) {
-      await auth.signOut();
-    }
   }
 }

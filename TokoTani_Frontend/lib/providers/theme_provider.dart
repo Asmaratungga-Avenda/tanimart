@@ -1,75 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Manajemen mode tema (Light / Dark / System) dengan penyimpanan di SharedPreferences.
+/// Mode tema (Terang / Gelap / Sistem) yang tersimpan setelah aplikasi ditutup.
 class ThemeProvider extends ChangeNotifier {
+  ThemeProvider({ThemeMode initialMode = ThemeMode.system})
+    : _mode = initialMode;
+
+  // Kunci lama dipertahankan agar pilihan pengguna sebelumnya tetap terbaca.
   static const String _storageKey = 'agrimart_theme_mode_v1';
 
-  ThemeMode _mode = ThemeMode.system;
-  bool _isLoading = true;
-
+  ThemeMode _mode;
   ThemeMode get mode => _mode;
-  bool get isLoading => _isLoading;
-  bool get isDark {
-    if (_mode == ThemeMode.system) {
-      // Fallback: assume light when system not yet detected
-      return false;
-    }
-    return _mode == ThemeMode.dark;
-  }
 
-  ThemeProvider() {
-    _loadTheme();
-  }
-
-  Future<void> _loadTheme() async {
+  /// Dipanggil di `main()` sebelum `runApp` agar tema benar sejak frame pertama.
+  static Future<ThemeMode> loadSaved() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_storageKey);
-      if (raw != null) {
-        switch (raw) {
-          case 'light':
-            _mode = ThemeMode.light;
-            break;
-          case 'dark':
-            _mode = ThemeMode.dark;
-            break;
-          case 'system':
-            _mode = ThemeMode.system;
-            break;
-        }
+      switch (prefs.getString(_storageKey)) {
+        case 'light':
+          return ThemeMode.light;
+        case 'dark':
+          return ThemeMode.dark;
+        default:
+          return ThemeMode.system;
       }
     } catch (_) {
-      _mode = ThemeMode.system;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      return ThemeMode.system;
     }
   }
 
-  Future<void> setTheme(ThemeMode mode) async {
+  Future<void> setMode(ThemeMode mode) async {
+    if (mode == _mode) return;
     _mode = mode;
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
-      String value;
-      switch (mode) {
-        case ThemeMode.light:
-          value = 'light';
-          break;
-        case ThemeMode.dark:
-          value = 'dark';
-          break;
-        case ThemeMode.system:
-          value = 'system';
-          break;
-      }
-      await prefs.setString(_storageKey, value);
-    } catch (_) {}
-  }
-
-  Future<void> toggleTheme() async {
-    final next = isDark ? ThemeMode.light : ThemeMode.dark;
-    await setTheme(next);
+      await prefs.setString(_storageKey, switch (mode) {
+        ThemeMode.light => 'light',
+        ThemeMode.dark => 'dark',
+        ThemeMode.system => 'system',
+      });
+    } catch (_) {
+      // Penyimpanan gagal: tema tetap berlaku untuk sesi ini.
+    }
   }
 }

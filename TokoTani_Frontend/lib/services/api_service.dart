@@ -4,14 +4,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import '../models/banner.dart';
+import '../core/config/api_config.dart';
 import '../models/cart_item.dart';
-import '../models/category.dart';
 import '../models/courier.dart';
 import '../models/order.dart';
 import '../models/payment_method.dart';
 import '../models/product.dart';
-import '../core/config/api_config.dart';
 
 /// Empat keadaan layar wajib sesuai ketentuan Rubrik Kriteria 7.
 enum KeadaanMuat { memuat, berhasil, kosong, galat }
@@ -69,9 +67,9 @@ class CartResponse {
 }
 
 class ApiService {
-  static String get baseUrl => ApiConfig.baseUrl;
+  /// Dipanggil saat server menjawab 401 (token tidak berlaku lagi).
+  static void Function()? onUnauthorized;
 
-  static const Duration timeoutDuration = ApiConfig.timeoutDuration;
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   static const String _tokenKey = 'sanctum_token';
   @visibleForTesting
@@ -105,7 +103,7 @@ class ApiService {
   // -------------------------------------------------------------
 
   static Uri _uri(String path, [Map<String, String>? query]) {
-    return Uri.parse('$baseUrl$path').replace(queryParameters: query);
+    return Uri.parse('${ApiConfig.baseUrl}$path').replace(queryParameters: query);
   }
 
   static Map<String, dynamic> _decodeResponse(http.Response response) {
@@ -130,6 +128,8 @@ class ApiService {
     final isSuccessStatus = body['status'] == 'sukses';
     final isHttpSuccess =
         response.statusCode >= 200 && response.statusCode < 300;
+
+    if (response.statusCode == 401) onUnauthorized?.call();
 
     if (!isHttpSuccess || !isSuccessStatus) {
       final code = int.tryParse('${body['code']}') ?? response.statusCode;
@@ -209,12 +209,16 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> currentUser() async {
-    final response = await httpClient
-        .get(_uri('/auth/me'), headers: await _headers())
-        .timeout(timeoutDuration);
-    final body = _decodeResponse(response);
-    final data = _requireMap(_extractData(body), 'profil pelanggan');
-    return _requireMap(data['user'], 'profil pelanggan');
+    try {
+      final response = await httpClient
+          .get(_uri('/auth/me'), headers: await _headers())
+          .timeout(ApiConfig.timeout);
+      final body = _decodeResponse(response);
+      final data = _requireMap(_extractData(body), 'profil pelanggan');
+      return _requireMap(data['user'] ?? data, 'profil pelanggan');
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
   }
 
   static Future<void> logout() async {
@@ -256,8 +260,7 @@ class ApiService {
     if (error is TimeoutException) {
       return const ApiException(
         statusCode: 408,
-        message:
-            'Server tidak membalas dalam batas waktu (10 detik). Silakan coba lagi.',
+        message: 'Server tidak membalas tepat waktu. Silakan coba lagi.',
         errorType: ApiErrorType.timeout,
       );
     }
@@ -288,7 +291,7 @@ class ApiService {
     try {
       final response = await httpClient
           .get(_uri('/keranjang'), headers: await _headers())
-          .timeout(timeoutDuration);
+          .timeout(ApiConfig.timeout);
 
       final body = _decodeResponse(response);
       final data = _extractData(body);
@@ -348,63 +351,47 @@ class ApiService {
   }
 
   // -------------------------------------------------------------
-  // ENDPOINT KELOLA PRODUK (Anggota 5)
+  // ENDPOINT PRODUK
   // -------------------------------------------------------------
 
   /// GET /api/produk
-  /// Mendukung parameter ?kategori= dan ?cari= sesuai spesifikasi Kriteria 2.
-  static Future<List<Product>> getProducts({
-    String? kategori,
-    String? cari,
-  }) async {
+  /// Mengambil seluruh produk. Bila Laravel mengirim respons berhalaman
+  /// (`current_page` / `last_page`), halaman berikutnya diambil otomatis.
+  static Future<List<Product>> getProducts() async {
     try {
-      final queryParams = <String, String>{};
-      if (kategori != null && kategori.isNotEmpty && kategori != 'Semua') {
-        queryParams['kategori'] = kategori;
-      }
-      if (cari != null && cari.trim().isNotEmpty) {
-        queryParams['cari'] = cari.trim();
-      }
+      final products = <Product>[];
+      var page = 1;
+      var lastPage = 1;
+      do {
+        final response = await httpClient
+            .get(
+              _uri('/produk', page > 1 ? {'page': '$page'} : null),
+              headers: await _headers(),
+            )
+            .timeout(ApiConfig.timeout);
+        final body = _decodeResponse(response);
+        final data = _extractData(body);
 
-      final uri = _uri('/produk', queryParams.isEmpty ? null : queryParams);
-      final response = await httpClient
-          .get(uri, headers: await _headers())
-          .timeout(timeoutDuration);
-      final body = _decodeResponse(response);
-      final data = _extractData(body);
-
-      final list = data is Map
-          ? _requireList(data['data'], 'produk')
-          : _requireList(data, 'produk');
-
-      return list
-          .map((e) => Product.fromJson(_requireMap(e, 'produk')))
-          .toList();
+        final List<dynamic> list;
+        if (data is Map) {
+          list = _requireList(data['data'], 'produk');
+          final last = int.tryParse('${data['last_page'] ?? 1}') ?? 1;
+          lastPage = last.clamp(1, _maxProductPages);
+        } else {
+          list = _requireList(data, 'produk');
+        }
+        products.addAll(
+          list.map((e) => Product.fromJson(_requireMap(e, 'produk'))),
+        );
+        page++;
+      } while (page <= lastPage);
+      return products;
     } catch (e) {
       throw _handleNetworkError(e);
     }
   }
 
-  /// POST /api/produk
-  /// Menambah produk pertanian baru. Mengembalikan 422 jika validasi gagal.
-  static Future<void> createProduct(Map<String, dynamic> payload) async {
-    await _send('POST', '/produk', payload);
-  }
-
-  /// PUT /api/produk/{id}
-  /// Memperbarui data produk pertanian. Mengembalikan 404 bila tidak ada, 422 bila validasi gagal.
-  static Future<void> updateProduct(
-    int id,
-    Map<String, dynamic> payload,
-  ) async {
-    await _send('PUT', '/produk/$id', payload);
-  }
-
-  /// DELETE /api/produk/{id}
-  /// Menghapus produk. Mengembalikan 409 bila produk masih terpakai pada pesanan aktif.
-  static Future<void> deleteProduct(int id) async {
-    await _send('DELETE', '/produk/$id');
-  }
+  static const int _maxProductPages = 20;
 
   // -------------------------------------------------------------
   // ENDPOINT CHECKOUT & PENGIRIMAN
@@ -415,7 +402,7 @@ class ApiService {
     try {
       final response = await httpClient
           .get(_uri('/kurir'), headers: await _headers())
-          .timeout(timeoutDuration);
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'kurir');
@@ -432,7 +419,7 @@ class ApiService {
     try {
       final response = await httpClient
           .get(_uri('/metode-pembayaran'), headers: await _headers())
-          .timeout(timeoutDuration);
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'metode pembayaran');
@@ -451,7 +438,7 @@ class ApiService {
     try {
       final response = await httpClient
           .get(_uri('/produk/$id'), headers: await _headers())
-          .timeout(timeoutDuration);
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       return Product.fromJson(_requireMap(data, 'produk'));
@@ -461,30 +448,24 @@ class ApiService {
   }
 
   /// GET /api/kategori
-  static Future<List<CategoryModel>> getCategories() async {
+  static Future<List<String>> getCategories() async {
     try {
       final response = await httpClient
           .get(_uri('/kategori'), headers: await _headers())
-          .timeout(timeoutDuration);
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'kategori');
-      return list.map((e) => CategoryModel.fromJson(_requireMap(e, 'kategori'))).toList();
-    } catch (e) {
-      throw _handleNetworkError(e);
-    }
-  }
-
-  /// GET /api/banners
-  static Future<List<BannerModel>> getBanners() async {
-    try {
-      final response = await httpClient
-          .get(_uri('/banners'), headers: await _headers())
-          .timeout(timeoutDuration);
-      final body = _decodeResponse(response);
-      final data = _extractData(body);
-      final list = _requireList(data, 'banner');
-      return list.map((e) => BannerModel.fromJson(_requireMap(e, 'banner'))).toList();
+      final names = <String>[];
+      for (final item in list) {
+        final name = item is Map
+            ? (item['nama'] ?? item['name'] ?? item['kategori'])?.toString()
+            : item?.toString();
+        if (name != null && name.trim().isNotEmpty && !names.contains(name)) {
+          names.add(name);
+        }
+      }
+      return names;
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -500,7 +481,13 @@ class ApiService {
         ? {'X-Kunci-Idempoten': idempotencyKey}
         : null;
     try {
-      final res = await _send('POST', '/checkout', payload, extra);
+      final res = await _send(
+        'POST',
+        '/checkout',
+        payload,
+        extra,
+        ApiConfig.checkoutTimeout,
+      );
       return res;
     } catch (e) {
       throw _handleNetworkError(e);
@@ -512,7 +499,7 @@ class ApiService {
     try {
       final response = await httpClient
           .get(_uri('/pesanan'), headers: await _headers())
-          .timeout(timeoutDuration);
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'pesanan');
@@ -529,7 +516,7 @@ class ApiService {
     try {
       final response = await httpClient
           .get(_uri('/pesanan/$id'), headers: await _headers())
-          .timeout(timeoutDuration);
+          .timeout(ApiConfig.timeout);
       final body = _decodeResponse(response);
       final data = _extractData(body);
       return OrderModel.fromJson(_requireMap(data, 'pesanan'));
@@ -551,17 +538,6 @@ class ApiService {
     }
   }
 
-  /// POST /api/pesanan/{id}/selesai
-  static Future<OrderModel> completeOrder(int id) async {
-    try {
-      final res = await _send('POST', '/pesanan/$id/selesai');
-      final data = _extractData(res);
-      return OrderModel.fromJson(_requireMap(data, 'pesanan'));
-    } catch (e) {
-      throw _handleNetworkError(e);
-    }
-  }
-
   /// POST /api/pesanan/{id}/pembayaran
   /// Meminta backend mengonfirmasi pembayaran pesanan.
   static Future<OrderModel> confirmPayment(int id, int paymentMethodId) async {
@@ -570,7 +546,14 @@ class ApiService {
         'payment_method_id': paymentMethodId,
       });
       final data = _extractData(response);
-      return OrderModel.fromJson(_requireMap(data, 'pesanan'));
+      if (data is! Map) {
+        throw const ApiException(
+          statusCode: 500,
+          message: 'Respons konfirmasi pembayaran tidak valid.',
+          errorType: ApiErrorType.other,
+        );
+      }
+      return OrderModel.fromJson(Map<String, dynamic>.from(data));
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -585,7 +568,9 @@ class ApiService {
     String path, [
     Map<String, dynamic>? payload,
     Map<String, String>? extraHeaders,
+    Duration? timeout,
   ]) async {
+    final limit = timeout ?? ApiConfig.timeout;
     try {
       late http.Response response;
       final uri = _uri(path);
@@ -596,22 +581,22 @@ class ApiService {
         case 'POST':
           response = await httpClient
               .post(uri, headers: reqHeaders, body: body)
-              .timeout(timeoutDuration);
+              .timeout(limit);
           break;
         case 'PUT':
           response = await httpClient
               .put(uri, headers: reqHeaders, body: body)
-              .timeout(timeoutDuration);
+              .timeout(limit);
           break;
         case 'PATCH':
           response = await httpClient
               .patch(uri, headers: reqHeaders, body: body)
-              .timeout(timeoutDuration);
+              .timeout(limit);
           break;
         case 'DELETE':
           response = await httpClient
               .delete(uri, headers: reqHeaders)
-              .timeout(timeoutDuration);
+              .timeout(limit);
           break;
         default:
           throw const ApiException(

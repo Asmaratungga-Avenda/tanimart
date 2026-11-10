@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Models\Category;
+use App\Models\ProductImage;
+use App\Models\OrderItem;
+use App\Models\Cart;
 
 class Product extends Model
 {

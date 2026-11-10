@@ -1,34 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../core/widgets/product_image.dart';
+
+import '../core/theme/app_palette.dart';
+import '../core/utils/cart_actions.dart';
+import '../core/utils/ui.dart';
 import '../models/product.dart';
+import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../providers/product_provider.dart';
+import '../widgets/app_logo.dart';
+import '../widgets/app_search_field.dart';
+import '../widgets/product_card.dart';
+import '../widgets/section_header.dart';
+import '../widgets/state_views.dart';
 import 'product_detail_page.dart';
 
-/// Beranda baru TaniMart: editorial fresh-market, ringkas, dan berbasis data API.
+/// Beranda: sapaan, pencarian, kategori, banner, dan produk dari API.
 class HomePage extends StatefulWidget {
-  final VoidCallback? onGoToCart;
-  final VoidCallback? onGoToProducts;
-  const HomePage({super.key, this.onGoToCart, this.onGoToProducts});
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final _search = TextEditingController();
+  final TextEditingController _search = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final provider = context.read<ProductProvider>();
-        provider.loadProducts();
-        provider.loadBanners();
-        provider.loadCategories();
-      }
+      if (mounted) context.read<ProductProvider>().ensureLoaded();
     });
   }
 
@@ -38,468 +41,338 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  void _open(Product product) => Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ProductDetailPage(productId: product.id, initialProduct: product),
-    ),
-  );
-
-  Future<void> _add(Product product) async {
-    if (!product.tersedia || product.stok < 1) {
-      _message('Produk sedang tidak tersedia.');
-      return;
-    }
-    final ok = await context.read<CartProvider>().addItem(product.id, 1);
-    if (!mounted) return;
-    if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${product.nama} ditambahkan ke keranjang'),
-          behavior: SnackBarBehavior.floating,
-          action: SnackBarAction(
-            label: 'LIHAT',
-            onPressed: widget.onGoToCart ?? () {},
-          ),
-        ),
-      );
-    } else {
-      _message(context.read<CartProvider>().errorMessage ?? 'Produk gagal ditambahkan.');
-    }
+  void _openCatalog({String? category, String query = ''}) {
+    context.read<ProductProvider>().setFilter(category: category, query: query);
+    context.read<NavigationProvider>().select(AppTab.products);
   }
 
-  void _message(String value) => ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(value), behavior: SnackBarBehavior.floating));
+  Future<void> _refresh() async {
+    final cart = context.read<CartProvider>();
+    final error = await context.read<ProductProvider>().load();
+    cart.loadIfStale();
+    if (error != null && mounted) showAppSnack(context, error, error: true);
+  }
+
+  void _open(Product product) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProductDetailPage(
+          productId: product.id,
+          initialProduct: product,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final productProvider = context.watch<ProductProvider>();
-    final products = productProvider.products;
-    final popularProducts = products.take(5).toList();
+    final products = context.select<ProductProvider, List<Product>>((p) => p.all);
+    final categories = context.select<ProductProvider, List<String>>(
+      (p) => p.categories,
+    );
+    final isLoading = context.select<ProductProvider, bool>((p) => p.isLoading);
+    final hasLoaded = context.select<ProductProvider, bool>((p) => p.hasLoaded);
+    final error = context.select<ProductProvider, String?>((p) => p.errorMessage);
+    final firstName = context.select<AuthProvider, String>((a) => a.firstName);
+    final cart = context.watch<CartProvider>();
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+
+    final latest = products.where((e) => e.isAvailable).toList()
+      ..sort((a, b) => b.id.compareTo(a.id));
+    final latestRow = latest.take(6).toList();
+    final gridProducts = products.take(8).toList();
+
+    Widget content;
+    if (products.isEmpty && isLoading) {
+      content = const SliverFillRemaining(
+        hasScrollBody: false,
+        child: LoadingView(),
+      );
+    } else if (products.isEmpty && error != null) {
+      content = SliverFillRemaining(
+        hasScrollBody: false,
+        child: ErrorView(
+          message: error,
+          scrollable: false,
+          onRetry: () => context.read<ProductProvider>().load(),
+        ),
+      );
+    } else if (products.isEmpty && hasLoaded) {
+      content = const SliverFillRemaining(
+        hasScrollBody: false,
+        child: EmptyView(
+          icon: Icons.storefront_outlined,
+          title: 'Belum ada produk',
+          message: 'Produk akan tampil di sini setelah ditambahkan oleh toko.',
+          scrollable: false,
+        ),
+      );
+    } else {
+      content = SliverMainAxisGroup(
+        slivers: [
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              title: 'Produk Terbaru',
+              onAction: () => _openCatalog(),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: ProductCard.extentFor(158, scale),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: latestRow.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final product = latestRow[index];
+                  return SizedBox(
+                    width: 158,
+                    child: ProductCard(
+                      key: ValueKey<int>(product.id),
+                      product: product,
+                      adding: cart.isAdding(product.id),
+                      onTap: () => _open(product),
+                      onAdd: () => addProductToCart(context, product),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              title: 'Semua Produk',
+              onAction: () => _openCatalog(),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            sliver: SliverProductGrid(
+              products: gridProducts,
+              onOpen: _open,
+              onAdd: (product) => addProductToCart(context, product),
+              isAdding: cart.isAdding,
+            ),
+          ),
+        ],
+      );
+    }
 
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: RefreshIndicator(
-          onRefresh: productProvider.refresh,
+          onRefresh: _refresh,
           child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // Header & Search
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Image.asset(
-                            'assets/images/logo/agrimart_logo.png',
-                            height: 32,
-                            errorBuilder: (_, __, ___) => Row(
-                              children: [
-                                Icon(Icons.eco, color: colors.primary, size: 28),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'TaniMart',
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colors.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.notifications_none_rounded),
-                            style: IconButton.styleFrom(
-                              backgroundColor: colors.surface,
-                              side: BorderSide(color: colors.outlineVariant),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+                      const AppLogo(size: 34),
+                      const SizedBox(height: 16),
                       Text(
-                        'Halo, Pelanggan 👋',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: colors.onSurfaceVariant,
+                        'Halo, $firstName',
+                        style: text.bodyMedium?.copyWith(
+                          color: p.textSecondary,
                         ),
                       ),
-                      Text(
-                        'Belanja Segar\nuntuk Keluarga',
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          height: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      TextField(
+                      Text('Belanja Segar\nuntuk Keluarga', style: text.headlineSmall),
+                      const SizedBox(height: 14),
+                      AppSearchField(
                         controller: _search,
-                        onSubmitted: (_) => widget.onGoToProducts?.call(),
-                        decoration: InputDecoration(
-                          hintText: 'Cari produk di TaniMart...',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          fillColor: colors.surface,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: colors.outlineVariant),
-                          ),
-                        ),
+                        hint: 'Cari produk di TaniMart...',
+                        onSubmitted: (value) =>
+                            _openCatalog(query: value.trim()),
                       ),
+                      const SizedBox(height: 16),
+                      _PromoBanner(onTap: () => _openCatalog()),
                     ],
                   ),
                 ),
               ),
-
-              // Banner
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: productProvider.banners.isEmpty
-                      ? Container(
-                          height: 160,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            image: const DecorationImage(
-                              image: AssetImage('assets/images/banners/banner_promo.jpg'),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  Colors.black.withValues(alpha: 0.6),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  'Diskon Spesial\nProduk Pertanian\nhingga 50%',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                ElevatedButton(
-                                  onPressed: widget.onGoToProducts,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: colors.primary,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                  ),
-                                  child: const Text('Belanja Sekarang →', style: TextStyle(fontSize: 12)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : SizedBox(
-                          height: 160,
-                          child: PageView.builder(
-                            itemCount: productProvider.banners.length,
-                            itemBuilder: (context, index) {
-                              final banner = productProvider.banners[index];
-                              return Container(
-                                margin: const EdgeInsets.only(right: 0),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: Stack(
-                                    children: [
-                                      Positioned.fill(
-                                        child: ProductImage(
-                                          imageUrl: banner.url,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.all(20),
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.centerLeft,
-                                            end: Alignment.centerRight,
-                                            colors: [
-                                              Colors.black.withValues(alpha: 0.6),
-                                              Colors.transparent,
-                                            ],
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              banner.judul,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            if (banner.link != null) ...[
-                                              const SizedBox(height: 12),
-                                              ElevatedButton(
-                                                onPressed: widget.onGoToProducts,
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: colors.primary,
-                                                  foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                                  minimumSize: Size.zero,
-                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(20),
-                                                  ),
-                                                ),
-                                                child: const Text('Lihat Detail →', style: TextStyle(fontSize: 12)),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+              if (categories.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: SizedBox(
+                      height: 92 * scale.clamp(1.0, 1.2),
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: categories.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 14),
+                        itemBuilder: (context, index) => _CategoryItem(
+                          name: categories[index],
+                          onTap: () => _openCatalog(category: categories[index]),
                         ),
-                ),
-              ),
-
-              // Categories
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: productProvider.categories.isEmpty
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _categoryItem(context, 'Sayur', null),
-                            _categoryItem(context, 'Buah', null),
-                            _categoryItem(context, 'Pangan', null),
-                            _categoryItem(context, 'Lainnya', null),
-                          ],
-                        )
-                      : SizedBox(
-                          height: 90,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: productProvider.categories.length,
-                            itemBuilder: (context, index) {
-                              final category = productProvider.categories[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 20),
-                                child: _categoryItem(context, category.nama, category.gambarUrl),
-                              );
-                            },
-                          ),
-                        ),
-                ),
-              ),
-
-              // Popular Products Header
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Produk Terlaris',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                      TextButton(
-                        onPressed: widget.onGoToProducts,
-                        child: const Text('Lihat Semua >'),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-
-              // Popular Products List
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 220,
-                  child: productProvider.isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: popularProducts.length,
-                          itemBuilder: (context, index) {
-                            final product = popularProducts[index];
-                            return _PopularProductCard(
-                              product: product,
-                              onTap: () => _open(product),
-                              onAdd: () => _add(product),
-                            );
-                          },
-                        ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              content,
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _categoryItem(BuildContext context, String label, String? imageUrl) {
-    final colors = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: () {
-        context.read<ProductProvider>().loadProducts(kategori: label);
-        widget.onGoToProducts?.call();
-      },
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: colors.outlineVariant),
+class _PromoBanner extends StatelessWidget {
+  const _PromoBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final text = Theme.of(context).textTheme;
+    return Material(
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [p.brand, BrandColors.deep],
             ),
-            child: imageUrl != null && imageUrl.isNotEmpty
-                ? ProductImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.contain,
-                    width: 40,
-                    height: 40,
-                  )
-                : Icon(Icons.category, color: colors.primary),
           ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-        ],
+          child: Stack(
+            children: [
+              Positioned(
+                right: -24,
+                top: -24,
+                child: Icon(
+                  Icons.eco_rounded,
+                  size: 140,
+                  color: p.onBrand.withValues(alpha: 0.14),
+                ),
+              ),
+              Positioned(
+                right: 18,
+                bottom: 14,
+                child: Icon(
+                  Icons.shopping_basket_rounded,
+                  size: 54,
+                  color: p.onBrand.withValues(alpha: 0.9),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Segar dari Petani\nLangsung ke Rumah',
+                      style: text.titleLarge?.copyWith(color: p.onBrand),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Sayur, buah, dan kebutuhan harian',
+                      style: text.bodySmall?.copyWith(
+                        color: p.onBrand.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: p.onBrand,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Belanja Sekarang',
+                            style: text.labelMedium?.copyWith(
+                              color: BrandColors.deep,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 14,
+                            color: BrandColors.deep,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _PopularProductCard extends StatelessWidget {
-  final Product product;
-  final VoidCallback onTap;
-  final VoidCallback onAdd;
+class _CategoryItem extends StatelessWidget {
+  const _CategoryItem({required this.name, required this.onTap});
 
-  const _PopularProductCard({
-    required this.product,
-    required this.onTap,
-    required this.onAdd,
-  });
+  final String name;
+  final VoidCallback onTap;
+
+  static IconData iconFor(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('sayur')) return Icons.eco_rounded;
+    if (n.contains('buah')) return Icons.local_florist_rounded;
+    if (n.contains('bibit') || n.contains('benih')) return Icons.spa_rounded;
+    if (n.contains('pupuk')) return Icons.grass_rounded;
+    if (n.contains('alat')) return Icons.agriculture_rounded;
+    if (n.contains('pangan') || n.contains('sembako') || n.contains('harian')) {
+      return Icons.rice_bowl_rounded;
+    }
+    return Icons.category_rounded;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return Container(
-      width: 150,
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    final p = context.palette;
+    return SizedBox(
+      width: 66,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: ProductImage(
-                  imageUrl: product.foto,
-                  productName: product.nama,
-                  category: product.kategori,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                ),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: p.brandSoft,
+                shape: BoxShape.circle,
+                border: Border.all(color: p.border),
               ),
+              child: Icon(iconFor(name), color: p.brandText, size: 26),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.nama,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Rp ${_rupiah(product.harga)}',
-                          style: TextStyle(
-                            color: colors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: onAdd,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: colors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.add, color: Colors.white, size: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
         ),
       ),
     );
   }
-
-  String _rupiah(int value) => value.toString().replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+(?!\d))'),
-        (_) => '.',
-      );
 }
