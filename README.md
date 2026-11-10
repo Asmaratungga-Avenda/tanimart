@@ -269,3 +269,16 @@ flutter run
 Tautan video demonstrasi (maksimal lima menit): **[isi tautan video]**. Demonstrasikan menjalankan backend dan Flutter, registrasi/login, katalog, keranjang, checkout, riwayat pesanan, satu skenario galat, dan panel admin.
 
 Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB).
+
+
+## Kontribusi
+
+Pengembangan TaniMart dilakukan secara kolaboratif. Setiap anggota tim dapat berkontribusi dengan cara:
+
+1. Memeriksa kode program sebelum melakukan perubahan.
+2. Memperbaiki bug yang ditemukan.
+3. Menambahkan atau meningkatkan fitur aplikasi.
+4. Melakukan pengujian setelah perubahan.
+5. Mengirimkan perubahan melalui Git commit dan pull request.
+
+Gunakan pesan commit yang jelas agar setiap perubahan mudah dipahami dan ditelusuri.
