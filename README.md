@@ -266,6 +266,20 @@ flutter run
 
 ## Demonstrasi dan Lisensi
 
-Tautan video demonstrasi (maksimal lima menit): **[isi tautan video]**. Demonstrasikan menjalankan backend dan Flutter, registrasi/login, katalog, keranjang, checkout, riwayat pesanan, satu skenario galat, dan panel admin.
+Tautan video demonstrasi (maksimal lima menit): 
+Demonstrasikan menjalankan backend dan Flutter, registrasi/login, katalog, keranjang, checkout, riwayat pesanan, satu skenario galat, dan panel admin.
 
-Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB).
+Proyek Ini Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB Dan SisTer).
+
+
+## 👥 Anggota Kelompok
+
+| No | Nama Lengkap | NIM |
+| :---: | :--- | :---: |
+| 1 | **Yudhistira Empi** | 24102023 |
+| 2 | Asmaratungga Avenda D.P. | 24102006 |
+| 3 | Eka Yuvita Sari Widya Diningrum | 24102008 |
+| 4 | Hikmah Nutriana | 24102011 |
+| 5 | M. Adzahahabi Putra Darmawan | 24102013 |
+| 6 | Moh Farhan Ali | 24102016 |
+| 7 | Vera Adelia | 24102032 |
