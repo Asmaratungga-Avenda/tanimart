@@ -42,7 +42,12 @@ class CartItem {
       stok: int.tryParse('${produk['stok'] ?? json['stok'] ?? 0}') ?? 0,
       satuanJual: '${produk['satuan_jual'] ?? json['satuan_jual'] ?? 'kg'}',
       mudahRusak: isMudahRusak,
-      foto: produk['foto']?.toString() ?? json['foto']?.toString(),
+      foto: produk['gambar_url']?.toString() ??
+          produk['image_url']?.toString() ??
+          produk['foto']?.toString() ??
+          produk['image']?.toString() ??
+          produk['gambar']?.toString() ??
+          json['foto']?.toString(),
     );
   }
 

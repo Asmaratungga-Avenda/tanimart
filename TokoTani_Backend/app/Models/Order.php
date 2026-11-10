@@ -8,6 +8,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Order extends Model
 {
+    protected $appends = [
+        'nomor_pesanan',
+    ];
+
+    public function getNomorPesananAttribute(): string
+    {
+        return '#TRX' . str_pad($this->id, 10, '0', STR_PAD_LEFT);
+    }
+
     protected $fillable = [
         'customer_id',
         'pelanggan_id',

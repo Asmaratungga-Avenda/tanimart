@@ -21,10 +21,10 @@ class ProductsTable
         return $table
             ->columns([
                 ImageColumn::make('gambar')
-                    ->label('Thumbnail')
+                    ->label('Foto')
                     ->disk('public')
-                    ->height(44)
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->square()
+                    ->size(48),
                 TextColumn::make('id')->sortable(),
                 TextColumn::make('nama')
                     ->label('Nama Produk')

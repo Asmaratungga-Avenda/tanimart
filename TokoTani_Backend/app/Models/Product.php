@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HandleImageStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,9 +12,9 @@ use Illuminate\Support\Str;
 
 class Product extends Model
 {
-    use HasFactory;
+    use HasFactory, HandleImageStorage;
 
-    protected $appends = ['gambar_url'];
+    protected $appends = ['gambar_url', 'image_url'];
 
     // Melindungi kolom id agar tidak bisa diisi sembarang, sisanya mass-assignable
     protected $guarded = ['id'];
@@ -44,6 +45,10 @@ class Product extends Model
                 }
             }
         });
+
+        static::deleted(function (Product $product) {
+            $product->deleteImage($product->gambar);
+        });
     }
 
     public function getGambarUrlAttribute(): ?string
@@ -57,6 +62,11 @@ class Product extends Model
         }
 
         return Storage::disk('public')->url($this->gambar);
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->getGambarUrlAttribute();
     }
 
     public function category(): BelongsTo

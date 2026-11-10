@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HandleImageStorage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Category extends Model
 {
+    use HandleImageStorage;
+
     protected $appends = ['gambar_url'];
 
     protected $fillable = [
@@ -15,17 +18,16 @@ class Category extends Model
         'gambar',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleted(function (Category $category) {
+            $category->deleteImage($category->gambar);
+        });
+    }
+
     public function getGambarUrlAttribute(): ?string
     {
-        if (! $this->gambar) {
-            return null;
-        }
-
-        if (Str::startsWith($this->gambar, ['http://', 'https://'])) {
-            return $this->gambar;
-        }
-
-        return Storage::disk('public')->url($this->gambar);
+        return $this->getFullImageUrl($this->gambar);
     }
 }
 

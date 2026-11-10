@@ -23,9 +23,6 @@ class ProductForm
                     ->directory('products')
                     ->visibility('public')
                     ->imagePreviewHeight(250)
-                    ->imageResizeTargetWidth(1200)
-                    ->imageResizeTargetHeight(1200)
-                    ->imageResizeMode('contain')
                     ->maxSize(10240)
                     ->columnSpanFull(),
                 TextInput::make('nama')

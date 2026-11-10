@@ -21,9 +21,9 @@ class PaymentMethodResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCreditCard;
 
-    protected static string|UnitEnum|null $navigationGroup = null;
+    protected static string|UnitEnum|null $navigationGroup = 'Pengaturan';
 
-    protected static ?int $navigationSort = null;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'nama';
 

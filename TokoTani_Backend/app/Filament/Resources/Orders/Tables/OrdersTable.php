@@ -49,6 +49,8 @@ class OrdersTable
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
                         'menunggu_pembayaran' => 'Menunggu Pembayaran',
+                        'menunggu_konfirmasi' => 'Menunggu Konfirmasi',
+                        'dibayar' => 'Dibayar',
                         'diproses' => 'Diproses',
                         'dikirim' => 'Dikirim',
                         'tiba' => 'Tiba',
@@ -57,8 +59,8 @@ class OrdersTable
                         default => ucfirst((string) $state),
                     })
                     ->color(fn (?string $state): string => match ($state) {
-                        'menunggu_pembayaran' => 'warning',
-                        'diproses' => 'info',
+                        'menunggu_pembayaran', 'menunggu_konfirmasi' => 'warning',
+                        'dibayar', 'diproses' => 'info',
                         'dikirim' => 'primary',
                         'tiba' => 'warning',
                         'selesai' => 'success',
@@ -90,6 +92,8 @@ class OrdersTable
                     ->label('Status Pesanan')
                     ->options([
                         'menunggu_pembayaran' => 'Menunggu Pembayaran',
+                        'menunggu_konfirmasi' => 'Menunggu Konfirmasi',
+                        'dibayar' => 'Dibayar',
                         'diproses' => 'Diproses',
                         'dikirim' => 'Dikirim',
                         'tiba' => 'Tiba',
@@ -109,47 +113,31 @@ class OrdersTable
                     ->icon('heroicon-o-eye')
                     ->color('gray'),
 
+                Action::make('prosesPesanan')
+                    ->label('Proses Pesanan')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('info')
+                    ->visible(fn (Order $record): bool => $record->status === 'dibayar')
+                    ->requiresConfirmation()
+                    ->modalHeading('Proses Pesanan')
+                    ->modalDescription('Apakah Anda yakin ingin mulai memproses pesanan ini?')
+                    ->action(function (Order $record) {
+                        $record->update(['status' => 'diproses']);
+                        Notification::make()->title('Pesanan Diproses')->success()->send();
+                    }),
+
                 Action::make('kirimPesanan')
                     ->label('Kirim Pesanan')
                     ->icon('heroicon-o-truck')
                     ->color('success')
                     ->visible(fn (Order $record): bool => $record->status === 'diproses')
-                    ->disabled(fn (Order $record): bool => ! in_array($record->payment_status, ['paid', 'lunas']))
-                    ->requiresConfirmation(fn (Order $record): bool => $record->status === 'diproses')
+                    ->requiresConfirmation()
                     ->modalHeading('Kirim Pesanan')
-                    ->modalDescription('Apakah Anda yakin ingin memproses dan mengirim pesanan ini sekarang? Pesanan yang belum lunas tidak dapat dikirim.')
+                    ->modalDescription('Apakah Anda yakin ingin mengirim pesanan ini?')
                     ->action(function (Order $record) {
-                        if ($record->status !== 'diproses') {
-                            Notification::make()
-                                ->title('Pesanan tidak dalam status diproses.')
-                                ->danger()
-                                ->send();
-
-                            return;
-                        }
-
-                        if (! in_array($record->payment_status, ['paid', 'lunas'])) {
-                            Notification::make()
-                                ->title('Pesanan belum lunas / dibayar.')
-                                ->danger()
-                                ->send();
-
-                            return;
-                        }
-
-                        if ($record->dikirim_at !== null && $record->status === 'dikirim') {
-                            Notification::make()
-                                ->title('Pesanan ini sudah pernah dikirim.')
-                                ->warning()
-                                ->send();
-
-                            return;
-                        }
-
                         $record->update([
                             'status' => 'dikirim',
                             'dikirim_at' => now(),
-                            'tiba_at' => null,
                         ]);
 
                         $seconds = (int) config('delivery.seconds', 5);
@@ -158,8 +146,8 @@ class OrdersTable
                         }
 
                         Notification::make()
-                            ->title('Pesanan Berhasil Dikirim')
-                            ->body("Pesanan #{$record->id} berhasil dikirim ke {$record->nama_penerima}. Status akan berubah menjadi tiba dalam {$seconds} detik.")
+                            ->title('Pesanan Dikirim')
+                            ->body("Status akan berubah menjadi 'tiba' dalam {$seconds} detik.")
                             ->success()
                             ->send();
                     }),

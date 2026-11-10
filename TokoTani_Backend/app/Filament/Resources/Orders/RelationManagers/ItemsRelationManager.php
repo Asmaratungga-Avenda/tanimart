@@ -32,8 +32,8 @@ class ItemsRelationManager extends RelationManager
                 ImageColumn::make('product.gambar')
                     ->label('Foto')
                     ->disk('public')
-                    ->circular()
-                    ->defaultImageUrl(url('/storage/products/default.jpg')),
+                    ->square()
+                    ->size(48),
                 TextColumn::make('product.nama')
                     ->label('Nama Produk')
                     ->searchable()

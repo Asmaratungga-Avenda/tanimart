@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HandleImageStorage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Banner extends Model
 {
+    use HandleImageStorage;
+
     protected $appends = ['url'];
 
     protected $fillable = [
@@ -26,13 +29,16 @@ class Banner extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::deleted(function (Banner $banner) {
+            $banner->deleteImage($banner->gambar);
+        });
+    }
+
     public function getUrlAttribute(): string
     {
-        if (Str::startsWith($this->gambar, ['http://', 'https://'])) {
-            return $this->gambar;
-        }
-
-        return Storage::disk('public')->url($this->gambar);
+        return $this->getFullImageUrl($this->gambar) ?? '';
     }
 
     public function scopeAktif($query)

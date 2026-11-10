@@ -19,6 +19,8 @@ class OrderModel {
   final String? idempotencyKey;
   final List<OrderItemModel> items;
 
+  String get nomorPesanan => '#TRX${id.toString().padLeft(10, '0')}';
+
   const OrderModel({
     required this.id,
     required this.namaPenerima,
@@ -125,6 +127,8 @@ class OrderItemModel {
   final String? fotoProduk;
   final Product? product;
 
+  int get jumlah => quantity;
+
   const OrderItemModel({
     required this.id,
     required this.orderId,
@@ -150,10 +154,16 @@ class OrderItemModel {
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     final produk = json['product'] ?? json['produk'];
-    final namaProduk = produk is Map
+    final namaProduk = json['nama_produk'] ?? (produk is Map
         ? '${produk['nama'] ?? json['nama'] ?? 'Produk'}'
-        : '${json['nama'] ?? 'Produk'}';
-    final foto = produk is Map ? produk['foto']?.toString() : null;
+        : '${json['nama'] ?? 'Produk'}');
+    final foto = produk is Map
+        ? (produk['gambar_url']?.toString() ??
+            produk['image_url']?.toString() ??
+            produk['foto']?.toString() ??
+            produk['image']?.toString() ??
+            produk['gambar']?.toString())
+        : null;
 
     return OrderItemModel(
       id: int.tryParse('${json['id']}') ?? 0,

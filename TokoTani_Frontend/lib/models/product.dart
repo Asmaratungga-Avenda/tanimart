@@ -45,7 +45,11 @@ class Product {
       deskripsi: json['deskripsi']?.toString(),
       satuanJual: '${json['satuan_jual'] ?? 'kg'}',
       mudahRusak: isMudahRusak,
-      foto: json['foto']?.toString(),
+      foto: json['gambar_url']?.toString() ?? 
+            json['image_url']?.toString() ?? 
+            json['foto']?.toString() ?? 
+            json['image']?.toString() ?? 
+            json['gambar']?.toString(),
     );
   }
 

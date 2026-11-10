@@ -1,508 +1,222 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../core/theme/app_theme.dart';
-import '../core/theme/theme_extension.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
-import '../services/notification_service.dart';
-import 'notifications_page.dart';
 import 'order_history_page.dart';
-import 'product_catalog_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryGreen = AppTheme.getPrimaryGreen(isDark);
-    final lightGreen = AppTheme.getLightGreen(isDark);
-    final textPrimary = AppTheme.getTextPrimaryColor(isDark);
-    final textSecondary = AppTheme.getTextSecondaryColor(isDark);
-    final surfaceColor = AppTheme.getSurfaceColor(isDark);
-    final backgroundColor = AppTheme.getBackgroundColor(isDark);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final auth = context.watch<AuthProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final user = auth.user;
 
     return Scaffold(
-      backgroundColor: backgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildHeader(isDark, primaryGreen),
-            const SizedBox(height: 20),
-            Consumer<AuthProvider>(
-              builder: (context, auth, _) {
-                final user = auth.user;
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: surfaceColor,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.of(context).shadowColor,
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.account_circle_outlined,
-                        color: primaryGreen,
-                        size: 32,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user?['name']?.toString() ?? 'Pelanggan',
-                              style: TextStyle(
-                                color: textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              user?['email']?.toString() ?? '',
-                              style: TextStyle(
-                                color: textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            _buildMenuSection(
-              context,
-              'Akun',
-              textPrimary,
-              textSecondary,
-              surfaceColor,
-              primaryGreen,
-              lightGreen,
-              [
-                _MenuItem(
-                  icon: Icons.logout,
-                  title: 'Keluar',
-                  subtitle: 'Akhiri sesi akun ini',
-                  iconColor: Theme.of(context).colorScheme.error,
-                  onTap: () => _confirmSignOut(context),
+            // Header Section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [colors.primary, colors.secondary],
                 ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Consumer<ThemeProvider>(
-              builder: (context, themeProvider, _) => _buildThemeSection(
-                context,
-                themeProvider,
-                textPrimary,
-                textSecondary,
-                surfaceColor,
-                primaryGreen,
-                lightGreen,
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
               ),
-            ),
-            const SizedBox(height: 14),
-            ValueListenableBuilder<int>(
-              valueListenable: NotificationService.unreadCountNotifier,
-              builder: (context, unread, _) => _buildMenuSection(
-                context,
-                'Notifikasi',
-                textPrimary,
-                textSecondary,
-                surfaceColor,
-                primaryGreen,
-                lightGreen,
-                [
-                  _MenuItem(
-                    icon: Icons.notifications_outlined,
-                    title: 'Notifikasi',
-                    subtitle: unread > 0
-                        ? '$unread notifikasi baru'
-                        : 'Tidak ada notifikasi baru',
-                    iconColor: primaryGreen,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const NotificationsPage(),
-                        ),
-                      );
-                    },
-                    trailing: unread > 0
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.getErrorRed(isDark),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '$unread',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onError,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          )
-                        : null,
+              child: Column(
+                children: [
+                  const CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.person_rounded, size: 60, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    user?['name']?.toString() ?? 'Pelanggan TaniMart',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    user?['email']?.toString() ?? 'pelanggan@email.com',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: const BorderSide(color: Colors.white),
+                      ),
+                    ),
+                    child: const Text('Ubah Profil'),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
-            _buildMenuSection(
-              context,
-              'Transaksi',
-              textPrimary,
-              textSecondary,
-              surfaceColor,
-              primaryGreen,
-              lightGreen,
-              [
-                _MenuItem(
-                  icon: Icons.shopping_bag_outlined,
-                  title: 'Riwayat Pesanan',
-                  subtitle: 'Lihat semua pesanan',
-                  iconColor: primaryGreen,
-                  onTap: () => Navigator.push(
+
+            // Menu Section
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _menuItem(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => OrderHistoryPage(
-                        showBackButton: true,
-                        onGoToCatalog: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ProductCatalogPage(),
-                          ),
-                        ),
-                      ),
+                    icon: Icons.receipt_long_rounded,
+                    title: 'Pesanan Saya',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const OrderHistoryPage(showBackButton: true)),
                     ),
                   ),
-                ),
-              ],
+                  _menuItem(
+                    context,
+                    icon: Icons.location_on_rounded,
+                    title: 'Alamat Saya',
+                    onTap: () {},
+                  ),
+                  _menuItem(
+                    context,
+                    icon: Icons.account_balance_wallet_rounded,
+                    title: 'Metode Pembayaran',
+                    onTap: () {},
+                  ),
+                  const Divider(height: 32),
+                  _menuItem(
+                    context,
+                    icon: Icons.settings_rounded,
+                    title: 'Pengaturan Aplikasi',
+                    onTap: () => _showThemePicker(context, themeProvider),
+                  ),
+                  _menuItem(
+                    context,
+                    icon: Icons.help_outline_rounded,
+                    title: 'Bantuan & FAQ',
+                    onTap: () {},
+                  ),
+                  _menuItem(
+                    context,
+                    icon: Icons.info_outline_rounded,
+                    title: 'Tentang TaniMart',
+                    onTap: () {},
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () => _confirmSignOut(context, auth),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Keluar'),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 100),
           ],
         ),
       ),
     );
   }
 
-  Future<void> _confirmSignOut(BuildContext context) async {
+  Widget _menuItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: Icon(icon, color: colors.primary),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
+  void _showThemePicker(BuildContext context, ThemeProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Pengaturan Tema', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.light_mode_outlined),
+              title: const Text('Terang'),
+              trailing: provider.mode == ThemeMode.light ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () {
+                provider.setTheme(ThemeMode.light);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.dark_mode_outlined),
+              title: const Text('Gelap'),
+              trailing: provider.mode == ThemeMode.dark ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () {
+                provider.setTheme(ThemeMode.dark);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_brightness_outlined),
+              title: const Text('Ikuti Sistem'),
+              trailing: provider.mode == ThemeMode.system ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () {
+                provider.setTheme(ThemeMode.system);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmSignOut(BuildContext context, AuthProvider auth) async {
     final shouldSignOut = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Keluar dari akun?'),
-        content: const Text(
-          'Anda perlu masuk kembali untuk melihat keranjang dan pesanan.',
-        ),
+        title: const Text('Keluar?'),
+        content: const Text('Apakah Anda yakin ingin keluar dari akun?'),
         actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Keluar'),
+            child: const Text('Keluar', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-    if (shouldSignOut != true || !context.mounted) return;
 
-    final revoked = await context.read<AuthProvider>().signOut();
-    if (!context.mounted || revoked) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Sesi di perangkat ini telah ditutup, tetapi token server belum dapat dicabut.',
-        ),
-      ),
-    );
+    if (shouldSignOut == true) {
+      await auth.signOut();
+    }
   }
-
-  Widget _buildHeader(bool isDark, Color primaryGreen) {
-    final foreground = isDark
-        ? AppTheme.darkTextPrimary
-        : AppTheme.lightSurface;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDark
-              ? [AppTheme.darkBackground, AppTheme.darkSurface]
-              : [primaryGreen, AppTheme.lightSecondaryGreen],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
-      child: Column(
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: foreground.withValues(alpha: 0.18),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: foreground.withValues(alpha: 0.45),
-                width: 2,
-              ),
-            ),
-            child: Icon(Icons.eco_rounded, color: foreground, size: 38),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Profil & Pengaturan',
-            style: GoogleFonts.poppins(
-              color: foreground,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Preferensi dan aktivitas Tani Mart',
-            style: GoogleFonts.poppins(
-              color: foreground.withValues(alpha: 0.85),
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildThemeSection(
-    BuildContext context,
-    ThemeProvider themeProvider,
-    Color textPrimary,
-    Color textSecondary,
-    Color surfaceColor,
-    Color primaryGreen,
-    Color lightGreen,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(
-              'Pengaturan Tampilan',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: textSecondary,
-              ),
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: surfaceColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.of(context).shadowColor,
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: lightGreen,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        themeProvider.isDark
-                            ? Icons.dark_mode_outlined
-                            : Icons.light_mode_outlined,
-                        color: primaryGreen,
-                        size: 18,
-                      ),
-                    ),
-                    title: Text(
-                      themeProvider.isDark ? 'Mode Gelap' : 'Mode Terang',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w500,
-                        color: textPrimary,
-                      ),
-                    ),
-                    subtitle: Text(
-                      themeProvider.isDark
-                          ? 'Tampilan gelap untuk kenyamanan malam hari'
-                          : 'Tampilan terang untuk kenyamanan siang hari',
-                      style: GoogleFonts.poppins(
-                        fontSize: 11.5,
-                        color: textSecondary,
-                      ),
-                    ),
-                    trailing: Switch(
-                      value: themeProvider.isDark,
-                      activeThumbColor: primaryGreen,
-                      onChanged: (_) => themeProvider.toggleTheme(),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMenuSection(
-    BuildContext context,
-    String title,
-    Color textPrimary,
-    Color textSecondary,
-    Color surfaceColor,
-    Color primaryGreen,
-    Color lightGreen,
-    List<_MenuItem> items,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 8),
-            child: Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: textSecondary,
-              ),
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: surfaceColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.of(context).shadowColor,
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Column(
-                children: items.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final item = entry.value;
-                  return Column(
-                    children: [
-                      if (i > 0)
-                        Divider(
-                          height: 1,
-                          indent: 16,
-                          color: AppTheme.getBorderColor(isDark(context)),
-                        ),
-                      ListTile(
-                        onTap: item.onTap,
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: lightGreen,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            item.icon,
-                            color: item.iconColor,
-                            size: 18,
-                          ),
-                        ),
-                        title: Text(
-                          item.title,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w500,
-                            color: textPrimary,
-                          ),
-                        ),
-                        subtitle: Text(
-                          item.subtitle,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11.5,
-                            color: textSecondary,
-                          ),
-                        ),
-                        trailing:
-                            item.trailing ??
-                            Icon(
-                              Icons.chevron_right,
-                              color: textSecondary,
-                              size: 20,
-                            ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 4,
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool isDark(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark;
-}
-
-class _MenuItem {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final Color iconColor;
-  final Widget? trailing;
-
-  const _MenuItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    required this.iconColor,
-    this.trailing,
-  });
 }

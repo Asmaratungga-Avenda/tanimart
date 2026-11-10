@@ -44,6 +44,26 @@ class OrderProvider extends ChangeNotifier {
     return result;
   }
 
+  Future<bool> completeOrder(int id) async {
+    _setLoading(true);
+    _errorMessage = null;
+    bool success = false;
+    try {
+      final updated = await ApiService.completeOrder(id);
+      _orderDetail = updated;
+      final index = _orders.indexWhere((o) => o.id == id);
+      if (index != -1) {
+        _orders[index] = updated;
+      }
+      success = true;
+    } on Exception catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _setLoading(false);
+    }
+    return success;
+  }
+
   Future<bool> updateOrderStatus(int id, String status) async {
     _setLoading(true);
     _errorMessage = null;

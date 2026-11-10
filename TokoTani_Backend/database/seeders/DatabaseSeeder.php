@@ -27,5 +27,24 @@ class DatabaseSeeder extends Seeder
             ['id' => 1, 'nama' => 'Transfer Bank', 'deskripsi' => 'Simulasi pembayaran melalui transfer bank.', 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
             ['id' => 2, 'nama' => 'Bayar di Tempat', 'deskripsi' => 'Simulasi pembayaran saat pesanan diterima.', 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
         ], ['id'], ['nama', 'deskripsi', 'aktif', 'updated_at']);
+
+        // Tambahkan User Default untuk Login
+        \App\Models\User::updateOrCreate(
+            ['email' => 'admin@tokotani.com'],
+            [
+                'name' => 'Admin TokoTani',
+                'password' => \Illuminate\Support\Facades\Hash::make('password'),
+                'role' => 'admin'
+            ]
+        );
+
+        \App\Models\User::updateOrCreate(
+            ['email' => 'user@tokotani.com'],
+            [
+                'name' => 'Pelanggan Setia',
+                'password' => \Illuminate\Support\Facades\Hash::make('password'),
+                'role' => 'user'
+            ]
+        );
     }
 }

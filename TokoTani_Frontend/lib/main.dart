@@ -20,7 +20,6 @@ void main() {
 
 class TaniMartApp extends StatelessWidget {
   final Widget? home;
-
   const TaniMartApp({super.key, this.home});
 
   @override
@@ -38,22 +37,8 @@ class TaniMartApp extends StatelessWidget {
   }
 }
 
-typedef AgriMartApp = TaniMartApp;
-
-class TokoTaniApp extends StatelessWidget {
-  final Widget? home;
-
-  const TokoTaniApp({super.key, this.home});
-
-  @override
-  Widget build(BuildContext context) {
-    return TaniMartApp(home: home);
-  }
-}
-
 class _TaniMartMaterialApp extends StatelessWidget {
   final Widget? home;
-
   const _TaniMartMaterialApp({this.home});
 
   @override
@@ -63,17 +48,14 @@ class _TaniMartMaterialApp extends StatelessWidget {
         if (themeProvider.isLoading) {
           return const Directionality(
             textDirection: TextDirection.ltr,
-            child: Center(child: CircularProgressIndicator()),
+            child: Scaffold(body: Center(child: CircularProgressIndicator())),
           );
         }
 
-        final isDark = themeProvider.isDark;
-        final themeData = isDark ? AppTheme.darkTheme : AppTheme.lightTheme;
-
         return MaterialApp(
-          title: 'Tani Mart',
+          title: 'TaniMart',
           debugShowCheckedModeBanner: false,
-          theme: themeData,
+          theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.mode,
           home: home ?? const AuthGate(),
@@ -100,34 +82,41 @@ class AuthGate extends StatelessWidget {
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.cloud_off_outlined,
-                        size: 44,
-                        color: Theme.of(context).colorScheme.error,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_outlined,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Koneksi Bermasalah',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Sesi belum dapat diperiksa',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(auth.sessionError!, textAlign: TextAlign.center),
-                      const SizedBox(height: 18),
-                      FilledButton(
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      auth.sessionError!,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
                         onPressed: auth.retrySession,
-                        child: const Text('Coba lagi'),
+                        child: const Text('Coba Lagi'),
                       ),
-                      TextButton(
-                        onPressed: auth.signOut,
-                        child: const Text('Keluar dari sesi ini'),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: auth.signOut,
+                      child: const Text('Keluar Akun'),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -141,33 +130,6 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-class MenuPage extends StatelessWidget {
-  const MenuPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kelola Produk (CRUD)'),
-        centerTitle: true,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-          Card(
-            child: ListTile(
-              leading: Icon(Icons.add_circle_outline),
-              title: Text('Tambah Produk'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Halaman navigasi utama dengan Bottom Navigation Bar (5 tab).
-/// Setiap tab mempertahankan state halaman melalui IndexedStack.
 class MainNavigationPage extends StatefulWidget {
   const MainNavigationPage({super.key});
 
@@ -177,41 +139,76 @@ class MainNavigationPage extends StatefulWidget {
 
 class _MainNavigationPageState extends State<MainNavigationPage> {
   int _currentIndex = 0;
-  late final List<Widget> _pages;
+  
+  final List<Widget> _pages = [];
 
   @override
   void initState() {
     super.initState();
-    _pages = [
-      HomePage(onGoToCart: () => setState(() => _currentIndex = 2), onGoToProducts: () => setState(() => _currentIndex = 1)),
+    _pages.addAll([
+      HomePage(
+        onGoToCart: () => setState(() => _currentIndex = 2),
+        onGoToProducts: () => setState(() => _currentIndex = 1),
+      ),
       const ProductCatalogPage(),
       const CartPage(),
-      OrderHistoryPage(onGoToCatalog: () => setState(() => _currentIndex = 1)),
+      OrderHistoryPage(
+        onGoToCatalog: () => setState(() => _currentIndex = 1),
+      ),
       const ProfilePage(),
-    ];
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Beranda', 'Produk', 'Keranjang', 'Pesanan', 'Akun'];
-    const icons = [Icons.home_rounded, Icons.grid_view_rounded, Icons.shopping_bag_rounded, Icons.receipt_long_rounded, Icons.person_rounded];
-    const outlines = [Icons.home_outlined, Icons.grid_view_outlined, Icons.shopping_bag_outlined, Icons.receipt_long_outlined, Icons.person_outline_rounded];
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tani Mart'),
-        centerTitle: true,
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
       ),
-      body: IndexedStack(index: _currentIndex, children: _pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: List.generate(5, (index) {
-          final selected = _currentIndex == index;
-          return NavigationDestination(
-            icon: Icon(selected ? icons[index] : outlines[index]),
-            label: labels[index],
+      bottomNavigationBar: Consumer<CartProvider>(
+        builder: (context, cart, child) {
+          return NavigationBar(
+            elevation: 10,
+            selectedIndex: _currentIndex,
+            onDestinationSelected: (index) => setState(() => _currentIndex = index),
+            destinations: [
+              const NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home_rounded),
+                label: 'Beranda',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.grid_view_outlined),
+                selectedIcon: Icon(Icons.grid_view_rounded),
+                label: 'Produk',
+              ),
+              NavigationDestination(
+                icon: Badge(
+                  label: Text(cart.itemCount.toString()),
+                  isLabelVisible: cart.itemCount > 0,
+                  child: const Icon(Icons.shopping_bag_outlined),
+                ),
+                selectedIcon: Badge(
+                  label: Text(cart.itemCount.toString()),
+                  isLabelVisible: cart.itemCount > 0,
+                  child: const Icon(Icons.shopping_bag_rounded),
+                ),
+                label: 'Keranjang',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.receipt_long_outlined),
+                selectedIcon: Icon(Icons.receipt_long_rounded),
+                label: 'Pesanan',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.person_outline_rounded),
+                selectedIcon: Icon(Icons.person_rounded),
+                label: 'Akun',
+              ),
+            ],
           );
-        }),
+        },
       ),
     );
   }

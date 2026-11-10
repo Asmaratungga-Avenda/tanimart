@@ -4,7 +4,6 @@ import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
-import '../services/notification_service.dart';
 import 'product_detail_page.dart';
 
 /// Beranda baru TaniMart: editorial fresh-market, ringkas, dan berbasis data API.
@@ -19,13 +18,17 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _search = TextEditingController();
-  String _category = 'Semua';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<ProductProvider>().loadProducts();
+      if (mounted) {
+        final provider = context.read<ProductProvider>();
+        provider.loadProducts();
+        provider.loadBanners();
+        provider.loadCategories();
+      }
     });
   }
 
@@ -37,7 +40,9 @@ class _HomePageState extends State<HomePage> {
 
   void _open(Product product) => Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => ProductDetailPage(productId: product.id, initialProduct: product)),
+    MaterialPageRoute(
+      builder: (_) => ProductDetailPage(productId: product.id, initialProduct: product),
+    ),
   );
 
   Future<void> _add(Product product) async {
@@ -48,8 +53,16 @@ class _HomePageState extends State<HomePage> {
     final ok = await context.read<CartProvider>().addItem(product.id, 1);
     if (!mounted) return;
     if (ok) {
-      NotificationService.cartCountNotifier.value++;
-      _message('${product.nama} ditambahkan ke keranjang.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${product.nama} ditambahkan ke keranjang'),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'LIHAT',
+            onPressed: widget.onGoToCart ?? () {},
+          ),
+        ),
+      );
     } else {
       _message(context.read<CartProvider>().errorMessage ?? 'Produk gagal ditambahkan.');
     }
@@ -63,87 +76,430 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final provider = context.watch<ProductProvider>();
-    final products = provider.products;
-    final categories = <String>{'Semua', ...products.map((p) => p.kategori).where((e) => e.trim().isNotEmpty)}.toList();
-    final visible = products.where((p) => (_category == 'Semua' || p.kategori == _category) &&
-      (_search.text.isEmpty || p.nama.toLowerCase().contains(_search.text.toLowerCase()))).toList();
-    final featured = visible.where((p) => p.tersedia && p.stok > 0).take(6).toList();
+    final productProvider = context.watch<ProductProvider>();
+    final products = productProvider.products;
+    final popularProducts = products.take(5).toList();
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: RefreshIndicator(
-        onRefresh: provider.refresh,
-        color: colors.primary,
-        child: CustomScrollView(slivers: [
-          SliverToBoxAdapter(child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(width: 42, height: 42, decoration: BoxDecoration(color: colors.primary, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.eco_rounded, color: Colors.white, size: 25)),
-                const SizedBox(width: 11),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('TANIMART', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, color: colors.primary, fontSize: 17)),
-                  Text('Pasar segar, langsung di genggaman', style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
-                ])),
-                IconButton.filledTonal(onPressed: widget.onGoToCart, icon: const Icon(Icons.shopping_bag_outlined), tooltip: 'Keranjang'),
-              ]),
-              const SizedBox(height: 22),
-              Text('Belanja lebih segar,', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, height: 1.1)),
-              Text('hidup lebih baik.', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: colors.primary, height: 1.2)),
-              const SizedBox(height: 7),
-              Text('Temukan kebutuhan pertanian dan harian pilihan.', style: theme.textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant)),
-              const SizedBox(height: 18),
-              TextField(controller: _search, onChanged: (_) => setState(() {}), onSubmitted: (_) => widget.onGoToProducts?.call(),
-                decoration: InputDecoration(hintText: 'Cari sayur, buah, sembako...', prefixIcon: const Icon(Icons.search_rounded), suffixIcon: _search.text.isEmpty ? null : IconButton(onPressed: () { _search.clear(); setState(() {}); }, icon: const Icon(Icons.close)), filled: true, fillColor: colors.surface, contentPadding: const EdgeInsets.symmetric(vertical: 15), border: OutlineInputBorder(borderRadius: BorderRadius.circular(17), borderSide: BorderSide(color: colors.outlineVariant)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(17), borderSide: BorderSide(color: colors.outlineVariant)))),
-              const SizedBox(height: 18),
-              Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: LinearGradient(colors: [colors.primary, Color.lerp(colors.primary, const Color(0xFF9BCB64), .42)!], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(22)),
-                child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.white.withValues(alpha: .18), borderRadius: BorderRadius.circular(20)), child: const Text('PILIHAN HARI INI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1))),
-                  const SizedBox(height: 12), const Text('Dari kebun\nuntuk keluarga.', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.15)),
-                  const SizedBox(height: 8), const Text('Belanja kebutuhan segar dengan mudah.', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                  const SizedBox(height: 14), TextButton(onPressed: widget.onGoToProducts, style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: colors.primary, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9)), child: const Text('Jelajahi produk  →', style: TextStyle(fontWeight: FontWeight.w800))),
-                ])), const SizedBox(width: 5), const Icon(Icons.spa_rounded, color: Colors.white, size: 88)])),
-              const SizedBox(height: 24),
-              _sectionTitle(context, 'Kategori', 'Pilih kebutuhanmu'),
-              const SizedBox(height: 12),
-              SizedBox(height: 42, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: categories.length, separatorBuilder: (_, _) => const SizedBox(width: 8), itemBuilder: (_, i) {
-                final value = categories[i]; final selected = _category == value;
-                return ChoiceChip(label: Text(value), selected: selected, onSelected: (_) => setState(() => _category = value), showCheckmark: false, labelStyle: TextStyle(fontWeight: FontWeight.w700, color: selected ? colors.onPrimary : colors.onSurfaceVariant), selectedColor: colors.primary, backgroundColor: colors.surface, side: BorderSide(color: selected ? colors.primary : colors.outlineVariant));
-              })),
-              const SizedBox(height: 24),
-              _sectionTitle(context, _category == 'Semua' ? 'Rekomendasi untukmu' : _category, 'Produk pilihan dari TaniMart', action: 'Lihat semua', onAction: widget.onGoToProducts),
-              const SizedBox(height: 13),
-            ]),
-          )),
-          if (provider.isLoading && products.isEmpty)
-            const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
-          else if (provider.errorMessage != null && products.isEmpty)
-            SliverFillRemaining(hasScrollBody: false, child: _stateMessage(context, Icons.wifi_off_rounded, 'Belum dapat memuat produk', provider.errorMessage!, 'Coba lagi', provider.refresh))
-          else if (featured.isEmpty)
-            SliverFillRemaining(hasScrollBody: false, child: _stateMessage(context, Icons.inventory_2_outlined, 'Produk belum tersedia', 'Coba kategori atau kata kunci lain.', 'Tampilkan semua', () => setState(() { _category = 'Semua'; _search.clear(); })))
-          else SliverPadding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 28), sliver: SliverGrid(delegate: SliverChildBuilderDelegate((context, index) => _FreshProductCard(product: featured[index], onTap: () => _open(featured[index]), onAdd: () => _add(featured[index])), childCount: featured.length), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 13, crossAxisSpacing: 13, childAspectRatio: .68))),
-          if (provider.isLoading && products.isNotEmpty) const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 2)),
-        ]),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: productProvider.refresh,
+          child: CustomScrollView(
+            slivers: [
+              // Header & Search
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Image.asset(
+                            'assets/images/logo/agrimart_logo.png',
+                            height: 32,
+                            errorBuilder: (_, __, ___) => Row(
+                              children: [
+                                Icon(Icons.eco, color: colors.primary, size: 28),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'TaniMart',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () {},
+                            icon: const Icon(Icons.notifications_none_rounded),
+                            style: IconButton.styleFrom(
+                              backgroundColor: colors.surface,
+                              side: BorderSide(color: colors.outlineVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Halo, Pelanggan 👋',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        'Belanja Segar\nuntuk Keluarga',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _search,
+                        onSubmitted: (_) => widget.onGoToProducts?.call(),
+                        decoration: InputDecoration(
+                          hintText: 'Cari produk di TaniMart...',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          fillColor: colors.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: colors.outlineVariant),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Banner
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: productProvider.banners.isEmpty
+                      ? Container(
+                          height: 160,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            image: const DecorationImage(
+                              image: AssetImage('assets/images/banners/banner_promo.jpg'),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.6),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'Diskon Spesial\nProduk Pertanian\nhingga 50%',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                ElevatedButton(
+                                  onPressed: widget.onGoToProducts,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: colors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                  ),
+                                  child: const Text('Belanja Sekarang →', style: TextStyle(fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : SizedBox(
+                          height: 160,
+                          child: PageView.builder(
+                            itemCount: productProvider.banners.length,
+                            itemBuilder: (context, index) {
+                              final banner = productProvider.banners[index];
+                              return Container(
+                                margin: const EdgeInsets.only(right: 0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Stack(
+                                    children: [
+                                      Positioned.fill(
+                                        child: ProductImage(
+                                          imageUrl: banner.url,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                            colors: [
+                                              Colors.black.withValues(alpha: 0.6),
+                                              Colors.transparent,
+                                            ],
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              banner.judul,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            if (banner.link != null) ...[
+                                              const SizedBox(height: 12),
+                                              ElevatedButton(
+                                                onPressed: widget.onGoToProducts,
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: colors.primary,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                                  minimumSize: Size.zero,
+                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(20),
+                                                  ),
+                                                ),
+                                                child: const Text('Lihat Detail →', style: TextStyle(fontSize: 12)),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                ),
+              ),
+
+              // Categories
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: productProvider.categories.isEmpty
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _categoryItem(context, 'Sayur', null),
+                            _categoryItem(context, 'Buah', null),
+                            _categoryItem(context, 'Pangan', null),
+                            _categoryItem(context, 'Lainnya', null),
+                          ],
+                        )
+                      : SizedBox(
+                          height: 90,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: productProvider.categories.length,
+                            itemBuilder: (context, index) {
+                              final category = productProvider.categories[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 20),
+                                child: _categoryItem(context, category.nama, category.gambarUrl),
+                              );
+                            },
+                          ),
+                        ),
+                ),
+              ),
+
+              // Popular Products Header
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Produk Terlaris',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      TextButton(
+                        onPressed: widget.onGoToProducts,
+                        child: const Text('Lihat Semua >'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Popular Products List
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 220,
+                  child: productProvider.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          itemCount: popularProducts.length,
+                          itemBuilder: (context, index) {
+                            final product = popularProducts[index];
+                            return _PopularProductCard(
+                              product: product,
+                              onTap: () => _open(product),
+                              onAdd: () => _add(product),
+                            );
+                          },
+                        ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _sectionTitle(BuildContext context, String title, String subtitle, {String? action, VoidCallback? onAction}) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)), const SizedBox(height: 2), Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant))])), if (action != null) TextButton(onPressed: onAction, child: Text(action))]);
-
-  Widget _stateMessage(BuildContext context, IconData icon, String title, String detail, String button, VoidCallback onTap) => Center(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 42, color: Theme.of(context).colorScheme.primary), const SizedBox(height: 12), Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 5), Text(detail, textAlign: TextAlign.center), const SizedBox(height: 14), FilledButton(onPressed: onTap, child: Text(button))])));
+  Widget _categoryItem(BuildContext context, String label, String? imageUrl) {
+    final colors = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () {
+        context.read<ProductProvider>().loadProducts(kategori: label);
+        widget.onGoToProducts?.call();
+      },
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.outlineVariant),
+            ),
+            child: imageUrl != null && imageUrl.isNotEmpty
+                ? ProductImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.contain,
+                    width: 40,
+                    height: 40,
+                  )
+                : Icon(Icons.category, color: colors.primary),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
 }
 
-class _FreshProductCard extends StatelessWidget {
-  final Product product; final VoidCallback onTap; final VoidCallback onAdd;
-  const _FreshProductCard({required this.product, required this.onTap, required this.onAdd});
+class _PopularProductCard extends StatelessWidget {
+  final Product product;
+  final VoidCallback onTap;
+  final VoidCallback onAdd;
+
+  const _PopularProductCard({
+    required this.product,
+    required this.onTap,
+    required this.onAdd,
+  });
+
   @override
   Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme;
-    return Material(color: c.surface, borderRadius: BorderRadius.circular(18), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: c.outlineVariant.withValues(alpha: .7))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Expanded(child: Stack(children: [Positioned.fill(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(17)), child: ProductImage(imageUrl: product.foto, productName: product.nama, category: product.kategori, fit: BoxFit.cover))), Positioned(left: 9, top: 9, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: c.surface.withValues(alpha: .94), borderRadius: BorderRadius.circular(30)), child: Text(product.kategori, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: c.onSurface))))])),
-      Padding(padding: const EdgeInsets.fromLTRB(11, 10, 11, 11), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(product.nama, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)), const SizedBox(height: 4), Text('Rp ${_rupiah(product.harga)}', style: TextStyle(color: c.primary, fontWeight: FontWeight.w900, fontSize: 14)), const SizedBox(height: 2), Text('per ${product.satuanJual} • Stok ${product.stok}', style: TextStyle(color: c.onSurfaceVariant, fontSize: 10)), const SizedBox(height: 8), SizedBox(width: double.infinity, height: 34, child: FilledButton.tonal(onPressed: product.tersedia && product.stok > 0 ? onAdd : null, style: FilledButton.styleFrom(padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('＋ Keranjang', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800))))]))
-    ]))));
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      width: 150,
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: ProductImage(
+                  imageUrl: product.foto,
+                  productName: product.nama,
+                  category: product.kategori,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.nama,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Rp ${_rupiah(product.harga)}',
+                          style: TextStyle(
+                            color: colors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: onAdd,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: colors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.add, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-  String _rupiah(int value) => value.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
+
+  String _rupiah(int value) => value.toString().replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'),
+        (_) => '.',
+      );
 }

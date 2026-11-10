@@ -39,7 +39,6 @@ class ApiConfig {
         return localBaseUrl;
       }
     } catch (_) {
-      // Fallback aman jika deteksi platform gagal
     }
 
     return emulatorBaseUrl;

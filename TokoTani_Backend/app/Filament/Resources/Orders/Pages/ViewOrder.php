@@ -16,50 +16,51 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('konfirmasiPembayaran')
+                ->label('Konfirmasi Pembayaran')
+                ->icon('heroicon-o-check-badge')
+                ->color('success')
+                ->visible(fn (): bool => $this->record->status === 'menunggu_konfirmasi')
+                ->requiresConfirmation()
+                ->action(function () {
+                    $this->record->update([
+                        'status' => 'dibayar',
+                        'payment_status' => 'lunas',
+                    ]);
+                    Notification::make()->title('Pembayaran Dikonfirmasi')->success()->send();
+                }),
+
+            Action::make('prosesPesanan')
+                ->label('Proses Pesanan')
+                ->icon('heroicon-o-arrow-path')
+                ->color('info')
+                ->visible(fn (): bool => $this->record->status === 'dibayar')
+                ->requiresConfirmation()
+                ->action(function () {
+                    $this->record->update(['status' => 'diproses']);
+                    Notification::make()->title('Pesanan Diproses')->success()->send();
+                }),
+
             Action::make('kirimPesanan')
                 ->label('Kirim Pesanan')
                 ->icon('heroicon-o-truck')
                 ->color('success')
-                ->visible(fn (): bool =>
-                    in_array($this->record->payment_status, ['paid', 'lunas']) &&
-                    $this->record->status === 'diproses'
-                )
+                ->visible(fn (): bool => $this->record->status === 'diproses')
                 ->requiresConfirmation()
-                ->modalHeading('Kirim Pesanan')
-                ->modalDescription('Apakah Anda yakin ingin memproses dan mengirim pesanan ini sekarang?')
                 ->action(function () {
-                    /** @var Order $order */
-                    $order = $this->record;
-
-                    if (! in_array($order->payment_status, ['paid', 'lunas']) || $order->status !== 'diproses') {
-                        Notification::make()
-                            ->title('Pesanan tidak memenuhi syarat untuk dikirim.')
-                            ->danger()
-                            ->send();
-                        return;
-                    }
-
-                    if ($order->dikirim_at !== null && $order->status === 'dikirim') {
-                        Notification::make()
-                            ->title('Pesanan ini sudah pernah dikirim.')
-                            ->warning()
-                            ->send();
-                        return;
-                    }
-
-                    $order->update([
+                    $this->record->update([
                         'status' => 'dikirim',
                         'dikirim_at' => now(),
                     ]);
 
                     $seconds = (int) config('delivery.seconds', 5);
                     if (config('delivery.enabled', true)) {
-                        DeliverOrderSimulation::dispatch($order->id)->delay(now()->addSeconds($seconds));
+                        DeliverOrderSimulation::dispatch($this->record->id)->delay(now()->addSeconds($seconds));
                     }
 
                     Notification::make()
-                        ->title('Pesanan Berhasil Dikirim')
-                        ->body("Pesanan #{$order->id} sedang dikirim. Estimasi tiba dalam {$seconds} detik.")
+                        ->title('Pesanan Dikirim')
+                        ->body("Status akan berubah menjadi 'tiba' dalam {$seconds} detik.")
                         ->success()
                         ->send();
                 }),

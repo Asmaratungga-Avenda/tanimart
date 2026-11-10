@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import '../models/banner.dart';
+import '../models/category.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
 
@@ -6,6 +8,8 @@ import '../services/api_service.dart';
 /// Mendukung 4 keadaan layar: memuat, berhasil, kosong, galat.
 class ProductProvider extends ChangeNotifier {
   List<Product> _products = [];
+  List<BannerModel> _banners = [];
+  List<CategoryModel> _categories = [];
   String? _selectedCategory;
   String? _searchQuery;
   String? _sortBy;
@@ -16,6 +20,8 @@ class ProductProvider extends ChangeNotifier {
   bool _hasError = false;
 
   List<Product> get products => _products;
+  List<BannerModel> get banners => _banners;
+  List<CategoryModel> get categories => _categories;
   String? get selectedCategory => _selectedCategory;
   String? get searchQuery => _searchQuery;
   String? get sortBy => _sortBy;
@@ -24,6 +30,24 @@ class ProductProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get hasError => _hasError;
   bool get isEmpty => _products.isEmpty;
+
+  Future<void> loadBanners() async {
+    try {
+      _banners = await ApiService.getBanners();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading banners: $e');
+    }
+  }
+
+  Future<void> loadCategories() async {
+    try {
+      _categories = await ApiService.getCategories();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading categories: $e');
+    }
+  }
 
   Future<void> loadProducts({String? kategori, String? cari, String? sortBy}) async {
     _setState(loading: true, refreshing: false, error: null);

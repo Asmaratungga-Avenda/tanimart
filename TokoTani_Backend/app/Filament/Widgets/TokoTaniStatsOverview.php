@@ -15,35 +15,28 @@ class TokoTaniStatsOverview extends StatsOverviewWidget
     protected function getStats(): array
     {
         $totalProduk = Product::count();
-        $totalKategori = Category::count();
         $totalPesanan = Order::count();
+        $totalPendapatan = Order::where('status', 'selesai')->sum('total_harga');
         $menungguPembayaran = Order::where('status', 'menunggu_pembayaran')->count();
         $diproses = Order::where('status', 'diproses')->count();
-        $dikirim = Order::where('status', 'dikirim')->count();
-        $selesai = Order::where('status', 'selesai')->count();
 
         return [
-            Stat::make('Total Produk', $totalProduk)
-                ->description('Semua produk dalam katalog')
-                ->color('primary'),
-            Stat::make('Total Kategori', $totalKategori)
-                ->description('Kategori produk tersedia')
-                ->color('info'),
+            Stat::make('Pendapatan', 'Rp ' . number_format($totalPendapatan, 0, ',', '.'))
+                ->description('Total dari pesanan selesai')
+                ->descriptionIcon('heroicon-m-banknotes')
+                ->color('success'),
             Stat::make('Total Pesanan', $totalPesanan)
                 ->description('Seluruh pesanan masuk')
+                ->descriptionIcon('heroicon-m-shopping-cart')
                 ->color('primary'),
-            Stat::make('Menunggu Pembayaran', $menungguPembayaran)
-                ->description('Belum dibayar pelanggan')
-                ->color('warning'),
-            Stat::make('Diproses', $diproses)
+            Stat::make('Pesanan Diproses', $diproses)
                 ->description('Siap untuk dikirim')
+                ->descriptionIcon('heroicon-m-truck')
                 ->color('info'),
-            Stat::make('Dikirim', $dikirim)
-                ->description('Sedang dalam pengiriman')
+            Stat::make('Total Produk', $totalProduk)
+                ->description('Produk dalam katalog')
+                ->descriptionIcon('heroicon-m-squares-2x2')
                 ->color('primary'),
-            Stat::make('Selesai', $selesai)
-                ->description('Transaksi berhasil')
-                ->color('success'),
         ];
     }
 }

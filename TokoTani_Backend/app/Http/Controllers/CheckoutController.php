@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Cart;
 use App\Models\Courier;
-use App\Models\Keranjang;
 use App\Models\Order;
 use App\Models\PaymentMethod;
 use App\Models\Product;
@@ -332,12 +331,11 @@ class CheckoutController extends Controller
 
         $inputData = $request->all();
         if (! array_key_exists('items', $inputData)) {
-            $inputData['items'] = Keranjang::where('pelanggan_id', $customerId)
-                ->orderBy('id')
-                ->get(['product_id', 'jumlah'])
-                ->map(fn (Keranjang $item) => [
+            $inputData['items'] = Cart::where('customer_id', $customerId)
+                ->get(['product_id', 'quantity'])
+                ->map(fn (Cart $item) => [
                     'product_id' => $item->product_id,
-                    'quantity' => $item->jumlah,
+                    'quantity' => $item->quantity,
                 ])
                 ->all();
         }
@@ -476,14 +474,9 @@ class CheckoutController extends Controller
                 $order->items()->createMany($orderItems);
 
                 // Sinkronisasi keranjang: Hapus item yang berhasil di-checkout dari tabel carts
-                if (Schema::hasTable('carts')) {
-                    $orderedProductIds = collect($orderItems)->pluck('product_id')->all();
-                    Cart::where('customer_id', $customerId)
-                        ->whereIn('product_id', $orderedProductIds)
-                        ->delete();
-                }
-                Keranjang::where('pelanggan_id', $customerId)
-                    ->whereIn('product_id', collect($orderItems)->pluck('product_id')->all())
+                $orderedProductIds = collect($orderItems)->pluck('product_id')->all();
+                Cart::where('customer_id', $customerId)
+                    ->whereIn('product_id', $orderedProductIds)
                     ->delete();
 
                 return $order->load('items');

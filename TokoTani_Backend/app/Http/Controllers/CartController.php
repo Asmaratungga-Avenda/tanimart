@@ -59,7 +59,7 @@ class CartController extends Controller
                 'stok'        => $product->stok,
                 'satuan_jual' => $product->satuan_jual,
                 'mudah_rusak' => (bool) $product->mudah_rusak,
-                'foto'        => null,
+                'foto'        => $product->gambar_url,
                 'subtotal'    => $itemSubtotal,
                 'produk'      => [
                     'id'          => $product->id,
@@ -71,6 +71,8 @@ class CartController extends Controller
                     'deskripsi'   => $product->deskripsi,
                     'satuan_jual' => $product->satuan_jual,
                     'mudah_rusak' => (bool) $product->mudah_rusak,
+                    'gambar_url'  => $product->gambar_url,
+                    'image_url'   => $product->image_url,
                 ],
             ];
         }
@@ -264,7 +266,7 @@ class CartController extends Controller
         return $this->jsonResponse(
             'sukses',
             200,
-            'Keranjang belanja berhasil dikosongkan'
+            'Seluruh isi keranjang belanja berhasil dikosongkan'
         );
     }
 }

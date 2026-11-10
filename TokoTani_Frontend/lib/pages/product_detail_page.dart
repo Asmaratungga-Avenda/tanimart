@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/theme/app_theme.dart';
 import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
-import '../services/notification_service.dart';
-import '../core/theme/theme_extension.dart';
-import '../widgets/responsive_wrapper.dart';
 import 'cart_page.dart';
 
 class ProductDetailPage extends StatefulWidget {
@@ -26,6 +24,7 @@ class ProductDetailPage extends StatefulWidget {
 class _ProductDetailPageState extends State<ProductDetailPage> {
   int quantity = 1;
   bool isAdding = false;
+  bool isFavorite = false;
 
   @override
   void initState() {
@@ -37,60 +36,36 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
-  String formatRupiah(int value) {
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (match) => '${match[1]}.')}';
-  }
+  String _rupiah(int value) => value.toString().replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'),
+        (_) => '.',
+      );
 
-  Future<void> addToCart(Product p) async {
+  Future<void> _addToCart(Product p) async {
     if (!p.tersedia || p.stok <= 0 || isAdding) return;
 
-    final theme = AppColors.of(context);
     setState(() => isAdding = true);
-
     try {
       final success = await context.read<CartProvider>().addItem(p.id, quantity);
       if (!mounted) return;
       if (success) {
-        NotificationService.cartCountNotifier.value++;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: theme.primaryGreen,
+            content: Text('${p.nama} ditambahkan ke keranjang'),
             behavior: SnackBarBehavior.floating,
-            content: Row(
-              children: [
-                Icon(Icons.check_circle_outline, color: theme.onPrimary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text('Berhasil menambahkan $quantity ${p.satuanJual} ke keranjang!'),
-                ),
-              ],
+            action: SnackBarAction(
+              label: 'LIHAT',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartPage(showBackButton: true)),
+              ),
             ),
-            duration: const Duration(seconds: 2),
           ),
-        );
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CartPage(showBackButton: true)),
         );
       } else {
         final error = context.read<CartProvider>().errorMessage;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: theme.errorRed,
-            behavior: SnackBarBehavior.floating,
-            content: Text(error ?? 'Gagal menambahkan ke keranjang.'),
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: theme.errorRed,
-            behavior: SnackBarBehavior.floating,
-            content: Text('Terjadi kesalahan sambungan jaringan.'),
-          ),
+          SnackBar(content: Text(error ?? 'Gagal menambahkan ke keranjang.')),
         );
       }
     } finally {
@@ -100,368 +75,229 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Consumer<ProductProvider>(
       builder: (context, provider, child) {
         Product? product;
-        bool isLoading = provider.isLoading;
-        String? errorMessage = provider.errorMessage;
-        final theme = AppColors.of(context);
-
         if (widget.initialProduct != null) {
           product = widget.initialProduct;
         } else {
           product = provider.products.where((p) => p.id == widget.productId).firstOrNull;
         }
 
-        if (widget.initialProduct == null && provider.isEmpty && !provider.isLoading && errorMessage == null) {
-          isLoading = true;
+        if (product == null && provider.isLoading) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        if (product == null) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: Text('Produk tidak ditemukan')),
+          );
         }
 
         return Scaffold(
-          backgroundColor: theme.backgroundColor,
-          appBar: AppBar(
-            title: Text(product?.nama ?? 'Rincian Produk'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined),
-                tooltip: 'Keranjang',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CartPage(showBackButton: true)),
-                  );
-                },
-              ),
-            ],
-          ),
-          body: ResponsiveScrollWrapper(
-            child: _buildBody(provider, product, isLoading, errorMessage),
-          ),
-          bottomNavigationBar: product != null && !isLoading
-              ? _buildBottomBar(product)
-              : null,
-        );
-      },
-    );
-  }
-
-  Widget _buildBody(ProductProvider provider, Product? p, bool isLoading, String? errorMessage) {
-    final theme = AppColors.of(context);
-    if (isLoading && p == null) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Memuat rincian produk...'),
-          ],
-        ),
-      );
-    }
-
-    if (p == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.inventory_2_outlined, size: 64, color: theme.textSecondary),
-              const SizedBox(height: 16),
-              const Text('Produk Tidak Ditemukan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(errorMessage ?? 'Produk ini mungkin telah dihapus atau tidak lagi tersedia.', textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: theme.primaryGreen),
-                onPressed: () => provider.loadProducts(),
-                child: const Text('Coba Lagi'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final isOutOfStock = p.stok <= 0 || !p.tersedia;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      children: [
-        Container(
-          height: 220,
-          decoration: BoxDecoration(
-            color: isOutOfStock ? theme.mutedContainer : theme.lightGreen,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.borderColor),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: ProductImage(
-              imageUrl: p.foto,
-              productName: p.nama,
-              category: p.kategori,
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.lightGreen,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                p.kategori,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: theme.primaryGreen,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (p.mudahRusak)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.warningContainer,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: theme.warning.withValues(alpha: 0.4)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.bolt_rounded, size: 14, color: theme.warning),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Mudah Rusak (Wajib Same Day)',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: theme.warning,
-                      ),
+          body: CustomScrollView(
+            slivers: [
+              // Header Image
+              SliverAppBar(
+                expandedHeight: 350,
+                pinned: true,
+                leading: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        Text(
-          p.nama,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: theme.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(
-              formatRupiah(p.harga),
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: theme.primaryGreen,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '/ ${p.satuanJual}',
-              style: TextStyle(fontSize: 14, color: theme.textSecondary),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: theme.surfaceColor,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: theme.borderColor),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    isOutOfStock ? Icons.cancel_outlined : Icons.check_circle_outline,
-                    color: isOutOfStock ? theme.errorRed : theme.primaryGreen,
-                    size: 20,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isOutOfStock ? 'Tidak Tersedia / Stok Habis' : 'Stok Tersedia',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: isOutOfStock ? theme.errorRed : theme.textPrimary,
+                ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white,
+                      child: IconButton(
+                        icon: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border_rounded,
+                          color: isFavorite ? Colors.red : colors.onSurface,
+                        ),
+                        onPressed: () => setState(() => isFavorite = !isFavorite),
+                      ),
                     ),
                   ),
                 ],
+                flexibleSpace: FlexibleSpaceBar(
+                  background: ProductImage(
+                    imageUrl: product.foto,
+                    productName: product.nama,
+                    category: product.kategori,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
-              Text(
-                '${p.stok} ${p.satuanJual}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
 
-        Text(
-          'Deskripsi Produk',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: theme.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          p.deskripsi != null && p.deskripsi!.trim().isNotEmpty
-              ? p.deskripsi!
-              : 'Deskripsi produk belum tersedia.',
-              style: TextStyle(fontSize: 14, color: theme.textSecondary, height: 1.5),
-        ),
-        const SizedBox(height: 20),
-
-        if (p.mudahRusak)
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: theme.warningContainer,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.warning.withValues(alpha: 0.4)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, color: theme.warning, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
+              // Content
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Aturan Pengiriman Produk Segar',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: theme.warning),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              product.nama,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.lightGreen,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              product.stok > 0 ? 'Stok Tersedia' : 'Stok Habis',
+                              style: TextStyle(
+                                color: colors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Text(
+                            'Rp ${_rupiah(product.harga)}',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            ' / ${product.satuanJual}',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(Icons.star_rounded, color: Colors.orange[400], size: 20),
+                          const SizedBox(width: 4),
+                          const Text(
+                            '4.8',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '(2.5k ulasan)',
+                            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
                       Text(
-                        'Produk ini mudah layu/rusak. Pada saat checkout, sistem server mewajibkan pengiriman pada hari yang sama (Same Day) untuk menjaga kesegaran.',
-                        style: TextStyle(fontSize: 12, color: theme.warning, height: 1.4),
+                        'Deskripsi Produk',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        product.deskripsi ?? 'Tidak ada deskripsi produk.',
+                        style: TextStyle(color: colors.onSurfaceVariant, height: 1.5),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: colors.outlineVariant),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove),
+                                  onPressed: quantity > 1 ? () => setState(() => quantity--) : null,
+                                ),
+                                Text(
+                                  '$quantity',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.add),
+                                  onPressed: quantity < product.stok ? () => setState(() => quantity++) : null,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            product.satuanJual,
+                            style: TextStyle(color: colors.onSurfaceVariant, fontWeight: FontWeight.w500),
+                          ),
+                        ],
                       ),
                     ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: Container(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: product.stok > 0 ? () => _addToCart(product!) : null,
+                    icon: const Icon(Icons.add_shopping_cart_rounded),
+                    label: const Text('Tambah ke Keranjang'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: product.stok > 0 ? () {} : null,
+                    icon: const Icon(Icons.flash_on_rounded),
+                    label: const Text('Beli Sekarang'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.orange[800],
+                      side: BorderSide(color: Colors.orange[800]!),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-      ],
-    );
-  }
-
-  Widget _buildBottomBar(Product p) {
-    final theme = AppColors.of(context);
-    final isOutOfStock = p.stok <= 0 || !p.tersedia;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.surfaceColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor,
-            offset: const Offset(0, -3),
-            blurRadius: 12,
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Center(
-          heightFactor: 1.0,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-              child: Row(
-                children: [
-                  if (!isOutOfStock) ...[
-                    Container(
-                      decoration: BoxDecoration(
-                        color: theme.mutedContainer,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove, size: 18),
-                            onPressed: quantity > 1 ? () => setState(() => quantity--) : null,
-                          ),
-                          Text(
-                            '$quantity',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.add, size: 18),
-                            onPressed: quantity < p.stok ? () => setState(() => quantity++) : null,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: theme.primaryGreen,
-                          disabledBackgroundColor: theme.mutedContainer,
-                          disabledForegroundColor: theme.textSecondary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        icon: isAdding
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: theme.onPrimary),
-                              )
-                            : Icon(isOutOfStock ? Icons.block : Icons.add_shopping_cart_rounded),
-                        label: Text(
-                          isOutOfStock ? 'Stok Tidak Tersedia' : 'Tambah ke Keranjang',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        onPressed: isOutOfStock || isAdding ? null : () => addToCart(p),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

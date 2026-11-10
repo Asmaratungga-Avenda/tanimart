@@ -4,11 +4,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import '../models/banner.dart';
 import '../models/cart_item.dart';
+import '../models/category.dart';
 import '../models/courier.dart';
 import '../models/order.dart';
 import '../models/payment_method.dart';
 import '../models/product.dart';
+import '../core/config/api_config.dart';
 
 /// Empat keadaan layar wajib sesuai ketentuan Rubrik Kriteria 7.
 enum KeadaanMuat { memuat, berhasil, kosong, galat }
@@ -66,22 +69,9 @@ class CartResponse {
 }
 
 class ApiService {
-  // Emulator Android memakai http://10.0.2.2:8000/api
-  // HP fisik: ganti dengan IP lokal laptop (misal http://192.168.1.10:8000/api)
-  // Web/Desktop: http://127.0.0.1:8000/api
-  static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000/api';
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8000/api';
-      }
-    } catch (_) {}
-    return 'http://127.0.0.1:8000/api';
-  }
+  static String get baseUrl => ApiConfig.baseUrl;
 
-  static const Duration timeoutDuration = Duration(seconds: 10);
+  static const Duration timeoutDuration = ApiConfig.timeoutDuration;
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   static const String _tokenKey = 'sanctum_token';
   @visibleForTesting
@@ -471,7 +461,7 @@ class ApiService {
   }
 
   /// GET /api/kategori
-  static Future<List<String>> getCategories() async {
+  static Future<List<CategoryModel>> getCategories() async {
     try {
       final response = await httpClient
           .get(_uri('/kategori'), headers: await _headers())
@@ -479,7 +469,22 @@ class ApiService {
       final body = _decodeResponse(response);
       final data = _extractData(body);
       final list = _requireList(data, 'kategori');
-      return list.map((e) => e.toString()).toList();
+      return list.map((e) => CategoryModel.fromJson(_requireMap(e, 'kategori'))).toList();
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
+  /// GET /api/banners
+  static Future<List<BannerModel>> getBanners() async {
+    try {
+      final response = await httpClient
+          .get(_uri('/banners'), headers: await _headers())
+          .timeout(timeoutDuration);
+      final body = _decodeResponse(response);
+      final data = _extractData(body);
+      final list = _requireList(data, 'banner');
+      return list.map((e) => BannerModel.fromJson(_requireMap(e, 'banner'))).toList();
     } catch (e) {
       throw _handleNetworkError(e);
     }
@@ -546,6 +551,17 @@ class ApiService {
     }
   }
 
+  /// POST /api/pesanan/{id}/selesai
+  static Future<OrderModel> completeOrder(int id) async {
+    try {
+      final res = await _send('POST', '/pesanan/$id/selesai');
+      final data = _extractData(res);
+      return OrderModel.fromJson(_requireMap(data, 'pesanan'));
+    } catch (e) {
+      throw _handleNetworkError(e);
+    }
+  }
+
   /// POST /api/pesanan/{id}/pembayaran
   /// Meminta backend mengonfirmasi pembayaran pesanan.
   static Future<OrderModel> confirmPayment(int id, int paymentMethodId) async {
@@ -554,14 +570,7 @@ class ApiService {
         'payment_method_id': paymentMethodId,
       });
       final data = _extractData(response);
-      if (data is! Map) {
-        throw const ApiException(
-          statusCode: 500,
-          message: 'Respons konfirmasi pembayaran tidak valid.',
-          errorType: ApiErrorType.other,
-        );
-      }
-      return OrderModel.fromJson(Map<String, dynamic>.from(data));
+      return OrderModel.fromJson(_requireMap(data, 'pesanan'));
     } catch (e) {
       throw _handleNetworkError(e);
     }
