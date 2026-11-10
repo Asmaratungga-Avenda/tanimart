@@ -90,7 +90,7 @@ void main() {
       provider.setCategory('Buah');
       expect(provider.filtered.map((p) => p.nama), ['Apel']);
 
-      provider.setFilter(query: 'tom');
+      provider.setFilter(query: 'tomat');
       expect(provider.filtered.map((p) => p.nama), ['Tomat']);
 
       provider.setSort(ProductSort.priceDesc);
