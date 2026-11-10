@@ -1,23 +1,16 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../core/constants/product_images.dart';
-import '../core/theme/theme_extension.dart';
 import '../core/widgets/product_image.dart';
 import '../models/product.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
 import '../services/notification_service.dart';
 import 'product_detail_page.dart';
-import 'product_catalog_page.dart';
 
-/// Halaman Beranda Tani Mart
-/// Konsep Desain: FRESH MARKET — MODERN AGRICULTURE
+/// Beranda baru TaniMart: editorial fresh-market, ringkas, dan berbasis data API.
 class HomePage extends StatefulWidget {
   final VoidCallback? onGoToCart;
   final VoidCallback? onGoToProducts;
-
   const HomePage({super.key, this.onGoToCart, this.onGoToProducts});
 
   @override
@@ -25,934 +18,132 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _bannerIndex = 0;
-  final PageController _bannerController = PageController();
-  Timer? _bannerTimer;
-  final TextEditingController _searchController = TextEditingController();
-
-  final List<Map<String, String>> _banners = [
-    {
-      'image': ProductImages.bannerPromo,
-      'title': 'Belanja Segar,\nHarga Bersahabat',
-      'subtitle': 'Produk pertanian segar pilihan langsung dari petani mitra',
-    },
-    {
-      'image': ProductImages.bannerPertanian,
-      'title': 'Lengkapi Kebutuhan\nPertanianmu',
-      'subtitle': 'Bibit unggul, pupuk organik, dan alat tani terlengkap',
-    },
-  ];
-
-
+  final _search = TextEditingController();
+  String _category = 'Semua';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final provider = context.read<ProductProvider>();
-        provider.loadCategories();
-        provider.loadProducts();
-      }
-    });
-    _startBannerTimer();
-  }
-
-  void _startBannerTimer() {
-    _bannerTimer?.cancel();
-    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      final next = (_bannerIndex + 1) % _banners.length;
-      if (_bannerController.hasClients) {
-        _bannerController.animateToPage(
-          next,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-        );
-      }
+      if (mounted) context.read<ProductProvider>().loadProducts();
     });
   }
 
   @override
   void dispose() {
-    _bannerTimer?.cancel();
-    _bannerController.dispose();
-    _searchController.dispose();
+    _search.dispose();
     super.dispose();
   }
 
-  String? _findCategory(ProductProvider provider, List<String> keywords) {
-    for (final category in provider.categories) {
-      final normalized = category.toLowerCase();
-      if (keywords.any(normalized.contains)) return category;
-    }
-    return null;
-  }
+  void _open(Product product) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => ProductDetailPage(productId: product.id, initialProduct: product)),
+  );
 
-  void _navigateToCatalog({String? category, String? query}) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProductCatalogPage(
-          initialCategory: category,
-          initialQuery: query,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = AppColors.of(context);
-    final provider = context.watch<ProductProvider>();
-    final products = provider.products;
-
-    final featuredProducts =
-        products.where((p) => p.tersedia && p.stok > 0).take(6).toList();
-    final bestSellingProducts = products.reversed.take(6).toList();
-    final agriculturalProducts = products.where((p) {
-      final k = p.kategori.toLowerCase();
-      final n = p.nama.toLowerCase();
-      return k.contains('sayur') ||
-          k.contains('buah') ||
-          k.contains('bibit') ||
-          k.contains('pupuk') ||
-          n.contains('bayam') ||
-          n.contains('tomat') ||
-          n.contains('cabai') ||
-          n.contains('kangkung');
-    }).toList();
-    final dailyNecessities = products.where((p) {
-      final k = p.kategori.toLowerCase();
-      final n = p.nama.toLowerCase();
-      return k.contains('sembako') ||
-          k.contains('harian') ||
-          n.contains('beras') ||
-          n.contains('minyak') ||
-          n.contains('telur') ||
-          n.contains('gula') ||
-          n.contains('terigu');
-    }).toList();
-
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      body: RefreshIndicator(
-        color: theme.primaryGreen,
-        onRefresh: () => provider.refresh(),
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _buildGreetingHeader(theme)),
-            SliverToBoxAdapter(child: _buildSearchBar(theme)),
-            SliverToBoxAdapter(child: _buildBannerCarousel(theme)),
-            SliverToBoxAdapter(child: _buildCategorySection(theme)),
-
-            if (provider.isLoading)
-              const SliverToBoxAdapter(child: _LoadingSkeleton())
-            else if (provider.errorMessage != null)
-              SliverToBoxAdapter(child: _buildError(provider.errorMessage!, theme))
-            else ...[
-              if (featuredProducts.isNotEmpty) ...[
-                SliverToBoxAdapter(
-                  child: _buildSectionHeader(
-                    'Produk Rekomendasi',
-                    Icons.star_rounded,
-                    theme,
-                    onSeeAll: widget.onGoToProducts,
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildProductHorizontalList(featuredProducts, theme),
-                ),
-              ],
-              if (bestSellingProducts.isNotEmpty) ...[
-                SliverToBoxAdapter(
-                  child: _buildSectionHeader(
-                    'Produk Terlaris',
-                    Icons.local_fire_department_rounded,
-                    theme,
-                    onSeeAll: widget.onGoToProducts,
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildProductHorizontalList(bestSellingProducts, theme),
-                ),
-              ],
-              if (agriculturalProducts.isNotEmpty) ...[
-                SliverToBoxAdapter(
-                  child: _buildSectionHeader(
-                    'Produk Pertanian Segar',
-                    Icons.eco_rounded,
-                    theme,
-                    onSeeAll: () => _navigateToCatalog(
-                      category: _findCategory(provider, ['sayur', 'buah']),
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildProductHorizontalList(agriculturalProducts, theme),
-                ),
-              ],
-              if (dailyNecessities.isNotEmpty) ...[
-                SliverToBoxAdapter(
-                  child: _buildSectionHeader(
-                    'Kebutuhan Harian & Sembako',
-                    Icons.shopping_basket_rounded,
-                    theme,
-                    onSeeAll: () => _navigateToCatalog(
-                      category: _findCategory(provider, ['sembako', 'harian']),
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildProductHorizontalList(dailyNecessities, theme),
-                ),
-              ],
-              SliverToBoxAdapter(
-                child: _buildSectionHeader(
-                  'Katalog Lengkap',
-                  Icons.grid_view_rounded,
-                  theme,
-                  onSeeAll: widget.onGoToProducts,
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.62,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, i) => _ProductCard(
-                      product: products[i],
-                      theme: theme,
-                      onTap: () => _openDetail(products[i]),
-                      onAddToCart: () => _addToCart(products[i]),
-                    ),
-                    childCount: products.length,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGreetingHeader(AppColors theme) {
-    final foreground = theme.isDark ? theme.textPrimary : theme.onPrimary;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: theme.isDark
-              ? [theme.backgroundColor, theme.surfaceColor]
-              : [theme.primaryGreen, theme.scheme.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Selamat Datang di Tani Mart 👋',
-                      style: GoogleFonts.poppins(
-                        color: foreground,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Kebutuhan Pertanian dan Harian dalam Satu Genggaman',
-                      style: GoogleFonts.poppins(
-                        color: foreground.withValues(alpha: 0.88),
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              InkWell(
-                onTap: widget.onGoToCart,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: foreground.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.shopping_cart_outlined,
-                    color: foreground,
-                    size: 22,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar(AppColors theme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.surfaceColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.borderColor),
-          boxShadow: theme.softShadow,
-        ),
-        child: TextField(
-          controller: _searchController,
-          textInputAction: TextInputAction.search,
-          onSubmitted: (query) {
-            if (query.trim().isNotEmpty) {
-              _navigateToCatalog(query: query.trim());
-            }
-          },
-          style: GoogleFonts.poppins(color: theme.textPrimary),
-          decoration: InputDecoration(
-            hintText: 'Cari produk pertanian atau kebutuhan harian...',
-            hintStyle: GoogleFonts.poppins(
-              color: theme.textSecondary,
-              fontSize: 12.5,
-            ),
-            prefixIcon: Icon(Icons.search, color: theme.primaryGreen, size: 22),
-            suffixIcon: IconButton(
-              icon: Icon(Icons.tune_rounded, color: theme.primaryGreen, size: 20),
-              tooltip: 'Buka Katalog & Filter',
-              onPressed: () => _navigateToCatalog(
-                query: _searchController.text.trim().isEmpty
-                    ? null
-                    : _searchController.text.trim(),
-              ),
-            ),
-            filled: true,
-            fillColor: theme.surfaceColor,
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBannerCarousel(AppColors theme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 155,
-            child: PageView.builder(
-              controller: _bannerController,
-              itemCount: _banners.length,
-              onPageChanged: (i) => setState(() => _bannerIndex = i),
-              itemBuilder: (ctx, i) {
-                final b = _banners[i];
-                return GestureDetector(
-                  onTap: widget.onGoToProducts,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: theme.softShadow,
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.asset(
-                            b['image']!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Container(
-                              color: theme.primaryGreen,
-                              child: Center(
-                                child: Icon(
-                                  Icons.agriculture_rounded,
-                                  color: theme.onImage,
-                                  size: 40,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                                colors: [
-                                  theme.imageOverlayStrong,
-                                  theme.imageOverlay.withValues(alpha: 0.15),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: theme.accentOrange,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    'TANI MART PROMO',
-                                    style: GoogleFonts.poppins(
-                                      color: theme.onPrimary,
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  b['title']!,
-                                  style: GoogleFonts.poppins(
-                                    color: theme.onImage,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.25,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  b['subtitle']!,
-                                  style: GoogleFonts.poppins(
-                                    color: theme.onImage.withValues(alpha: 0.9),
-                                    fontSize: 11,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              _banners.length,
-              (i) => AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: _bannerIndex == i ? 18 : 6,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: _bannerIndex == i ? theme.primaryGreen : theme.borderColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategorySection(AppColors theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Kategori Produk',
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: theme.textPrimary,
-                ),
-              ),
-              InkWell(
-                onTap: widget.onGoToProducts,
-                child: Text(
-                  'Lihat Semua',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryGreen,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: context.watch<ProductProvider>().categories.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 14),
-            itemBuilder: (ctx, i) {
-              final cat = context.read<ProductProvider>().categories[i];
-              return InkWell(
-                onTap: () => _navigateToCatalog(category: cat),
-                borderRadius: BorderRadius.circular(14),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 58,
-                      height: 58,
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: theme.surfaceColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: theme.borderColor),
-                        boxShadow: theme.softShadow,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.asset(
-                          ProductImages.getCategoryAsset(cat),
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, _, _) => Icon(
-                            Icons.category_rounded,
-                            color: theme.primaryGreen,
-                            size: 26,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      width: 66,
-                      child: Text(
-                        cat,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w500,
-                          color: theme.textPrimary,
-                          height: 1.15,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeader(String title, IconData icon, AppColors theme,
-      {VoidCallback? onSeeAll}) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Icon(icon, color: theme.primaryGreen, size: 20),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: theme.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (onSeeAll != null)
-            InkWell(
-              onTap: onSeeAll,
-              child: Text(
-                'Lihat Semua',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: theme.primaryGreen,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductHorizontalList(List<Product> products, AppColors theme) {
-    if (products.isEmpty) {
-      return SizedBox(
-        height: 50,
-        child: Center(
-          child: Text('Belum ada produk untuk kategori ini.',
-              style: TextStyle(color: theme.textSecondary, fontSize: 12)),
-        ),
-      );
-    }
-    return SizedBox(
-      height: 275,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: products.length,
-        itemBuilder: (ctx, i) => SizedBox(
-          width: 170,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: _ProductCard(
-              product: products[i],
-              theme: theme,
-              onTap: () => _openDetail(products[i]),
-              onAddToCart: () => _addToCart(products[i]),
-              compact: true,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildError(String message, AppColors theme) {
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        children: [
-          Icon(
-            Icons.wifi_off_rounded,
-            size: 52,
-            color: theme.textSecondary,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(color: theme.textSecondary, fontSize: 13),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () => context.read<ProductProvider>().refresh(),
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text('Coba Lagi'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openDetail(Product product) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProductDetailPage(
-          productId: product.id,
-          initialProduct: product,
-        ),
-      ),
-    );
-  }
-
-  void _addToCart(Product product) async {
-    final theme = AppColors.of(context);
-    if (!product.tersedia || product.stok <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Produk tidak tersedia atau stok telah habis.'),
-          backgroundColor: theme.errorRed,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+  Future<void> _add(Product product) async {
+    if (!product.tersedia || product.stok < 1) {
+      _message('Produk sedang tidak tersedia.');
       return;
     }
-    try {
-      final success = await context.read<CartProvider>().addItem(product.id, 1);
-      if (!mounted) return;
-      if (success) {
-        NotificationService.cartCountNotifier.value++;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${product.nama} berhasil masuk ke keranjang! 🛒'),
-            backgroundColor: theme.primaryGreen,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      } else {
-        final error = context.read<CartProvider>().errorMessage;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error ?? 'Gagal menambahkan ke keranjang.'),
-            backgroundColor: theme.errorRed,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Terjadi kesalahan jaringan: $error'),
-          backgroundColor: theme.errorRed,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    final ok = await context.read<CartProvider>().addItem(product.id, 1);
+    if (!mounted) return;
+    if (ok) {
+      NotificationService.cartCountNotifier.value++;
+      _message('${product.nama} ditambahkan ke keranjang.');
+    } else {
+      _message(context.read<CartProvider>().errorMessage ?? 'Produk gagal ditambahkan.');
     }
   }
-}
 
-class _ProductCard extends StatelessWidget {
-  final Product product;
-  final VoidCallback onTap;
-  final VoidCallback onAddToCart;
-  final bool compact;
-  final AppColors theme;
-
-  const _ProductCard({
-    required this.product,
-    required this.onTap,
-    required this.onAddToCart,
-    this.compact = false,
-    required this.theme,
-  });
-
-  String _formatRupiah(int value) {
-    return 'Rp ${value.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
-  }
+  void _message(String value) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(value), behavior: SnackBarBehavior.floating));
 
   @override
   Widget build(BuildContext context) {
-    final isAvailable = product.tersedia && product.stok > 0;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final provider = context.watch<ProductProvider>();
+    final products = provider.products;
+    final categories = <String>{'Semua', ...products.map((p) => p.kategori).where((e) => e.trim().isNotEmpty)}.toList();
+    final visible = products.where((p) => (_category == 'Semua' || p.kategori == _category) &&
+      (_search.text.isEmpty || p.nama.toLowerCase().contains(_search.text.toLowerCase()))).toList();
+    final featured = visible.where((p) => p.tersedia && p.stok > 0).take(6).toList();
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.surfaceColor,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: theme.borderColor, width: 0.8),
-          boxShadow: theme.softShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 1.0,
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(18)),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    ProductImage(
-                      imageUrl: product.foto,
-                      productName: product.nama,
-                      category: product.kategori,
-                      fit: BoxFit.cover,
-                    ),
-                    if (!isAvailable)
-                      Container(
-                        color: theme.imageOverlay,
-                        child: Center(
-                          child: Text(
-                            'Stok Habis',
-                            style: TextStyle(
-                              color: theme.onImage,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
-                    if (product.mudahRusak)
-                      Positioned(
-                        top: 6,
-                        left: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: theme.accentOrange,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Segar',
-                            style: TextStyle(
-                              color: theme.onPrimary,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.kategori,
-                      style: GoogleFonts.poppins(
-                        fontSize: 9.5,
-                        color: theme.primaryGreen,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      product.nama,
-                      style: GoogleFonts.poppins(
-                        fontSize: compact ? 12 : 13,
-                        fontWeight: FontWeight.w600,
-                        color: theme.textPrimary,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          _formatRupiah(product.harga),
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: theme.primaryGreen,
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '/${product.satuanJual}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 9.5,
-                            color: theme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 32,
-                      child: FilledButton(
-                        onPressed: isAvailable ? onAddToCart : null,
-                        style: FilledButton.styleFrom(
-            backgroundColor: AppColors.of(context).primaryGreen,
-                          disabledBackgroundColor: theme.borderColor,
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              isAvailable
-                                  ? Icons.add_shopping_cart
-                                  : Icons.remove_shopping_cart_outlined,
-                              size: 13,
-                              color: isAvailable
-                                  ? theme.onPrimary
-                                  : theme.textSecondary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              isAvailable ? '+ Keranjang' : 'Habis',
-                              style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: isAvailable
-                                    ? theme.onPrimary
-                                    : theme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: RefreshIndicator(
+        onRefresh: provider.refresh,
+        color: colors.primary,
+        child: CustomScrollView(slivers: [
+          SliverToBoxAdapter(child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 42, height: 42, decoration: BoxDecoration(color: colors.primary, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.eco_rounded, color: Colors.white, size: 25)),
+                const SizedBox(width: 11),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('TANIMART', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, color: colors.primary, fontSize: 17)),
+                  Text('Pasar segar, langsung di genggaman', style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+                ])),
+                IconButton.filledTonal(onPressed: widget.onGoToCart, icon: const Icon(Icons.shopping_bag_outlined), tooltip: 'Keranjang'),
+              ]),
+              const SizedBox(height: 22),
+              Text('Belanja lebih segar,', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, height: 1.1)),
+              Text('hidup lebih baik.', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: colors.primary, height: 1.2)),
+              const SizedBox(height: 7),
+              Text('Temukan kebutuhan pertanian dan harian pilihan.', style: theme.textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant)),
+              const SizedBox(height: 18),
+              TextField(controller: _search, onChanged: (_) => setState(() {}), onSubmitted: (_) => widget.onGoToProducts?.call(),
+                decoration: InputDecoration(hintText: 'Cari sayur, buah, sembako...', prefixIcon: const Icon(Icons.search_rounded), suffixIcon: _search.text.isEmpty ? null : IconButton(onPressed: () { _search.clear(); setState(() {}); }, icon: const Icon(Icons.close)), filled: true, fillColor: colors.surface, contentPadding: const EdgeInsets.symmetric(vertical: 15), border: OutlineInputBorder(borderRadius: BorderRadius.circular(17), borderSide: BorderSide(color: colors.outlineVariant)), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(17), borderSide: BorderSide(color: colors.outlineVariant)))),
+              const SizedBox(height: 18),
+              Container(width: double.infinity, padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: LinearGradient(colors: [colors.primary, Color.lerp(colors.primary, const Color(0xFF9BCB64), .42)!], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(22)),
+                child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.white.withValues(alpha: .18), borderRadius: BorderRadius.circular(20)), child: const Text('PILIHAN HARI INI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1))),
+                  const SizedBox(height: 12), const Text('Dari kebun\nuntuk keluarga.', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.15)),
+                  const SizedBox(height: 8), const Text('Belanja kebutuhan segar dengan mudah.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 14), TextButton(onPressed: widget.onGoToProducts, style: TextButton.styleFrom(backgroundColor: Colors.white, foregroundColor: colors.primary, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9)), child: const Text('Jelajahi produk  →', style: TextStyle(fontWeight: FontWeight.w800))),
+                ])), const SizedBox(width: 5), const Icon(Icons.spa_rounded, color: Colors.white, size: 88)])),
+              const SizedBox(height: 24),
+              _sectionTitle(context, 'Kategori', 'Pilih kebutuhanmu'),
+              const SizedBox(height: 12),
+              SizedBox(height: 42, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: categories.length, separatorBuilder: (_, _) => const SizedBox(width: 8), itemBuilder: (_, i) {
+                final value = categories[i]; final selected = _category == value;
+                return ChoiceChip(label: Text(value), selected: selected, onSelected: (_) => setState(() => _category = value), showCheckmark: false, labelStyle: TextStyle(fontWeight: FontWeight.w700, color: selected ? colors.onPrimary : colors.onSurfaceVariant), selectedColor: colors.primary, backgroundColor: colors.surface, side: BorderSide(color: selected ? colors.primary : colors.outlineVariant));
+              })),
+              const SizedBox(height: 24),
+              _sectionTitle(context, _category == 'Semua' ? 'Rekomendasi untukmu' : _category, 'Produk pilihan dari TaniMart', action: 'Lihat semua', onAction: widget.onGoToProducts),
+              const SizedBox(height: 13),
+            ]),
+          )),
+          if (provider.isLoading && products.isEmpty)
+            const SliverFillRemaining(hasScrollBody: false, child: Center(child: CircularProgressIndicator()))
+          else if (provider.errorMessage != null && products.isEmpty)
+            SliverFillRemaining(hasScrollBody: false, child: _stateMessage(context, Icons.wifi_off_rounded, 'Belum dapat memuat produk', provider.errorMessage!, 'Coba lagi', provider.refresh))
+          else if (featured.isEmpty)
+            SliverFillRemaining(hasScrollBody: false, child: _stateMessage(context, Icons.inventory_2_outlined, 'Produk belum tersedia', 'Coba kategori atau kata kunci lain.', 'Tampilkan semua', () => setState(() { _category = 'Semua'; _search.clear(); })))
+          else SliverPadding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 28), sliver: SliverGrid(delegate: SliverChildBuilderDelegate((context, index) => _FreshProductCard(product: featured[index], onTap: () => _open(featured[index]), onAdd: () => _add(featured[index])), childCount: featured.length), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 13, crossAxisSpacing: 13, childAspectRatio: .68))),
+          if (provider.isLoading && products.isNotEmpty) const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 2)),
+        ]),
       ),
     );
   }
+
+  Widget _sectionTitle(BuildContext context, String title, String subtitle, {String? action, VoidCallback? onAction}) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)), const SizedBox(height: 2), Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant))])), if (action != null) TextButton(onPressed: onAction, child: Text(action))]);
+
+  Widget _stateMessage(BuildContext context, IconData icon, String title, String detail, String button, VoidCallback onTap) => Center(child: Padding(padding: const EdgeInsets.all(28), child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 42, color: Theme.of(context).colorScheme.primary), const SizedBox(height: 12), Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)), const SizedBox(height: 5), Text(detail, textAlign: TextAlign.center), const SizedBox(height: 14), FilledButton(onPressed: onTap, child: Text(button))])));
 }
 
-class _LoadingSkeleton extends StatelessWidget {
-  const _LoadingSkeleton();
-
+class _FreshProductCard extends StatelessWidget {
+  final Product product; final VoidCallback onTap; final VoidCallback onAdd;
+  const _FreshProductCard({required this.product, required this.onTap, required this.onAdd});
   @override
   Widget build(BuildContext context) {
-    final theme = AppColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          CircularProgressIndicator(color: theme.primaryGreen),
-          const SizedBox(height: 12),
-          Text(
-            'Memuat produk segar Tani Mart...',
-            style: GoogleFonts.poppins(color: theme.textSecondary, fontSize: 12),
-          ),
-          const SizedBox(height: 40),
-        ],
-      ),
-    );
+    final c = Theme.of(context).colorScheme;
+    return Material(color: c.surface, borderRadius: BorderRadius.circular(18), child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: c.outlineVariant.withValues(alpha: .7))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(child: Stack(children: [Positioned.fill(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(17)), child: ProductImage(imageUrl: product.foto, productName: product.nama, category: product.kategori, fit: BoxFit.cover))), Positioned(left: 9, top: 9, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: c.surface.withValues(alpha: .94), borderRadius: BorderRadius.circular(30)), child: Text(product.kategori, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: c.onSurface))))])),
+      Padding(padding: const EdgeInsets.fromLTRB(11, 10, 11, 11), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(product.nama, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)), const SizedBox(height: 4), Text('Rp ${_rupiah(product.harga)}', style: TextStyle(color: c.primary, fontWeight: FontWeight.w900, fontSize: 14)), const SizedBox(height: 2), Text('per ${product.satuanJual} • Stok ${product.stok}', style: TextStyle(color: c.onSurfaceVariant, fontSize: 10)), const SizedBox(height: 8), SizedBox(width: double.infinity, height: 34, child: FilledButton.tonal(onPressed: product.tersedia && product.stok > 0 ? onAdd : null, style: FilledButton.styleFrom(padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), child: const Text('＋ Keranjang', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800))))]))
+    ]))));
   }
+  String _rupiah(int value) => value.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
 }

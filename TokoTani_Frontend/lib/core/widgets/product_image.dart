@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../theme/theme_extension.dart';
 import '../constants/product_images.dart';
+import '../config/api_config.dart';
 
 /// Widget gambar produk terpadu Tani Mart.
 /// Mendukung foto lokal (assets/images/products/) dan foto remote dari Laravel API.
@@ -32,13 +33,12 @@ class ProductImage extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget imageWidget;
 
-    final hasValidRemoteUrl = imageUrl != null &&
-        imageUrl!.trim().isNotEmpty &&
-        (imageUrl!.startsWith('http://') || imageUrl!.startsWith('https://'));
+    final resolvedUrl = _resolveImageUrl(imageUrl);
+    final hasValidRemoteUrl = resolvedUrl != null;
 
     if (hasValidRemoteUrl) {
       imageWidget = CachedNetworkImage(
-        imageUrl: imageUrl!,
+        imageUrl: resolvedUrl,
         width: width,
         height: height,
         fit: fit,
@@ -57,6 +57,26 @@ class ProductImage extends StatelessWidget {
     }
 
     return imageWidget;
+  }
+
+  /// API Laravel sering mengirim path relatif (/storage/...) atau URL localhost.
+  /// Ubah keduanya ke host API aktif agar dapat diakses dari Android emulator/perangkat.
+  String? _resolveImageUrl(String? raw) {
+    final value = raw?.trim();
+    if (value == null || value.isEmpty || value.toLowerCase() == 'null') return null;
+    final apiUri = Uri.tryParse(ApiConfig.baseUrl);
+    if (apiUri == null || apiUri.host.isEmpty) return null;
+    final origin = '${apiUri.scheme}://${apiUri.authority}';
+    final parsed = Uri.tryParse(value);
+    if (parsed != null && parsed.hasScheme) {
+      final localHost = ['localhost', '127.0.0.1', '0.0.0.0'].contains(parsed.host);
+      if (localHost) return parsed.replace(scheme: apiUri.scheme, host: apiUri.host, port: apiUri.hasPort ? apiUri.port : null).toString();
+      return value;
+    }
+    var path = value.replaceAll('\\', '/');
+    if (path.startsWith('storage/')) path = '/$path';
+    if (!path.startsWith('/')) path = '/storage/$path';
+    return '$origin$path';
   }
 
   Widget _buildLocalOrPlaceholder(BuildContext context) {

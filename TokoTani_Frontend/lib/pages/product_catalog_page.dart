@@ -29,7 +29,14 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
   String _searchQuery = '';
   late final TextEditingController _searchController;
 
-
+  List<String> get _categories {
+    final values = context.read<ProductProvider>().products
+        .map((product) => product.kategori.trim())
+        .where((category) => category.isNotEmpty)
+        .toSet()
+        .toList()..sort();
+    return ['Semua', ...values];
+  }
 
   @override
   void initState() {
@@ -37,21 +44,16 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
     _searchQuery = widget.initialQuery ?? '';
     _searchController = TextEditingController(text: _searchQuery);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      final provider = context.read<ProductProvider>();
-      await provider.loadCategories();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (widget.initialCategory != null) {
-        final query = widget.initialCategory!.toLowerCase().replaceAll(' & ', ' ');
-        String? match;
-        for (final category in provider.categories) {
-          if (category.toLowerCase().contains(query) || query.contains(category.toLowerCase())) {
-            match = category;
-            break;
-          }
-        }
-        provider.setCategory(match);
+        final match = _categories.firstWhere(
+          (category) => category.toLowerCase().contains(
+            widget.initialCategory!.toLowerCase().replaceAll(' & ', ' '),
+          ),
+          orElse: () => 'Semua',
+        );
+        context.read<ProductProvider>().setCategory(match);
       }
       _loadProducts();
     });
@@ -66,7 +68,9 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
   Future<void> _loadProducts({String? sortBy}) async {
     final provider = context.read<ProductProvider>();
     await provider.loadProducts(
-      kategori: provider.selectedCategory == 'Semua' ? null : provider.selectedCategory,
+      kategori: provider.selectedCategory == 'Semua'
+          ? null
+          : provider.selectedCategory,
       cari: _searchQuery.trim().isEmpty ? null : _searchQuery.trim(),
       sortBy: sortBy,
     );
@@ -184,10 +188,9 @@ class _ProductCatalogPageState extends State<ProductCatalogPage> {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: context.watch<ProductProvider>().categories.length + 1,
+        itemCount: _categories.length,
         itemBuilder: (ctx, i) {
-          final categories = context.read<ProductProvider>().categories;
-          final cat = i == 0 ? 'Semua' : categories[i - 1];
+          final cat = _categories[i];
           final isSelected = selectedCategory == cat;
           return Padding(
             padding: const EdgeInsets.only(right: 8),

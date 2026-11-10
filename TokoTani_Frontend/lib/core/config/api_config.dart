@@ -9,6 +9,7 @@ class ApiConfig {
 
   /// Base URL untuk peramban web dan desktop (Windows/macOS/Linux).
   static const String localBaseUrl = 'http://127.0.0.1:8000/api';
+  static const String buildTimeBaseUrl = String.fromEnvironment('API_BASE_URL');
 
   /// Base URL untuk pengujian pada perangkat fisik Android/iOS.
   /// Ganti dengan IP lokal Wi-Fi komputer/laptop pengembang (contoh: 192.168.1.10).
@@ -22,6 +23,7 @@ class ApiConfig {
     if (customBaseUrl != null && customBaseUrl!.isNotEmpty) {
       return customBaseUrl!;
     }
+    if (buildTimeBaseUrl.isNotEmpty) return buildTimeBaseUrl;
 
     if (kIsWeb) {
       return localBaseUrl;

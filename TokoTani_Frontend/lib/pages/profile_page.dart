@@ -298,7 +298,6 @@ class ProfilePage extends StatelessWidget {
     Color primaryGreen,
     Color lightGreen,
   ) {
-    final activeDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -339,7 +338,7 @@ class ProfilePage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
-                        activeDark
+                        themeProvider.isDark
                             ? Icons.dark_mode_outlined
                             : Icons.light_mode_outlined,
                         color: primaryGreen,
@@ -347,7 +346,7 @@ class ProfilePage extends StatelessWidget {
                       ),
                     ),
                     title: Text(
-                      activeDark ? 'Mode Gelap' : 'Mode Terang',
+                      themeProvider.isDark ? 'Mode Gelap' : 'Mode Terang',
                       style: GoogleFonts.poppins(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w500,
@@ -355,7 +354,7 @@ class ProfilePage extends StatelessWidget {
                       ),
                     ),
                     subtitle: Text(
-                      activeDark
+                      themeProvider.isDark
                           ? 'Tampilan gelap untuk kenyamanan malam hari'
                           : 'Tampilan terang untuk kenyamanan siang hari',
                       style: GoogleFonts.poppins(
@@ -363,28 +362,10 @@ class ProfilePage extends StatelessWidget {
                         color: textSecondary,
                       ),
                     ),
-                    trailing: DropdownButtonHideUnderline(
-                      child: DropdownButton<ThemeMode>(
-                        value: themeProvider.mode,
-                        borderRadius: BorderRadius.circular(12),
-                        items: const [
-                          DropdownMenuItem(
-                            value: ThemeMode.light,
-                            child: Text('Terang'),
-                          ),
-                          DropdownMenuItem(
-                            value: ThemeMode.dark,
-                            child: Text('Gelap'),
-                          ),
-                          DropdownMenuItem(
-                            value: ThemeMode.system,
-                            child: Text('Sistem'),
-                          ),
-                        ],
-                        onChanged: (mode) {
-                          if (mode != null) themeProvider.setTheme(mode);
-                        },
-                      ),
+                    trailing: Switch(
+                      value: themeProvider.isDark,
+                      activeThumbColor: primaryGreen,
+                      onChanged: (_) => themeProvider.toggleTheme(),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 14,

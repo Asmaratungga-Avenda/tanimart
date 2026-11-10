@@ -10,7 +10,13 @@ class ThemeProvider extends ChangeNotifier {
 
   ThemeMode get mode => _mode;
   bool get isLoading => _isLoading;
-  bool get isDark => _mode == ThemeMode.dark;
+  bool get isDark {
+    if (_mode == ThemeMode.system) {
+      // Fallback: assume light when system not yet detected
+      return false;
+    }
+    return _mode == ThemeMode.dark;
+  }
 
   ThemeProvider() {
     _loadTheme();
