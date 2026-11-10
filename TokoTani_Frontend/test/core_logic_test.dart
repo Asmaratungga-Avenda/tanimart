@@ -7,7 +7,10 @@ import 'package:http/testing.dart';
 import 'package:tokotani/core/config/api_config.dart';
 import 'package:tokotani/core/utils/formatters.dart';
 import 'package:tokotani/core/utils/order_status.dart';
+import 'package:tokotani/models/cart_item.dart';
 import 'package:tokotani/models/category.dart';
+import 'package:tokotani/models/courier.dart';
+import 'package:tokotani/models/payment_method.dart';
 import 'package:tokotani/providers/product_provider.dart';
 import 'package:tokotani/services/api_service.dart';
 
@@ -24,6 +27,126 @@ void main() {
     test('formatDate menerima tanggal API', () {
       expect(formatDate('2026-11-09'), '9 Nov 2026');
       expect(formatDate(null), '-');
+    });
+
+    test('formatDateTime memformat tanggal dan waktu secara tepat', () {
+      expect(formatDateTime('2026-11-09T17:49:00Z'), isNotNull);
+      expect(formatDateTime(null), '-');
+      expect(formatDateTime(''), '-');
+    });
+
+    test('toApiDate memformat objek DateTime ke format YYYY-MM-DD', () {
+      final date = DateTime(2026, 11, 9);
+      expect(toApiDate(date), '2026-11-09');
+    });
+  });
+
+  group('CartItem model', () {
+    test('menghitung subtotal dengan benar', () {
+      final item = CartItem(
+        id: 1,
+        produkId: 10,
+        nama: 'Tomat Segar',
+        harga: 15000,
+        jumlah: 3,
+        stok: 10,
+        satuanJual: 'kg',
+      );
+
+      expect(item.subtotal, 45000);
+      expect(item.isOutOfStock, isFalse);
+      expect(item.hasSufficientStock, isTrue);
+    });
+
+    test('validasi stok habis dan batas pesanan', () {
+      final itemHabis = CartItem(
+        id: 2,
+        produkId: 11,
+        nama: 'Cabai Rawit',
+        harga: 25000,
+        jumlah: 2,
+        stok: 0,
+        satuanJual: 'kg',
+      );
+
+      expect(itemHabis.isOutOfStock, isTrue);
+      expect(itemHabis.hasSufficientStock, isFalse);
+    });
+
+    test('copyWith memperbarui field secara spesifik', () {
+      final item = CartItem(
+        id: 1,
+        produkId: 10,
+        nama: 'Tomat Segar',
+        harga: 15000,
+        jumlah: 1,
+        stok: 10,
+        satuanJual: 'kg',
+      );
+
+      final updated = item.copyWith(jumlah: 5);
+      expect(updated.jumlah, 5);
+      expect(updated.subtotal, 75000);
+      expect(updated.nama, item.nama);
+    });
+
+    test('fromJson melakukan sanitasi string dan angka', () {
+      final item = CartItem.fromJson({
+        'id': '5',
+        'produk_id': '12',
+        'nama': '  Bayam Hijau  ',
+        'harga': '5000',
+        'jumlah': '2',
+        'stok': '20',
+        'satuan_jual': ' ikat ',
+      });
+
+      expect(item.id, 5);
+      expect(item.produkId, 12);
+      expect(item.nama, 'Bayam Hijau');
+      expect(item.harga, 5000);
+      expect(item.jumlah, 2);
+      expect(item.stok, 20);
+      expect(item.satuanJual, 'ikat');
+      expect(item.subtotal, 10000);
+    });
+  });
+
+  group('Courier & PaymentMethod models', () {
+    test('Courier mengenali gratis ongkir dan sanitasi nama', () {
+      final freeCourier = Courier.fromJson({
+        'id': 1,
+        'nama': '  Ambil di Kebun  ',
+        'tarif': 0,
+        'aktif': 1,
+      });
+
+      expect(freeCourier.nama, 'Ambil di Kebun');
+      expect(freeCourier.isGratisOngkir, isTrue);
+      expect(freeCourier.aktif, isTrue);
+
+      final regularCourier = Courier.fromJson({
+        'id': 2,
+        'nama': 'Kurir Standar',
+        'tarif': 15000,
+        'aktif': 'true',
+      });
+
+      expect(regularCourier.isGratisOngkir, isFalse);
+      expect(regularCourier.tarif, 15000);
+    });
+
+    test('PaymentMethod melakukan parsing dan sanitasi deskripsi', () {
+      final payment = PaymentMethod.fromJson({
+        'id': 1,
+        'nama': '  Transfer Bank  ',
+        'deskripsi': '  BCA / Mandiri / BRI  ',
+        'aktif': 1,
+      });
+
+      expect(payment.nama, 'Transfer Bank');
+      expect(payment.deskripsi, 'BCA / Mandiri / BRI');
+      expect(payment.aktif, isTrue);
     });
   });
 
