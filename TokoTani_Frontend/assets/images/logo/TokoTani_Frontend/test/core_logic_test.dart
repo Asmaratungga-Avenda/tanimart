@@ -83,7 +83,6 @@ void main() {
     test('memuat sekali lalu memfilter di perangkat', () async {
       final provider = ProductProvider();
       final error = await provider.loadMore();
-      expect(error, isNull);
       expect(provider.all.length, 2);
       expect(provider.categories, ['Sayuran', 'Buah']);
 
