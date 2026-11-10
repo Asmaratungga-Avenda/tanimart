@@ -269,9 +269,6 @@ flutter run
 Tautan video demonstrasi (maksimal lima menit): 
 Demonstrasikan menjalankan backend dan Flutter, registrasi/login, katalog, keranjang, checkout, riwayat pesanan, satu skenario galat, dan panel admin.
 
-Proyek Ini Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB Dan SisTer).
-
-
 Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB dan SisTer).
 
 ## 👥 Anggota Kelompok
@@ -288,13 +285,13 @@ Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB dan SisTer).
 
 ## Kontribusi
 
-Pengembangan TaniMart dilakukan secara kolaboratif. Setiap anggota tim dapat berkontribusi dengan cara:
+Pengembangan TaniMart dilakukan secara kolaboratif. Setiap anggota tim dapat berkontribusi dengan alur kerja Git berikut:
 
-1. Memeriksa kode program sebelum melakukan perubahan.
-2. Memperbaiki bug yang ditemukan.
-3. Menambahkan atau meningkatkan fitur aplikasi.
-4. Melakukan pengujian setelah perubahan.
-5. Mengirimkan perubahan melalui Git commit dan pull request.
+1. `git pull origin main` (Mengambil update terbaru dari tim/server).
+2. Lakukan perubahan / perbaikan fitur pada file yang ditugaskan.
+3. `git add .` (Menyiapkan file yang diubah).
+4. `git commit -m "pesan commit Anda"` (Menyimpan perubahan secara lokal dengan format pesan yang jelas).
+5. `git push origin main` (Mengirim hasil kerja ke repositori server).
 
-Gunakan pesan commit yang jelas agar setiap perubahan mudah dipahami dan ditelusuri.
+Gunakan pesan commit yang deskriptif (misal: `feat:`, `fix:`, `test:`, `docs:`) agar setiap perubahan mudah dipahami dan ditelusuri riwayatnya.
 
