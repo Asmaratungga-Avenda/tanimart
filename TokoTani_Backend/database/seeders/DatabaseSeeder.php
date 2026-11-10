@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -10,6 +11,26 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! app()->isProduction()) {
+            User::firstOrCreate(
+                ['email' => 'admin@tokotani.test'],
+                [
+                    'name' => 'Admin TaniMart',
+                    'password' => 'password',
+                    'role' => 'admin',
+                ],
+            );
+
+            User::firstOrCreate(
+                ['email' => 'user@tokotani.test'],
+                [
+                    'name' => 'Pelanggan TaniMart',
+                    'password' => 'password',
+                    'role' => 'customer',
+                ],
+            );
+        }
+
         DB::table('categories')->upsert([
             ['id' => 1, 'nama_kategori' => 'Sayuran Segar', 'gambar' => 'categories/sayuran.jpg', 'created_at' => now(), 'updated_at' => now()],
             ['id' => 2, 'nama_kategori' => 'Buah Segar', 'gambar' => 'categories/buah.jpg', 'created_at' => now(), 'updated_at' => now()],
@@ -22,6 +43,7 @@ class DatabaseSeeder extends Seeder
         DB::table('couriers')->upsert([
             ['id' => 1, 'nama' => 'Kurir Toko Area Dekat', 'tarif' => 10000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
             ['id' => 2, 'nama' => 'Kurir Toko Area Jauh', 'tarif' => 20000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'nama' => 'Kurir Toko Area Sedang', 'tarif' => 15000, 'aktif' => true, 'created_at' => now(), 'updated_at' => now()],
         ], ['id'], ['nama', 'tarif', 'aktif', 'updated_at']);
 
         DB::table('payment_methods')->upsert([
