@@ -35,7 +35,7 @@ class ProductProvider extends ChangeNotifier {
 
   String? _errorMessage;
   String? _refreshError;
-  bool _isOffline = false;
+  final bool _isOffline = false;
   bool _isRefreshing = false;
 
   List<Product> get all => _all;
