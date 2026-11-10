@@ -38,7 +38,9 @@ class Product {
     final foto = (json['foto'] ??
             json['gambar_url'] ??
             json['image_url'] ??
-            json['gambar'])
+            json['gambar'] ??
+            json['foto_produk'] ??
+            json['photo'])
         ?.toString();
 
     return Product(
@@ -59,6 +61,7 @@ class Product {
   bool get isAvailable => tersedia && stok > 0;
 
   Map<String, dynamic> toJson() => {
+    'id': id,
     'nama': nama,
     'harga': harga,
     'kategori': kategori,
@@ -67,6 +70,9 @@ class Product {
     'deskripsi': deskripsi,
     'satuan_jual': satuanJual,
     'mudah_rusak': mudahRusak ? 1 : 0,
-    if (foto != null && foto!.isNotEmpty) 'foto': foto,
+    'foto': foto,
+    'gambar': foto,
+    'gambar_url': foto,
+    'image_url': foto,
   };
 }

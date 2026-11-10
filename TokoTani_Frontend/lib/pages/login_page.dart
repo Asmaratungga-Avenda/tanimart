@@ -79,23 +79,26 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Center(child: AppLogo(full: true, size: 96)),
-                    const SizedBox(height: 20),
+                    const Center(child: AppLogo(full: true, size: 100)),
+                    const SizedBox(height: 24),
                     Text(
                       _registerMode ? 'Buat Akun TaniMart' : 'Masuk ke TaniMart',
                       textAlign: TextAlign.center,
-                      style: text.headlineSmall,
+                      style: text.headlineSmall?.copyWith(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       'Belanja Mudah, Hasil Bumi Berkualitas',
                       textAlign: TextAlign.center,
                       style: text.bodyMedium?.copyWith(color: p.textSecondary),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 28),
                     if (auth.errorMessage != null) ...[
                       InlineBanner(message: auth.errorMessage!),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                     ],
                     if (_registerMode) ...[
                       TextFormField(
@@ -104,7 +107,7 @@ class _LoginPageState extends State<LoginPage> {
                         textCapitalization: TextCapitalization.words,
                         autofillHints: const [AutofillHints.name],
                         decoration: InputDecoration(
-                          labelText: 'Nama',
+                          labelText: 'Nama Lengkap',
                           prefixIcon: const Icon(Icons.person_outline_rounded),
                           errorText: fieldErrors['name'],
                         ),
@@ -112,7 +115,7 @@ class _LoginPageState extends State<LoginPage> {
                             ? 'Nama wajib diisi'
                             : null,
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                     ],
                     TextFormField(
                       controller: _email,
@@ -133,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     TextFormField(
                       controller: _password,
                       obscureText: _obscure,
@@ -145,7 +148,7 @@ class _LoginPageState extends State<LoginPage> {
                       },
                       autofillHints: const [AutofillHints.password],
                       decoration: InputDecoration(
-                        labelText: 'Kata sandi',
+                        labelText: 'Kata Sandi',
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         errorText: fieldErrors['password'],
                         suffixIcon: IconButton(
@@ -170,14 +173,14 @@ class _LoginPageState extends State<LoginPage> {
                       },
                     ),
                     if (_registerMode) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       TextFormField(
                         controller: _confirm,
                         obscureText: _obscure,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _submit(),
                         decoration: const InputDecoration(
-                          labelText: 'Ulangi kata sandi',
+                          labelText: 'Ulangi Kata Sandi',
                           prefixIcon: Icon(Icons.lock_outline_rounded),
                         ),
                         validator: (v) => v != _password.text
@@ -185,13 +188,13 @@ class _LoginPageState extends State<LoginPage> {
                             : null,
                       ),
                     ],
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 24),
                     PrimaryButton(
-                      label: _registerMode ? 'Daftar' : 'Masuk',
+                      label: _registerMode ? 'Daftar Sekarang' : 'Masuk',
                       loading: auth.isSubmitting,
                       onPressed: _submit,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     TextButton(
                       onPressed: auth.isSubmitting ? null : _toggleMode,
                       child: Text(

@@ -134,7 +134,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final total = product.harga * _quantity;
 
     return Scaffold(
-      extendBodyBehindAppBar: false,
       body: Column(
         children: [
           Expanded(
@@ -152,7 +151,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           child: ProductImage(
                             url: product.foto,
                             cacheWidth: 900,
-                            iconSize: 64,
+                            height: double.infinity,
+                            width: double.infinity,
                           ),
                         ),
                         SafeArea(

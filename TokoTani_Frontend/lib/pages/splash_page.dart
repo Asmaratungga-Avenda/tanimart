@@ -24,19 +24,28 @@ class SplashPage extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const AppLogo(full: true, size: 120),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Text(
-                'Belanja Mudah\nHasil Bumi Berkualitas',
+                'TaniMart',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Belanja Mudah, Hasil Bumi Berkualitas',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: p.textSecondary,
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 32),
               const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(strokeWidth: 3),
               ),
             ],
           ),

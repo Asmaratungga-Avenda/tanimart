@@ -14,13 +14,13 @@ void main() {
 
     expect(find.text('Masuk ke TaniMart'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
-    expect(find.text('Kata sandi'), findsOneWidget);
+    expect(find.text('Kata Sandi'), findsOneWidget);
 
     await tester.tap(find.text('Belum punya akun? Daftar'));
     await tester.pumpAndSettle();
 
     expect(find.text('Buat Akun TaniMart'), findsOneWidget);
-    expect(find.text('Nama'), findsOneWidget);
-    expect(find.text('Ulangi kata sandi'), findsOneWidget);
+    expect(find.text('Nama Lengkap'), findsOneWidget);
+    expect(find.text('Ulangi Kata Sandi'), findsOneWidget);
   });
 }
