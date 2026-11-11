@@ -271,18 +271,6 @@ Demonstrasikan menjalankan backend dan Flutter, registrasi/login, katalog, keran
 
 Dikembangkan untuk keperluan pendidikan (UTS mata kuliah PAPB dan SisTer).
 
-## 👥 Anggota Kelompok
-
-| No | Nama Lengkap | NIM | Peran |
-| :---: | :--- | :---: | :---: |
-| 1 | Yudhistira Empi | 24102023 | Ketua |
-| 2 | Asmaratungga Avenda D.P. | 24102006 | Anggota |
-| 3 | Eka Yuvita Sari Widya Diningrum | 24102008 | Anggota |
-| 4 | Hikmah Nutriana | 24102011 | Anggota |
-| 5 | M. Adzahahabi Putra Darmawan | 24102013 | Anggota |
-| 6 | Moh Farhan Ali | 24102016 | Anggota |
-| 7 | Vera Adelia | 24102032 | Anggota |
-
 ## Kontribusi
 
 Pengembangan TaniMart dilakukan secara kolaboratif. Setiap anggota tim dapat berkontribusi dengan alur kerja Git berikut:
@@ -294,4 +282,16 @@ Pengembangan TaniMart dilakukan secara kolaboratif. Setiap anggota tim dapat ber
 5. `git push origin main` (Mengirim hasil kerja ke repositori server).
 
 Gunakan pesan commit yang deskriptif (misal: `feat:`, `fix:`, `test:`, `docs:`) agar setiap perubahan mudah dipahami dan ditelusuri riwayatnya.
+
+## Anggota Kelompok 4
+
+| No | Nama Lengkap | NIM | Peran |
+| :---: | :--- | :---: | :---: |
+| 1 | Yudhistira Empi | 24102023 | Ketua |
+| 2 | Asmaratungga Avenda D.P. | 24102006 | Anggota |
+| 3 | Eka Yuvita Sari Widya Diningrum | 24102008 | Anggota |
+| 4 | Hikmah Nutriana | 24102011 | Anggota |
+| 5 | M. Adzahahabi Putra Darmawan | 24102013 | Anggota |
+| 6 | Moh Farhan Ali | 24102016 | Anggota |
+| 7 | Fera Adelia | 24102032 | Anggota |
 
