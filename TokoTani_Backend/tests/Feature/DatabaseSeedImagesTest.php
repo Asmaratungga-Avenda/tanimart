@@ -4,12 +4,37 @@ namespace Tests\Feature;
 
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DatabaseSeedImagesTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_seeder_reuses_existing_category_ids_instead_of_assuming_fixed_ids(): void
+    {
+        DB::table('categories')->insert([
+            ['id' => 1, 'nama_kategori' => 'Kategori Lama', 'gambar' => null, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 8, 'nama_kategori' => 'Sayuran Segar', 'gambar' => null, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertDatabaseHas('categories', [
+            'id' => 1,
+            'nama_kategori' => 'Kategori Lama',
+        ]);
+        $this->assertDatabaseHas('categories', [
+            'id' => 8,
+            'nama_kategori' => 'Sayuran Segar',
+            'gambar' => 'categories/sayuranSegar/sayuran.jpg',
+        ]);
+        $this->assertDatabaseHas('products', [
+            'nama' => 'Bayam Hijau',
+            'category_id' => 8,
+        ]);
+    }
 
     public function test_seeded_image_references_exist_in_the_public_storage_disk(): void
     {

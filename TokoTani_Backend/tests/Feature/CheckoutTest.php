@@ -145,11 +145,12 @@ class CheckoutTest extends TestCase
             $product,
             $courier,
             $paymentMethod,
-            now()->toDateString()
+            now()->toDateString(),
+            2
         ))
-            ->assertUnprocessable()
+            ->assertStatus(409)
             ->assertJsonPath('status', 'gagal')
-            ->assertJsonPath('code', '422');
+            ->assertJsonPath('code', '409');
 
         $this->assertDatabaseHas('products', [
             'id' => $product->id,

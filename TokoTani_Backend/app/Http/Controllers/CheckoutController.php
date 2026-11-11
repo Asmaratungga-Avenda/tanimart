@@ -435,7 +435,7 @@ class CheckoutController extends Controller
                     if ($item['quantity'] > $product->stok) {
                         abort($this->jsonResponse(
                             'gagal',
-                            422,
+                            409,
                             "Stok untuk produk '{$product->nama}' tidak mencukupi"
                         ));
                     }

@@ -308,9 +308,9 @@ class PesananAcceptanceTest extends TestCase
             'X-Kunci-Idempoten' => 'acceptance-rollback-tengah',
             'X-Pelanggan-Id' => (string) $pelanggan->id,
         ])
-            ->assertUnprocessable()
+            ->assertStatus(409)
             ->assertJsonPath('status', 'gagal')
-            ->assertJsonPath('code', '422');
+            ->assertJsonPath('code', '409');
 
         $this->assertDatabaseCount('orders', 0);
         $this->assertDatabaseCount('order_items', 0);

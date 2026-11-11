@@ -100,6 +100,59 @@ class CheckoutDemoTest extends TestCase
         $this->assertDatabaseHas('products', ['id' => $product->id, 'stok' => 10]);
     }
 
+    public function test_demo_stok_kurang_menghasilkan_conflict(): void
+    {
+        $product = $this->createProduct(['stok' => 1]);
+        $courier = $this->createCourier();
+        $paymentMethod = $this->createPaymentMethod();
+
+        $this->postJson('/api/checkout', $this->checkoutPayload(
+            $product,
+            $courier,
+            $paymentMethod,
+            now()->toDateString(),
+            2
+        ), ['X-Kunci-Idempoten' => 'demo-stok-kurang'])
+            ->assertStatus(409)
+            ->assertJsonPath('status', 'gagal')
+            ->assertJsonPath('code', '409')
+            ->assertJsonPath('message', "Stok untuk produk '{$product->nama}' tidak mencukupi");
+
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'stok' => 1]);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_demo_checkout_gagal_di_rollback_seluruh_item(): void
+    {
+        $firstProduct = $this->createProduct(['nama' => 'Produk Rollback Pertama', 'stok' => 10]);
+        $outOfStockProduct = $this->createProduct([
+            'nama' => 'Produk Rollback Habis',
+            'stok' => 0,
+            'tersedia' => false,
+        ]);
+        $courier = $this->createCourier();
+        $paymentMethod = $this->createPaymentMethod();
+        $payload = $this->checkoutPayload(
+            $firstProduct,
+            $courier,
+            $paymentMethod,
+            now()->toDateString()
+        );
+        $payload['items'][] = [
+            'product_id' => $outOfStockProduct->id,
+            'quantity' => 1,
+        ];
+
+        $this->postJson('/api/checkout', $payload, ['X-Kunci-Idempoten' => 'demo-rollback'])
+            ->assertStatus(409)
+            ->assertJsonPath('code', '409');
+
+        $this->assertDatabaseHas('products', ['id' => $firstProduct->id, 'stok' => 10]);
+        $this->assertDatabaseHas('products', ['id' => $outOfStockProduct->id, 'stok' => 0]);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
+    }
+
     public function test_demo_retry_tidak_membuat_pesanan_ganda(): void
     {
         $product = $this->createProduct([

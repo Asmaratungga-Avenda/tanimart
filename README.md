@@ -232,6 +232,68 @@ php artisan test --filter=KurirTest
 
 Suite backend mencakup validasi checkout, perhitungan server, snapshot transaksi, idempotensi, rollback, keranjang, tarif dan penghapusan kurir, matriks transisi status, serta checkout konkuren. Jalankan pengujian frontend dari `TokoTani_Frontend` dengan `flutter analyze` dan `flutter test`. Hasil yang dicatat pada dokumen terdahulu merupakan snapshot dari waktu berbeda; gunakan hasil perintah terbaru sebagai acuan.
 
+### Uji API Checkout dengan Postman
+
+Collection siap impor: [`postman/TaniMart Checkout Tests.postman_collection.json`](./postman/TaniMart%20Checkout%20Tests.postman_collection.json). Collection menyiapkan produk melalui API admin, mengambil token, menguji endpoint publik dan keranjang, lalu memeriksa validasi checkout, stok nol, stok kurang, checkout sukses, rollback, retry idempoten, dan transisi status ilegal.
+
+1. Pastikan database lokal berisi seed dan server berjalan:
+
+   ```powershell
+   cd TokoTani_Backend
+   php artisan migrate --seed
+   php artisan serve
+   ```
+
+2. Di Postman, pilih **Import → File**, lalu impor collection JSON tersebut. Gunakan collection pada database lokal khusus pengujian karena collection membuat beberapa produk baru.
+3. Jika URL atau akun berbeda, buka collection **Variables** dan sesuaikan `base_url`, `admin_email`, `admin_password`, `customer_email`, dan `customer_password`. Nilai default memakai `http://127.0.0.1:8000/api` serta akun demo hasil seeder.
+4. Buka **Runner**, pilih collection `TaniMart - Checkout Acceptance Tests`, dan jalankan request **berurutan**. Request berikutnya memakai token dan ID yang disimpan otomatis oleh script tes.
+5. Semua tes Postman harus berstatus PASS. Simpan bukti dengan screenshot status request dan tab **Test Results**. Uji memakai DB lokal, bukan production.
+
+Status dan bentuk respons yang diuji:
+
+| Skenario | Hasil yang diharapkan |
+|---|---|
+| Produk stok 0 atau tidak tersedia | HTTP `409`, `code: "409"`, pesan produk habis/tidak tersedia |
+| Stok positif tetapi jumlah pesanan melebihi stok | HTTP `409`, pesan stok produk tidak mencukupi |
+| Field checkout wajib hilang/tidak valid | HTTP `422`, `errors` memuat nama field yang gagal |
+| Checkout sukses | HTTP `201`; stok berkurang sesuai jumlah |
+| Item kedua checkout gagal | HTTP `409`; transaksi rollback, stok item pertama dan jumlah order tidak berubah |
+| Checkout ulang dengan key dan payload sama | Request pertama `201`, retry `200`, ID sama, hanya satu order |
+| Transisi `menunggu_pembayaran` langsung ke `dikirim` | HTTP `409`; status order tetap `menunggu_pembayaran` |
+
+Respons error stok tidak cukup saat ini berbentuk:
+
+```json
+{
+  "success": false,
+  "status": "gagal",
+  "code": "409",
+  "message": "Stok untuk produk 'Nama Produk' tidak mencukupi",
+  "data": null,
+  "meta": null
+}
+```
+
+Contoh bukti stok checkout sukses—ganti ID dan kunci dengan nilai yang terlihat pada Postman:
+
+```sql
+SELECT id, nama, stok, tersedia
+FROM products
+WHERE id = <product_id>;
+
+SELECT id, customer_id, status, idempotency_key, subtotal, ongkir, total_harga
+FROM orders
+WHERE idempotency_key = '<key_checkout>';
+
+SELECT COUNT(*) AS jumlah_order
+FROM orders
+WHERE idempotency_key = '<key_checkout>';
+```
+
+Catat stok sebelum request (misalnya `10`) dan sesudah checkout 2 unit (harus `8`); `jumlah_order` harus `1`. Untuk rollback, jalankan query produk sebelum dan sesudah request multi-item yang gagal: stok produk pertama harus tetap sama, dan query `orders` berdasarkan key rollback harus menghasilkan nol baris.
+
+Collection mencakup endpoint publik katalog/kategori/banner/kurir/metode pembayaran, endpoint keranjang pelanggan, autentikasi, checkout, riwayat/detail pesanan, serta perubahan status admin. Endpoint CRUD admin, alias endpoint, dan endpoint pengiriman/pembayaran yang tidak ada pada skenario collection dapat diuji dengan pola yang sama: gunakan Bearer token sesuai peran, kirim `Accept: application/json`, periksa status HTTP dan body `status`/`code`, lalu verifikasi efek database bila endpoint mengubah data.
+
 ## Troubleshooting
 
 | Masalah | Solusi |
