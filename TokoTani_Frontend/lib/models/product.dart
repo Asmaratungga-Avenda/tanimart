@@ -1,3 +1,4 @@
+
 class Product {
   final int id;
   final String nama;
@@ -27,7 +28,10 @@ class Product {
     final rawTersedia = json['tersedia'];
     final isTersedia = rawTersedia == null
         ? true
-        : (rawTersedia == true || rawTersedia == 1 || '$rawTersedia' == '1' || '$rawTersedia'.toLowerCase() == 'true');
+        : (rawTersedia == true ||
+            rawTersedia == 1 ||
+            '$rawTersedia' == '1' ||
+            '$rawTersedia'.toLowerCase() == 'true');
 
     final rawMudahRusak = json['mudah_rusak'];
     final isMudahRusak = rawMudahRusak == true ||
@@ -43,12 +47,18 @@ class Product {
             json['photo'])
         ?.toString();
 
+    final nama = '${json['nama'] ?? ''}'.trim();
+    final rawKategori = '${json['kategori'] ?? ''}'.trim();
+
+    final harga = int.tryParse('${json['harga'] ?? 0}') ?? 0;
+    final stok = int.tryParse('${json['stok'] ?? 0}') ?? 0;
+
     return Product(
       id: int.tryParse('${json['id']}') ?? 0,
-      nama: '${json['nama'] ?? ''}',
-      harga: int.tryParse('${json['harga'] ?? 0}') ?? 0,
-      kategori: '${json['kategori'] ?? 'Umum'}',
-      stok: int.tryParse('${json['stok'] ?? 0}') ?? 0,
+      nama: nama,
+      harga: harga.clamp(0, 2147483647),
+      kategori: rawKategori.isEmpty ? 'Umum' : rawKategori,
+      stok: stok.clamp(0, 2147483647),
       tersedia: isTersedia,
       deskripsi: json['deskripsi']?.toString(),
       satuanJual: '${json['satuan_jual'] ?? 'kg'}',
@@ -57,22 +67,22 @@ class Product {
     );
   }
 
-  /// Dapat dibeli: tersedia menurut server dan stok masih ada.
+  /// Produk dapat dibeli jika tersedia dan stok masih ada.
   bool get isAvailable => tersedia && stok > 0;
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'nama': nama,
-    'harga': harga,
-    'kategori': kategori,
-    'stok': stok,
-    'tersedia': tersedia ? 1 : 0,
-    'deskripsi': deskripsi,
-    'satuan_jual': satuanJual,
-    'mudah_rusak': mudahRusak ? 1 : 0,
-    'foto': foto,
-    'gambar': foto,
-    'gambar_url': foto,
-    'image_url': foto,
-  };
+        'id': id,
+        'nama': nama,
+        'harga': harga,
+        'kategori': kategori,
+        'stok': stok,
+        'tersedia': tersedia ? 1 : 0,
+        'deskripsi': deskripsi,
+        'satuan_jual': satuanJual,
+        'mudah_rusak': mudahRusak ? 1 : 0,
+        'foto': foto,
+        'gambar': foto,
+        'gambar_url': foto,
+        'image_url': foto,
+      };
 }

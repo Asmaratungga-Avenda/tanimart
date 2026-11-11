@@ -38,6 +38,10 @@ class Product extends Model
     protected static function booted(): void
     {
         static::saving(function (Product $product) {
+            if ($product->stok < 0) {
+                $product->stok = 0;
+            }
+
             if ($product->stok <= 0) {
                 $product->tersedia = false;
             }
@@ -96,5 +100,21 @@ class Product extends Model
     public function carts(): HasMany
     {
         return $this->hasMany(Cart::class);
+    }
+
+    /**
+     * Scope untuk produk yang siap dibeli (tersedia dan memiliki stok).
+     */
+    public function scopeTersedia($query)
+    {
+        return $query->where('tersedia', true)->where('stok', '>', 0);
+    }
+
+    /**
+     * Scope untuk produk yang tergolong mudah rusak (perishable).
+     */
+    public function scopeMudahRusak($query)
+    {
+        return $query->where('mudah_rusak', true);
     }
 }

@@ -11,6 +11,9 @@ class Courier {
     this.aktif = true,
   });
 
+  /// Memeriksa apakah kurir bebas biaya / gratis ongkir.
+  bool get isGratisOngkir => tarif == 0;
+
   factory Courier.fromJson(Map<String, dynamic> json) {
     final rawAktif = json['aktif'];
     final isAktif =
@@ -19,10 +22,13 @@ class Courier {
         '$rawAktif' == '1' ||
         '$rawAktif'.toLowerCase() == 'true';
 
+    final nama = '${json['nama'] ?? ''}'.trim();
+    final tarif = (int.tryParse('${json['tarif'] ?? 0}') ?? 0).clamp(0, 2147483647);
+
     return Courier(
       id: int.tryParse('${json['id']}') ?? 0,
-      nama: '${json['nama'] ?? ''}',
-      tarif: int.tryParse('${json['tarif'] ?? 0}') ?? 0,
+      nama: nama,
+      tarif: tarif,
       aktif: isAktif,
     );
   }

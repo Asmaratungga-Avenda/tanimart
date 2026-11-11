@@ -21,6 +21,40 @@ class CartItem {
     this.foto,
   });
 
+  /// Menghitung subtotal harga item (harga * jumlah).
+  int get subtotal => harga * jumlah;
+
+  /// Memeriksa apakah stok produk habis.
+  bool get isOutOfStock => stok <= 0;
+
+  /// Memeriksa apakah stok masih mencukupi untuk jumlah yang diinginkan.
+  bool get hasSufficientStock => stok >= jumlah && stok > 0;
+
+  /// Salinan objek CartItem dengan pembaruan nilai tertentu.
+  CartItem copyWith({
+    int? id,
+    int? produkId,
+    String? nama,
+    int? harga,
+    int? jumlah,
+    int? stok,
+    String? satuanJual,
+    bool? mudahRusak,
+    String? foto,
+  }) {
+    return CartItem(
+      id: id ?? this.id,
+      produkId: produkId ?? this.produkId,
+      nama: nama ?? this.nama,
+      harga: harga ?? this.harga,
+      jumlah: jumlah ?? this.jumlah,
+      stok: stok ?? this.stok,
+      satuanJual: satuanJual ?? this.satuanJual,
+      mudahRusak: mudahRusak ?? this.mudahRusak,
+      foto: foto ?? this.foto,
+    );
+  }
+
   factory CartItem.fromJson(Map<String, dynamic> json) {
     // Mendukung respons dengan objek produk bersarang (relasi Eloquent) maupun kolom rata
     final produk = json['produk'] is Map
@@ -43,14 +77,20 @@ class CartItem {
             json['gambar'])
         ?.toString();
 
+    final nama = '${produk['nama'] ?? json['nama'] ?? 'Produk Pertanian'}'.trim();
+    final harga = (int.tryParse('${produk['harga'] ?? json['harga'] ?? 0}') ?? 0).clamp(0, 2147483647);
+    final jumlah = (int.tryParse('${json['jumlah'] ?? 1}') ?? 1).clamp(1, 2147483647);
+    final stok = (int.tryParse('${produk['stok'] ?? json['stok'] ?? 0}') ?? 0).clamp(0, 2147483647);
+    final satuanJual = '${produk['satuan_jual'] ?? json['satuan_jual'] ?? 'kg'}'.trim();
+
     return CartItem(
       id: int.tryParse('${json['id']}') ?? 0,
       produkId: int.tryParse('${json['produk_id'] ?? produk['id']}') ?? 0,
-      nama: '${produk['nama'] ?? json['nama'] ?? 'Produk Pertanian'}',
-      harga: int.tryParse('${produk['harga'] ?? json['harga'] ?? 0}') ?? 0,
-      jumlah: int.tryParse('${json['jumlah'] ?? 1}') ?? 1,
-      stok: int.tryParse('${produk['stok'] ?? json['stok'] ?? 0}') ?? 0,
-      satuanJual: '${produk['satuan_jual'] ?? json['satuan_jual'] ?? 'kg'}',
+      nama: nama.isEmpty ? 'Produk Pertanian' : nama,
+      harga: harga,
+      jumlah: jumlah,
+      stok: stok,
+      satuanJual: satuanJual.isEmpty ? 'kg' : satuanJual,
       mudahRusak: isMudahRusak,
       foto: foto,
     );
