@@ -6,6 +6,9 @@ class OrderModel {
   final int id;
   final String namaPenerima;
   final String alamatPenerima;
+  final double? latitude;
+  final double? longitude;
+  final double? accuracy;
   final int kurirId;
   final Courier? courier;
   final int paymentMethodId;
@@ -23,6 +26,9 @@ class OrderModel {
     required this.id,
     required this.namaPenerima,
     required this.alamatPenerima,
+    this.latitude,
+    this.longitude,
+    this.accuracy,
     required this.kurirId,
     this.courier,
     required this.paymentMethodId,
@@ -41,24 +47,26 @@ class OrderModel {
     String? status,
     Courier? courier,
     PaymentMethod? paymentMethod,
-  }) =>
-      OrderModel(
-        id: id,
-        namaPenerima: namaPenerima,
-        alamatPenerima: alamatPenerima,
-        kurirId: kurirId,
-        courier: courier ?? this.courier,
-        paymentMethodId: paymentMethodId,
-        paymentMethod: paymentMethod ?? this.paymentMethod,
-        subtotal: subtotal,
-        ongkir: ongkir,
-        totalHarga: totalHarga,
-        status: status ?? this.status,
-        tanggalAntar: tanggalAntar,
-        createdAt: createdAt,
-        idempotencyKey: idempotencyKey,
-        items: items,
-      );
+  }) => OrderModel(
+    id: id,
+    namaPenerima: namaPenerima,
+    alamatPenerima: alamatPenerima,
+    latitude: latitude,
+    longitude: longitude,
+    accuracy: accuracy,
+    kurirId: kurirId,
+    courier: courier ?? this.courier,
+    paymentMethodId: paymentMethodId,
+    paymentMethod: paymentMethod ?? this.paymentMethod,
+    subtotal: subtotal,
+    ongkir: ongkir,
+    totalHarga: totalHarga,
+    status: status ?? this.status,
+    tanggalAntar: tanggalAntar,
+    createdAt: createdAt,
+    idempotencyKey: idempotencyKey,
+    items: items,
+  );
 
   Map<String, dynamic> toJson() {
     return {
@@ -66,6 +74,9 @@ class OrderModel {
       'order_id': id,
       'nama_penerima': namaPenerima,
       'alamat_penerima': alamatPenerima,
+      'latitude': latitude,
+      'longitude': longitude,
+      'accuracy': accuracy,
       'kurir_id': kurirId,
       'payment_method_id': paymentMethodId,
       'subtotal': subtotal,
@@ -86,15 +97,18 @@ class OrderModel {
     final rawItems = json['items'] ?? json['order_items'] ?? [];
     final itemsList = rawItems is List
         ? rawItems
-            .whereType<Map>()
-            .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
-            .toList()
+              .whereType<Map>()
+              .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
         : <OrderItemModel>[];
 
     return OrderModel(
       id: int.tryParse('${json['id']}') ?? 0,
       namaPenerima: '${json['nama_penerima'] ?? ''}',
       alamatPenerima: '${json['alamat_penerima'] ?? ''}',
+      latitude: double.tryParse('${json['latitude'] ?? ''}'),
+      longitude: double.tryParse('${json['longitude'] ?? ''}'),
+      accuracy: double.tryParse('${json['accuracy'] ?? ''}'),
       kurirId: int.tryParse('${json['kurir_id'] ?? 0}') ?? 0,
       courier: courierData is Map
           ? Courier.fromJson(Map<String, dynamic>.from(courierData))
@@ -156,11 +170,11 @@ class OrderItemModel {
         : '${json['nama'] ?? 'Produk'}';
     final foto = produk is Map
         ? (produk['foto'] ??
-                produk['gambar_url'] ??
-                produk['image_url'] ??
-                produk['gambar'] ??
-                json['foto_produk'])
-            ?.toString()
+                  produk['gambar_url'] ??
+                  produk['image_url'] ??
+                  produk['gambar'] ??
+                  json['foto_produk'])
+              ?.toString()
         : json['foto_produk']?.toString();
 
     return OrderItemModel(

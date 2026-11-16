@@ -377,6 +377,9 @@ class CheckoutController extends Controller
         $validator = Validator::make($inputData, [
             'nama_penerima' => 'required|string|max:255',
             'alamat_penerima' => 'required|string|max:2000',
+            'latitude' => 'nullable|required_with:longitude|numeric|between:-90,90',
+            'longitude' => 'nullable|required_with:latitude|numeric|between:-180,180',
+            'accuracy' => 'nullable|numeric|min:0|max:100000',
             'kurir_id' => [
                 'required',
                 Rule::exists('couriers', 'id')
@@ -493,6 +496,9 @@ class CheckoutController extends Controller
                     'pelanggan_id' => $customerId,
                     'nama_penerima' => $validated['nama_penerima'],
                     'alamat_penerima' => $validated['alamat_penerima'],
+                    'latitude' => $validated['latitude'] ?? null,
+                    'longitude' => $validated['longitude'] ?? null,
+                    'accuracy' => $validated['accuracy'] ?? null,
                     'kurir_id' => $validated['kurir_id'],
                     'payment_method_id' => $validated['payment_method_id'],
                     'subtotal' => $subtotal,

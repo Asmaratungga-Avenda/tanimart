@@ -9,8 +9,10 @@ import '../core/utils/formatters.dart';
 import '../core/utils/order_status.dart';
 import '../core/utils/ui.dart';
 import '../models/courier.dart';
+import '../models/delivery_location.dart';
 import '../models/order.dart';
 import '../models/payment_method.dart';
+import 'location_picker_page.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/navigation_provider.dart';
@@ -42,6 +44,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   List<PaymentMethod> _payments = const [];
   Courier? _courier;
   PaymentMethod? _payment;
+  DeliveryLocation? _deliveryLocation;
   DateTime _deliveryDate = DateTime.now();
 
   bool _loadingOptions = true;
@@ -75,10 +78,48 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final accountName = auth.user?['name']?.toString() ?? '';
     final saved = await AddressStore.load(userId);
     if (!mounted) return;
-    if (_name.text.isEmpty) {
-      _name.text = (saved?.name.isNotEmpty ?? false) ? saved!.name : accountName;
-    }
-    if (_address.text.isEmpty && saved != null) _address.text = saved.address;
+    setState(() {
+      if (_name.text.isEmpty) {
+        _name.text = (saved?.name.isNotEmpty ?? false)
+            ? saved!.name
+            : accountName;
+      }
+      if (_address.text.isEmpty && saved != null) {
+        _address.text = saved.address;
+        final latitude = saved.latitude;
+        final longitude = saved.longitude;
+        if (latitude != null && longitude != null) {
+          final location = DeliveryLocation(
+            address: saved.address,
+            latitude: latitude,
+            longitude: longitude,
+            accuracy: saved.accuracy,
+          );
+          if (location.isValid) _deliveryLocation = location;
+        }
+      }
+    });
+  }
+
+  Future<void> _selectDeliveryLocation() async {
+    final location = await Navigator.of(context).push<DeliveryLocation>(
+      MaterialPageRoute<DeliveryLocation>(
+        builder: (_) => LocationPickerPage(
+          initialLocation: _deliveryLocation,
+          initialAddress: _address.text.trim(),
+        ),
+      ),
+    );
+    if (!mounted || location == null || !location.isValid) return;
+
+    setState(() {
+      _deliveryLocation = location;
+      _address.text = location.address;
+      _serverErrors = {..._serverErrors}
+        ..remove('latitude')
+        ..remove('longitude')
+        ..remove('alamat_penerima');
+    });
   }
 
   Future<void> _loadOptions() async {
@@ -92,7 +133,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
         ApiService.getPaymentMethods(),
       ]);
       if (!mounted) return;
-      final couriers = (results[0] as List<Courier>).where((c) => c.aktif).toList();
+      final couriers = (results[0] as List<Courier>)
+          .where((c) => c.aktif)
+          .toList();
       final payments = (results[1] as List<PaymentMethod>)
           .where((m) => m.aktif)
           .toList();
@@ -163,11 +206,37 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
   }
 
+  String? _validationSummary(ApiException error) {
+    const displayedFields = {
+      'nama_penerima',
+      'alamat_penerima',
+      'latitude',
+      'longitude',
+      'accuracy',
+      'tanggal_antar',
+      'kurir_id',
+      'payment_method_id',
+    };
+    final otherErrors = error.fieldErrors.entries
+        .where((entry) => !displayedFields.contains(entry.key))
+        .map((entry) => entry.value.trim())
+        .where((message) => message.isNotEmpty)
+        .toSet()
+        .toList();
+    if (otherErrors.isNotEmpty) return otherErrors.join('\n');
+    return error.fieldErrors.isEmpty ? error.message : null;
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
     final cart = context.read<CartProvider>();
     if (cart.isEmpty) {
       showAppSnack(context, 'Keranjang kosong.', error: true);
+      return;
+    }
+    final deliveryLocation = _deliveryLocation;
+    if (deliveryLocation == null || !deliveryLocation.isValid) {
+      await _selectDeliveryLocation();
       return;
     }
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -198,6 +267,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
       final response = await ApiService.checkout({
         'nama_penerima': recipient,
         'alamat_penerima': address,
+        'latitude': deliveryLocation.latitude,
+        'longitude': deliveryLocation.longitude,
+        if (deliveryLocation.accuracy != null)
+          'accuracy': deliveryLocation.accuracy,
         'kurir_id': courier.id,
         'payment_method_id': payment.id,
         'tanggal_antar': toApiDate(_deliveryDate),
@@ -219,13 +292,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
       unawaited(
         AddressStore.save(
           auth.userId,
-          SavedAddress(name: recipient, address: address),
+          SavedAddress(
+            name: recipient,
+            address: address,
+            latitude: deliveryLocation.latitude,
+            longitude: deliveryLocation.longitude,
+            accuracy: deliveryLocation.accuracy,
+          ),
         ),
       );
       if (!mounted) return;
       await navigator.pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => OrderDetailPage(orderId: order.id, initialOrder: order),
+          builder: (_) =>
+              OrderDetailPage(orderId: order.id, initialOrder: order),
         ),
       );
     } on ApiException catch (e) {
@@ -233,7 +313,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       if (e.statusCode == 422) {
         _idempotencyKey = null;
         setState(() => _serverErrors = e.fieldErrors);
-        setState(() => _generalError = e.message);
+        setState(() => _generalError = _validationSummary(e));
         _formKey.currentState?.validate();
       } else if (e.statusCode == 409) {
         _idempotencyKey = null;
@@ -284,7 +364,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
     } else if (_loadingOptions) {
       body = const LoadingView();
-    } else if (_optionsError != null && (_couriers.isEmpty || _payments.isEmpty)) {
+    } else if (_optionsError != null &&
+        (_couriers.isEmpty || _payments.isEmpty)) {
       body = ErrorView(message: _optionsError!, onRetry: _loadOptions);
     } else {
       final shipping = _courier?.tarif ?? 0;
@@ -351,6 +432,49 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       return null;
                     },
                   ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: _submitting ? null : _selectDeliveryLocation,
+                      icon: const Icon(Icons.map_outlined),
+                      label: Text(
+                        _deliveryLocation == null
+                            ? 'Pilih Lokasi di Peta'
+                            : 'Ubah Lokasi',
+                      ),
+                    ),
+                  ),
+                  if (_deliveryLocation != null) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: p.brandSoft,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Lokasi terkonfirmasi · '
+                        '${_deliveryLocation!.latitude.toStringAsFixed(6)}, '
+                        '${_deliveryLocation!.longitude.toStringAsFixed(6)}'
+                        '${_deliveryLocation!.accuracy == null ? '' : ' · akurasi ±${_deliveryLocation!.accuracy!.round()} m'}',
+                        style: text.bodySmall?.copyWith(color: p.brandText),
+                      ),
+                    ),
+                  ],
+                  if (_serverErrors['latitude'] != null ||
+                      _serverErrors['longitude'] != null ||
+                      _serverErrors['accuracy'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        _serverErrors['latitude'] ??
+                            _serverErrors['longitude'] ??
+                            _serverErrors['accuracy']!,
+                        style: text.bodySmall?.copyWith(color: p.danger),
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   InkWell(
                     onTap: _pickDate,
@@ -386,6 +510,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     ),
                     const SizedBox(height: 8),
                   ],
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Tarif kurir mengikuti data yang ditetapkan toko; '
+                      'backend belum menyediakan estimasi berdasarkan jarak.',
+                      style: text.bodySmall?.copyWith(color: p.textSecondary),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -455,7 +587,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
       );
     }
 
-    final canSubmit = cart.hasLoaded &&
+    final canSubmit =
+        cart.hasLoaded &&
         !cart.isEmpty &&
         !_loadingOptions &&
         _courier != null &&
@@ -476,7 +609,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                   child: PrimaryButton(
                     label: 'Buat Pesanan',
-                    trailing: formatRupiah(cart.subtotal + (_courier?.tarif ?? 0)),
+                    trailing: formatRupiah(
+                      cart.subtotal + (_courier?.tarif ?? 0),
+                    ),
                     loading: _submitting,
                     onPressed: _submit,
                   ),

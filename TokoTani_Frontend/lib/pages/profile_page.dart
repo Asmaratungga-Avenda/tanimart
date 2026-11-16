@@ -65,40 +65,58 @@ class ProfilePage extends StatelessWidget {
               bottom: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 32,
-                      backgroundColor: p.onBrand,
-                      child: Text(
-                        initial,
-                        style: text.headlineSmall?.copyWith(
-                          color: BrandColors.deep,
-                        ),
+                    Text(
+                      'Profil Saya',
+                      style: text.titleMedium?.copyWith(
+                        color: p.onBrand.withValues(alpha: 0.9),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: text.titleLarge?.copyWith(color: p.onBrand),
-                          ),
-                          if (auth.email.isNotEmpty)
-                            Text(
-                              auth.email,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: text.bodySmall?.copyWith(
-                                color: p.onBrand.withValues(alpha: 0.9),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 32,
+                          backgroundColor: p.onBrand.withValues(alpha: 0.22),
+                          child: CircleAvatar(
+                            radius: 27,
+                            backgroundColor: p.onBrand,
+                            child: Text(
+                              initial,
+                              style: text.headlineSmall?.copyWith(
+                                color: BrandColors.deep,
                               ),
                             ),
-                        ],
-                      ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: text.titleLarge?.copyWith(
+                                  color: p.onBrand,
+                                ),
+                              ),
+                              if (auth.email.isNotEmpty)
+                                Text(
+                                  auth.email,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: text.bodySmall?.copyWith(
+                                    color: p.onBrand.withValues(alpha: 0.9),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -12,6 +12,7 @@ import '../providers/navigation_provider.dart';
 import '../providers/product_provider.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/app_search_field.dart';
+import '../widgets/banner_carousel.dart';
 import '../widgets/product_card.dart';
 import '../widgets/section_header.dart';
 import '../widgets/state_views.dart';
@@ -215,7 +216,7 @@ class _HomePageState extends State<HomePage> {
                             _openCatalog(query: value.trim()),
                       ),
                       const SizedBox(height: 16),
-                      _PromoBanner(onTap: () => _openCatalog()),
+                      BannerCarousel(onTap: () => _openCatalog()),
                     ],
                   ),
                 ),
@@ -257,32 +258,6 @@ class _HomePageState extends State<HomePage> {
     if (hasLoaded) return true;
     if (error != null) return true;
     return false;
-  }
-}
-
-class _PromoBanner extends StatelessWidget {
-  const _PromoBanner({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      borderRadius: BorderRadius.circular(18),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: AspectRatio(
-          aspectRatio: 2,
-          child: Image.asset(
-            'assets/images/banners/tanimart_banner.png',
-            width: double.infinity,
-            fit: BoxFit.cover,
-            semanticLabel: 'Banner TaniMart',
-          ),
-        ),
-      ),
-    );
   }
 }
 

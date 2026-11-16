@@ -18,6 +18,14 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Tema terang digunakan secara default', (tester) async {
+    await tester.pumpWidget(testApp(const MainShell()));
+    await tester.pumpAndSettle();
+
+    final context = tester.element(find.byType(Scaffold).first);
+    expect(Theme.of(context).brightness, Brightness.light);
+  });
+
   testWidgets('Setiap tab dapat dibuka tanpa galat', (tester) async {
     await tester.pumpWidget(testApp(const MainShell()));
     await tester.pumpAndSettle();

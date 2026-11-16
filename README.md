@@ -111,6 +111,8 @@ flutter build apk --dart-define=API_BASE_URL=https://api.tanimart.id/api
 
 ## API
 
+Gunakan token Sanctum dengan skema `Bearer` pada header autentikasi. Operasi admin juga memerlukan akun berperan administrator.
+
 Base URL lokal: `http://127.0.0.1:8000/api`. Endpoint bertanda **Login** memerlukan token Sanctum pada header `Authorization: Bearer <token>`. Endpoint bertanda **Admin** juga memerlukan peran administrator.
 
 | Metode | Endpoint | Akses | Fungsi |
@@ -123,15 +125,17 @@ Base URL lokal: `http://127.0.0.1:8000/api`. Endpoint bertanda **Login** memerlu
 | `GET` | `/produk/{id}` | Publik | Detail produk |
 | `GET` | `/kategori` | Publik | Daftar kategori |
 | `GET` | `/banners` | Publik | Daftar banner |
+| `GET` | `/kurir` | Publik | Daftar kurir aktif beserta tarif |
+| `GET` | `/metode-pembayaran` | Publik | Daftar metode pembayaran aktif |
+| `GET` | `/wilayah` | Publik | Daftar kurir/wilayah aktif |
 | `POST` | `/produk` | Admin | Membuat produk, unggah multipart melalui field `gambar` |
 | `PUT` | `/produk/{id}` | Admin | Mengubah produk |
 | `DELETE` | `/produk/{id}` | Admin | Menghapus produk |
 | `GET` / `POST` | `/keranjang` | Login | Melihat atau menambah item keranjang |
 | `PUT` / `DELETE` | `/keranjang/{id}` | Login | Mengubah atau menghapus item |
 | `DELETE` | `/keranjang` | Login | Mengosongkan keranjang |
-| `GET` | `/kurir` | Publik | Daftar kurir/wilayah aktif dan tarif |
-| `GET` | `/metode-pembayaran` | Publik | Daftar metode pembayaran |
 | `POST` | `/checkout` | Login | Membuat pesanan |
+| `GET` | `/checkout/{id}` | Login | Detail pesanan milik pelanggan |
 | `GET` | `/pesanan` | Login | Riwayat pesanan terbaru lebih dahulu |
 | `GET` | `/pesanan/{id}` | Login | Detail pesanan |
 | `POST` | `/pesanan/{id}/pembayaran` | Login | Mengajukan konfirmasi pembayaran |
@@ -139,7 +143,7 @@ Base URL lokal: `http://127.0.0.1:8000/api`. Endpoint bertanda **Login** memerlu
 | `PATCH` | `/pesanan/{id}/status` | Admin | Mengubah status sesuai transisi yang diizinkan |
 | `POST` | `/pesanan/{id}/kirim` | Admin | Menandai pesanan dikirim |
 
-Alias kurir yang tersedia: `/couriers` dan `/wilayah`. Endpoint penghapusan kurir menggunakan soft delete agar data pesanan lama tetap utuh.
+Alias kompatibilitas yang tersedia: `GET /banner` untuk `/banners`, `GET /categories` untuk `/kategori`, `GET /couriers` untuk `/kurir`, `GET /payment-methods` untuk `/metode-pembayaran`, `GET/POST /cart` dan `PUT/DELETE /cart/{id}` untuk keranjang, serta `GET /orders`, `GET /orders/{id}`, dan `PATCH /orders/{id}/status` untuk pesanan. Admin juga dapat mengubah status melalui `PATCH /checkout/{id}/status`. Endpoint penghapusan kurir tersedia melalui `/kurir/{id}`, `/couriers/{id}`, dan `/wilayah/{id}`; penghapusan menggunakan soft delete agar data pesanan lama tetap utuh.
 
 Respons API mengikuti bentuk umum berikut:
 
@@ -152,7 +156,50 @@ Respons API mengikuti bentuk umum berikut:
 }
 ```
 
-Respons validasi dapat menyertakan properti `errors`.
+Respons kegagalan validasi menggunakan HTTP `422` dan dapat menyertakan properti `errors` yang memetakan nama field ke daftar pesan. Kesalahan stok atau konflik status menggunakan HTTP `409`; akses tanpa autentikasi ditolak dengan HTTP `401`, sedangkan akses ke data milik pengguna lain ditolak dengan HTTP `403`.
+
+### Request checkout
+
+`POST /checkout` memerlukan token pelanggan. Contoh body JSON:
+
+```json
+{
+  "nama_penerima": "Pelanggan TaniMart",
+  "alamat_penerima": "Alamat lengkap penerima",
+  "kurir_id": 1,
+  "payment_method_id": 1,
+  "tanggal_antar": "2026-11-16",
+  "items": [
+    {
+      "product_id": 1,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+- `nama_penerima`, `alamat_penerima`, `kurir_id`, `payment_method_id`, dan `tanggal_antar` wajib diisi. Tanggal memakai format `YYYY-MM-DD` dan tidak boleh sebelum hari ini.
+- `items` opsional. Jika dihilangkan, backend memakai seluruh item pada keranjang pelanggan. Jika dikirim, setiap item memerlukan `product_id` dan `quantity` minimal 1.
+- `latitude` dan `longitude` opsional untuk kompatibilitas klien lama. Jika koordinat dikirim, keduanya wajib dikirim berpasangan; nilai harus berada dalam rentang lintang `-90..90` dan bujur `-180..180`.
+- `accuracy` opsional dan menerima angka dari `0` sampai `100000` meter. Backend tidak mewajibkan nilai ini ketika koordinat dikirim.
+- Koordinat lokasi disimpan sebagai lokasi pengiriman. Ongkir tetap memakai tarif kurir aktif (`couriers.tarif`), bukan jarak koordinat.
+- Aplikasi Flutter meminta pelanggan memilih lokasi sebelum checkout. API tetap menerima checkout tanpa koordinat agar klien lama tetap kompatibel.
+- Header idempotensi bersifat opsional: `X-Kunci-Idempoten`, `X-Idempotency-Key`, atau `Idempotency-Key`; key juga dapat dikirim sebagai `idempotency_key` di body. Ulangi key yang sama hanya untuk retry operasi checkout yang sama. Jika pesanan dengan key tersebut sudah ada untuk pelanggan yang sama, API mengembalikan pesanan itu tanpa membuat pesanan baru. Key yang dimiliki pelanggan lain menghasilkan `409`.
+- Backend menghitung subtotal, ongkir, dan total; nilai harga atau total dari klien tidak digunakan. Stok diperiksa dan dikurangi dalam transaksi.
+
+Contoh respons validasi:
+
+```json
+{
+  "status": "gagal",
+  "code": "422",
+  "message": "Validasi gagal",
+  "data": null,
+  "errors": {
+    "longitude": ["The longitude field is required when latitude is present."]
+  }
+}
+```
 
 ### Autentikasi dan keamanan data
 
@@ -169,9 +216,10 @@ Respons validasi dapat menyertakan properti `errors`.
 - Pesanan menyimpan snapshot nama dan harga produk di detail pesanan agar riwayat tidak berubah ketika katalog diperbarui.
 - Tarif kurir diambil dari data server. Pilihan kurir contoh memiliki tarif 10.000, 20.000, dan 35.000.
 - Checkout menggunakan transaksi database dan penguncian data produk/keranjang untuk memvalidasi ulang stok dan mencegah overselling.
-- Kunci idempoten wajib dikirim pada header `X-Kunci-Idempoten` (alias yang didukung: `X-Idempotency-Key`, `Idempotency-Key`, atau body `idempotency_key`). Kunci dan payload sama mengembalikan pesanan yang telah dibuat; kunci sama dengan payload berbeda menghasilkan `409`.
+- Kunci idempoten checkout opsional. Alias header yang didukung: `X-Kunci-Idempoten`, `X-Idempotency-Key`, dan `Idempotency-Key`; key juga bisa dikirim melalui body `idempotency_key`. Untuk retry, gunakan key yang sama hanya untuk operasi yang sama; key yang sudah terdaftar pada pelanggan yang sama mengembalikan pesanan terdahulu.
 - Isi `items` dapat dikirim pada request checkout; jika tidak dikirim, backend memakai keranjang pelanggan.
-- Produk mudah rusak wajib dikirim pada hari yang sama. Batas jumlah per produk dikonfigurasi melalui `CHECKOUT_MAX_MUDAH_RUSAK` (default 5). Slot pengantaran yang valid: `pagi`, `siang`, dan `sore`.
+- Koordinat pengiriman `latitude` dan `longitude` dapat dikirim berpasangan; `accuracy` bersifat opsional. Koordinat disimpan pada pesanan, tetapi tidak mengubah perhitungan tarif kurir.
+- Produk mudah rusak wajib dikirim pada hari yang sama. Batas jumlah per produk mudah rusak dikonfigurasi melalui `CHECKOUT_MAX_MUDAH_RUSAK` (default 5); produk lain dibatasi 20 unit per baris pesanan.
 
 ### Status pesanan
 
@@ -356,4 +404,3 @@ Gunakan pesan commit yang deskriptif (misal: `feat:`, `fix:`, `test:`, `docs:`) 
 | 5 | M. Adzahahabi Putra Darmawan | 24102013 | Anggota |
 | 6 | Moh Farhan Ali | 24102016 | Anggota |
 | 7 | Fera Adelia | 24102032 | Anggota |
-

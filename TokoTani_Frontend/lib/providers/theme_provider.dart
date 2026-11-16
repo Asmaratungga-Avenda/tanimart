@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Mode tema (Terang / Gelap / Sistem) yang tersimpan setelah aplikasi ditutup.
 class ThemeProvider extends ChangeNotifier {
-  ThemeProvider({ThemeMode initialMode = ThemeMode.system})
+  ThemeProvider({ThemeMode initialMode = ThemeMode.light})
     : _mode = initialMode;
 
   // Kunci lama dipertahankan agar pilihan pengguna sebelumnya tetap terbaca.
@@ -22,10 +22,10 @@ class ThemeProvider extends ChangeNotifier {
         case 'dark':
           return ThemeMode.dark;
         default:
-          return ThemeMode.system;
+          return ThemeMode.light;
       }
     } catch (_) {
-      return ThemeMode.system;
+      return ThemeMode.light;
     }
   }
 

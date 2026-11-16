@@ -21,9 +21,15 @@ Akun admin contoh (`admin@tokotani.test` / `password`) hanya tersedia dari seede
 
 - **Publik:** `GET /produk`, `GET /produk/{id}`, `GET /kategori`, `GET /banners`, `GET /kurir`, `GET /metode-pembayaran`, `GET /wilayah`.
 - **Autentikasi:** `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `POST /auth/logout`.
-- **Pelanggan:** operasi keranjang `GET/POST /keranjang`, `PUT/DELETE /keranjang/{id}`, `DELETE /keranjang`; checkout `POST /checkout`; pesanan `GET /pesanan`, `GET /pesanan/{id}`, `POST /pesanan/{id}/pembayaran`, `POST /pesanan/{id}/selesai`.
+- **Pelanggan:** operasi keranjang `GET/POST /keranjang`, `PUT/DELETE /keranjang/{id}`, `DELETE /keranjang`; checkout `POST /checkout`, detail `GET /checkout/{id}`; pesanan `GET /pesanan`, `GET /pesanan/{id}`, `POST /pesanan/{id}/pembayaran`, `POST /pesanan/{id}/selesai`.
 - **Admin:** `POST/PUT/DELETE /produk`, `PATCH /pesanan/{id}/status`, dan `POST /pesanan/{id}/kirim`.
 
-Alias route yang juga tersedia: `GET /banner`, `GET /categories`, `GET /couriers`, `GET /payment-methods`; prefix `/cart` untuk operasi keranjang; `GET /orders` dan `GET /orders/{id}` untuk pesanan; serta `PATCH /checkout/{id}/status` dan `PATCH /orders/{id}/status` untuk admin. Penghapusan kurir/wilayah tersedia melalui `DELETE /kurir/{id}`, `/couriers/{id}`, atau `/wilayah/{id}`; endpoint penghapusan ini tidak dijalankan otomatis karena mengubah data seed.
+Alias route yang juga tersedia: `GET /banner`, `GET /categories`, `GET /couriers`, dan `GET /payment-methods`; `GET/POST /cart` serta `PUT/DELETE /cart/{id}` untuk keranjang; `GET /orders` dan `GET /orders/{id}` untuk pesanan; serta `PATCH /checkout/{id}/status` dan `PATCH /orders/{id}/status` untuk admin. Penghapusan kurir/wilayah tersedia melalui `DELETE /kurir/{id}`, `/couriers/{id}`, atau `/wilayah/{id}`; endpoint penghapusan ini tidak dijalankan otomatis karena mengubah data seed.
 
-Request checkout mengirim `nama_penerima`, `alamat_penerima`, `kurir_id`, `payment_method_id`, `tanggal_antar` (`YYYY-MM-DD`), dan `items` berisi `product_id` serta `quantity`. Header `X-Idempotency-Key` diisi otomatis.
+### Checkout
+
+Request checkout mengirim `nama_penerima`, `alamat_penerima`, `kurir_id`, `payment_method_id`, dan `tanggal_antar` (`YYYY-MM-DD`). `items` berisi `product_id` dan `quantity`; field ini boleh dihilangkan untuk memakai isi keranjang pelanggan.
+
+`latitude` dan `longitude` adalah koordinat lokasi pengiriman yang opsional untuk kompatibilitas klien lama, tetapi jika salah satunya dikirim maka keduanya wajib disertakan dan harus dalam rentang lintang `-90..90` serta bujur `-180..180`. `accuracy` bersifat opsional dan menerima angka dalam meter (`0..100000`); backend tidak mewajibkannya ketika koordinat dikirim. Koordinat disimpan pada order, tidak digunakan untuk menghitung ongkir; ongkir tetap menggunakan tarif kurir dari backend. Aplikasi Flutter meminta pelanggan memilih lokasi sebelum mengirim checkout.
+
+Header `X-Idempotency-Key` pada request koleksi dibuat otomatis. Key tidak wajib; gunakan key yang sama hanya saat retry satu operasi checkout. Jika key sudah membuat pesanan untuk pelanggan yang sama, server mengembalikan pesanan yang sudah ada.

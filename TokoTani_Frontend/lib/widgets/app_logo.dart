@@ -8,15 +8,17 @@ class LogoAssets {
 
   /// Logo lengkap (emblem + tulisan). Dipakai di Splash dan Login.
   static const String full = 'assets/images/logo/tanimart_logo.png';
-
-  /// Ikon persegi (emblem saja). Dipakai di header Beranda.
-  static const String icon = 'assets/images/logo/tanimart_icon.png';
 }
 
 /// Logo TaniMart. Memakai berkas gambar bila ada; bila belum ada, otomatis
 /// memakai logo gambar-tema (ikon daun + tulisan) sehingga aplikasi tidak error.
 class AppLogo extends StatelessWidget {
-  const AppLogo({super.key, this.size = 36, this.showWordmark = true, this.full = false});
+  const AppLogo({
+    super.key,
+    this.size = 36,
+    this.showWordmark = true,
+    this.full = false,
+  });
 
   /// Tinggi logo.
   final double size;
@@ -32,22 +34,11 @@ class AppLogo extends StatelessWidget {
         LogoAssets.full,
         height: size,
         fit: BoxFit.contain,
-        errorBuilder: (context, _, _) => _Drawn(size: size * 0.45, wordmark: true),
+        errorBuilder: (context, _, _) =>
+            _Drawn(size: size * 0.45, wordmark: true),
       );
     }
-    final mark = Image.asset(
-      LogoAssets.icon,
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
-      errorBuilder: (context, _, _) => Image.asset(
-        LogoAssets.full,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        errorBuilder: (context, _, _) => _Drawn(size: size, wordmark: false),
-      ),
-    );
+    final mark = _Drawn(size: size, wordmark: false);
     if (!showWordmark) return mark;
     final p = context.palette;
     return Row(
@@ -58,8 +49,14 @@ class AppLogo extends StatelessWidget {
         Text.rich(
           TextSpan(
             children: [
-              TextSpan(text: 'Tani', style: TextStyle(color: p.textPrimary)),
-              TextSpan(text: 'Mart', style: TextStyle(color: p.brandText)),
+              TextSpan(
+                text: 'Tani',
+                style: TextStyle(color: p.textPrimary),
+              ),
+              TextSpan(
+                text: 'Mart',
+                style: TextStyle(color: p.brandText),
+              ),
             ],
           ),
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -99,8 +96,14 @@ class _Drawn extends StatelessWidget {
         Text.rich(
           TextSpan(
             children: [
-              TextSpan(text: 'Tani', style: TextStyle(color: p.textPrimary)),
-              TextSpan(text: 'Mart', style: TextStyle(color: p.brandText)),
+              TextSpan(
+                text: 'Tani',
+                style: TextStyle(color: p.textPrimary),
+              ),
+              TextSpan(
+                text: 'Mart',
+                style: TextStyle(color: p.brandText),
+              ),
             ],
           ),
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(

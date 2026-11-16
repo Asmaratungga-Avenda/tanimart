@@ -20,7 +20,7 @@ class TaniMartApp extends StatelessWidget {
   const TaniMartApp({
     super.key,
     this.home,
-    this.initialThemeMode = ThemeMode.system,
+    this.initialThemeMode = ThemeMode.light,
   });
 
   /// Hanya untuk pengujian: menggantikan AuthGate.

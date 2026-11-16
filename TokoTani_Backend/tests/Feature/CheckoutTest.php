@@ -48,6 +48,97 @@ class CheckoutTest extends TestCase
         ]);
     }
 
+    public function test_checkout_persists_valid_delivery_coordinates_without_changing_courier_tariff(): void
+    {
+        $product = $this->createProduct();
+        $courier = Courier::create(['nama' => 'Kurir Lokasi Tes', 'tarif' => 13500]);
+        $paymentMethod = PaymentMethod::create(['nama' => 'Transfer Lokasi Tes']);
+        $payload = $this->checkoutPayload(
+            $product,
+            $courier,
+            $paymentMethod,
+            now()->toDateString()
+        );
+        $payload['latitude'] = -7.9666;
+        $payload['longitude'] = 112.6326;
+        $payload['accuracy'] = 12.5;
+
+        $response = $this->postJson('/api/checkout', $payload);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.latitude', -7.9666)
+            ->assertJsonPath('data.longitude', 112.6326)
+            ->assertJsonPath('data.accuracy', 12.5)
+            ->assertJsonPath('data.ongkir', 13500);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $response->json('data.id'),
+            'latitude' => -7.9666,
+            'longitude' => 112.6326,
+            'accuracy' => 12.5,
+            'ongkir' => 13500,
+        ]);
+    }
+
+    public function test_checkout_accepts_delivery_coordinates_without_accuracy(): void
+    {
+        $product = $this->createProduct();
+        $courier = Courier::create(['nama' => 'Kurir Tanpa Akurasi Tes', 'tarif' => 10000]);
+        $paymentMethod = PaymentMethod::create(['nama' => 'Transfer Tanpa Akurasi Tes']);
+        $payload = $this->checkoutPayload(
+            $product,
+            $courier,
+            $paymentMethod,
+            now()->toDateString()
+        );
+        $payload['latitude'] = -7.9666;
+        $payload['longitude'] = 112.6326;
+
+        $response = $this->postJson('/api/checkout', $payload);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.latitude', -7.9666)
+            ->assertJsonPath('data.longitude', 112.6326)
+            ->assertJsonPath('data.accuracy', null);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $response->json('data.id'),
+            'latitude' => -7.9666,
+            'longitude' => 112.6326,
+            'accuracy' => null,
+        ]);
+    }
+
+    public function test_checkout_rejects_invalid_or_unpaired_delivery_coordinates(): void
+    {
+        $product = $this->createProduct();
+        $courier = Courier::create(['nama' => 'Kurir Koordinat Invalid Tes', 'tarif' => 10000]);
+        $paymentMethod = PaymentMethod::create(['nama' => 'Transfer Koordinat Invalid Tes']);
+        $payload = $this->checkoutPayload(
+            $product,
+            $courier,
+            $paymentMethod,
+            now()->toDateString()
+        );
+        $payload['latitude'] = 91;
+        $payload['longitude'] = 112;
+
+        $this->postJson('/api/checkout', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['latitude']);
+
+        $payload['latitude'] = -7.9;
+        unset($payload['longitude']);
+
+        $this->postJson('/api/checkout', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['longitude']);
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
     public function test_idempotency_key_prevents_duplicate_orders_and_stock_changes(): void
     {
         $product = $this->createProduct();

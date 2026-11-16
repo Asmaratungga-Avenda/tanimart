@@ -11,11 +11,4 @@ return [
     |
     */
     'max_mudah_rusak_per_pesanan' => (int) env('CHECKOUT_MAX_MUDAH_RUSAK', 5),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Slot Pengantaran
-    |--------------------------------------------------------------------------
-    */
-    'slot_pengantaran' => ['pagi', 'siang', 'sore'],
 ];
