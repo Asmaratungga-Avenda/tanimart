@@ -1,0 +1,1368 @@
+openapi: 3.0.3
+
+info:
+  title: TaniMart API
+  version: 1.0.0
+  description: |
+    Dokumentasi REST API TaniMart berdasarkan routes/api.php dan Controller Laravel yang diberikan.
+    Endpoint dilindungi menggunakan Laravel Sanctum sesuai middleware pada route.
+    Endpoint di dalam grup middleware admin juga memerlukan hak akses admin.
+
+servers:
+  - url: http://127.0.0.1:8000/api
+    description: Server pengembangan lokal Laravel
+
+tags:
+  - name: Authentication
+  - name: Produk
+  - name: Keranjang
+  - name: Kurir
+  - name: Pembayaran
+  - name: Wilayah
+  - name: Checkout
+  - name: Pesanan
+  - name: Admin
+
+security:
+  - sanctumBearer: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Registrasi pelanggan
+      description: Membuat akun dengan role customer dan mengembalikan token Sanctum.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, password_confirmation]
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  example: Budi
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  example: budi@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: rahasia123
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: rahasia123
+      responses:
+        '201':
+          description: Registrasi berhasil dan token diterbitkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login pelanggan
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: budi@example.com
+                password:
+                  type: string
+                  format: password
+                  example: rahasia123
+      responses:
+        '200':
+          description: Login berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Email atau kata sandi tidak valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Mendapatkan profil pengguna yang sedang login
+      responses:
+        '200':
+          description: Data pengguna berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout dan menghapus token aktif
+      responses:
+        '200':
+          description: Logout berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /kurir:
+    get:
+      tags: [Kurir]
+      summary: Mendapatkan daftar kurir aktif
+      description: Menggunakan CheckoutController.couriers.
+      security: []
+      responses:
+        '200':
+          description: Daftar kurir berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+  /couriers:
+    get:
+      tags: [Kurir]
+      summary: Alias daftar kurir aktif
+      description: Alias route untuk CheckoutController.couriers.
+      security: []
+      responses:
+        '200':
+          description: Daftar kurir berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+  /metode-pembayaran:
+    get:
+      tags: [Pembayaran]
+      summary: Mendapatkan metode pembayaran aktif
+      security: []
+      responses:
+        '200':
+          description: Daftar metode pembayaran berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+  /payment-methods:
+    get:
+      tags: [Pembayaran]
+      summary: Alias daftar metode pembayaran
+      security: []
+      responses:
+        '200':
+          description: Daftar metode pembayaran berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+  /wilayah:
+    get:
+      tags: [Wilayah]
+      summary: Mendapatkan daftar kurir atau wilayah antar aktif
+      security: []
+      responses:
+        '200':
+          description: Daftar kurir/wilayah antar berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KurirResponse'
+
+  /banners:
+    get:
+      tags: [Produk]
+      summary: Mendapatkan daftar banner promo
+      security: []
+      responses:
+        '200':
+          description: Daftar banner promo berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+  /banner:
+    get:
+      tags: [Produk]
+      summary: Alias daftar banner promo
+      security: []
+      responses:
+        '200':
+          description: Daftar banner promo berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+  /kategori:
+    get:
+      tags: [Produk]
+      summary: Mendapatkan daftar kategori produk
+      security: []
+      responses:
+        '200':
+          description: Daftar kategori berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+  /categories:
+    get:
+      tags: [Produk]
+      summary: Alias daftar kategori produk
+      security: []
+      responses:
+        '200':
+          description: Daftar kategori berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+  /produk:
+    get:
+      tags: [Produk]
+      summary: Mendapatkan daftar produk
+      security: []
+      parameters:
+        - name: kategori
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter berdasarkan nama kategori.
+        - name: cari
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Pencarian berdasarkan nama produk.
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 15
+          description: Jumlah data per halaman.
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Nomor halaman.
+      responses:
+        '200':
+          description: Daftar produk berhasil diambil. Informasi pagination berada di meta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+
+    post:
+      tags: [Admin]
+      summary: Menambahkan produk (Admin)
+      description: Memerlukan middleware admin. Gunakan multipart/form-data jika mengunggah gambar.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductWrite'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductWrite'
+      responses:
+        '201':
+          description: Produk berhasil ditambahkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /produk/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Produk]
+      summary: Mendapatkan detail produk
+      security: []
+      responses:
+        '200':
+          description: Rincian produk berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Admin]
+      summary: Memperbarui produk (Admin)
+      description: Semua field bersifat opsional sesuai aturan sometimes pada validasi Controller. Gunakan multipart/form-data untuk upload gambar.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+      responses:
+        '200':
+          description: Produk berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    delete:
+      tags: [Admin]
+      summary: Menghapus produk (Admin)
+      responses:
+        '200':
+          description: Produk berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Produk masih digunakan dalam pesanan aktif sehingga tidak dapat dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /keranjang:
+    get:
+      tags: [Keranjang]
+      summary: Melihat isi keranjang pelanggan
+      responses:
+        '200':
+          description: Isi keranjang berhasil diambil, termasuk subtotal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Keranjang]
+      summary: Menambahkan produk ke keranjang
+      description: Mendukung produk_id atau product_id, serta jumlah atau quantity. Jika produk sudah ada, jumlah akan ditambahkan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                produk_id:
+                  type: integer
+                  example: 1
+                  description: Gunakan produk_id atau product_id.
+                product_id:
+                  type: integer
+                  example: 1
+                jumlah:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                  example: 2
+                  description: Gunakan jumlah atau quantity.
+                quantity:
+                  type: integer
+                  minimum: 1
+                  example: 2
+      responses:
+        '201':
+          description: Produk baru berhasil ditambahkan ke keranjang.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '200':
+          description: Jumlah produk yang sudah ada berhasil ditambahkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '409':
+          description: Produk tidak tersedia atau stok tidak mencukupi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Keranjang]
+      summary: Mengosongkan seluruh keranjang pelanggan
+      responses:
+        '200':
+          description: Seluruh isi keranjang berhasil dikosongkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /keranjang/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Keranjang]
+      summary: Mengubah jumlah item keranjang
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jumlah:
+                  type: integer
+                  minimum: 1
+                  example: 3
+                quantity:
+                  type: integer
+                  minimum: 1
+                  example: 3
+              description: Kirim jumlah atau quantity.
+      responses:
+        '200':
+          description: Jumlah item keranjang berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Produk tidak tersedia atau stok tidak mencukupi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Keranjang]
+      summary: Menghapus satu item keranjang
+      responses:
+        '200':
+          description: Item keranjang berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart:
+    get:
+      tags: [Keranjang]
+      summary: Alias melihat isi keranjang
+      responses:
+        '200':
+          description: Isi keranjang berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Keranjang]
+      summary: Alias menambahkan produk ke keranjang
+      description: Meneruskan ke CartController.store.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                produk_id:
+                  type: integer
+                  example: 1
+                product_id:
+                  type: integer
+                  example: 1
+                jumlah:
+                  type: integer
+                  minimum: 1
+                  example: 2
+                quantity:
+                  type: integer
+                  minimum: 1
+                  example: 2
+      responses:
+        '200':
+          description: Produk berhasil ditambahkan atau jumlah diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '201':
+          description: Produk baru berhasil ditambahkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '409':
+          description: Produk tidak tersedia atau stok tidak mencukupi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /cart/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Keranjang]
+      summary: Alias mengubah jumlah item keranjang
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jumlah:
+                  type: integer
+                  minimum: 1
+                  example: 3
+                quantity:
+                  type: integer
+                  minimum: 1
+                  example: 3
+      responses:
+        '200':
+          description: Jumlah item berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Produk tidak tersedia atau stok tidak mencukupi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Keranjang]
+      summary: Alias menghapus satu item keranjang
+      responses:
+        '200':
+          description: Item keranjang berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /checkout:
+    post:
+      tags: [Checkout]
+      summary: Membuat pesanan atau checkout
+      description: |
+        Jika items tidak dikirim, item diambil dari keranjang pelanggan.
+        Mendukung idempotency key melalui header X-Kunci-Idempoten,
+        X-Idempotency-Key, Idempotency-Key, atau body idempotency_key.
+        Produk mudah rusak wajib dikirim pada hari yang sama.
+      parameters:
+        - name: X-Kunci-Idempoten
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Kunci idempotensi; alternatifnya X-Idempotency-Key atau Idempotency-Key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nama_penerima, alamat_penerima, kurir_id, payment_method_id, tanggal_antar]
+              properties:
+                nama_penerima:
+                  type: string
+                  maxLength: 255
+                  example: Budi Santoso
+                alamat_penerima:
+                  type: string
+                  maxLength: 2000
+                  example: Jl. Melati No. 10, Malang
+                kurir_id:
+                  type: integer
+                  example: 1
+                payment_method_id:
+                  type: integer
+                  example: 1
+                tanggal_antar:
+                  type: string
+                  format: date
+                  example: '2026-11-20'
+                slot_pengantaran:
+                  type: string
+                  nullable: true
+                  example: Pagi
+                idempotency_key:
+                  type: string
+                  nullable: true
+                  maxLength: 255
+                  example: checkout-budi-001
+                items:
+                  type: array
+                  minItems: 1
+                  description: Opsional. Jika tidak dikirim, item diambil dari keranjang.
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id:
+                        type: integer
+                        example: 1
+                      quantity:
+                        type: integer
+                        minimum: 1
+                        example: 2
+      responses:
+        '201':
+          description: Checkout berhasil diproses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '200':
+          description: Pesanan dengan idempotency key tersebut sudah diproses sebelumnya.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          description: Produk tidak ditemukan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '409':
+          description: Stok tidak tersedia atau kunci idempotensi digunakan akun lain.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          description: Terjadi kesalahan pada server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /checkout/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Checkout]
+      summary: Melihat detail checkout atau pesanan milik pelanggan
+      responses:
+        '200':
+          description: Rincian pesanan berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /checkout/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Admin]
+      summary: Mengubah status pesanan (Admin)
+      description: Memerlukan middleware admin dan transisi status harus diizinkan oleh model Order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [menunggu_pembayaran, menunggu_konfirmasi, dibayar, diproses, dikirim, tiba, selesai, dibatalkan]
+                  example: diproses
+      responses:
+        '200':
+          description: Status pesanan berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Perubahan status pesanan tidak diizinkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /pesanan:
+    get:
+      tags: [Pesanan]
+      summary: Mendapatkan daftar pesanan pelanggan yang login
+      responses:
+        '200':
+          description: Daftar pesanan berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /pesanan/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Pesanan]
+      summary: Mendapatkan detail pesanan milik pelanggan yang login
+      responses:
+        '200':
+          description: Rincian pesanan berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /pesanan/{id}/pembayaran:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Pesanan]
+      summary: Mengajukan konfirmasi pembayaran
+      description: Hanya pemilik pesanan dan hanya saat status menunggu_pembayaran. Verifikasi tetap dilakukan admin.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment_method_id:
+                  type: integer
+                  example: 1
+                  description: Opsional; jika tidak dikirim metode pembayaran sebelumnya dipertahankan.
+      responses:
+        '200':
+          description: Konfirmasi pembayaran diterima dan menunggu verifikasi admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Status pesanan tidak memungkinkan konfirmasi pembayaran.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /pesanan/{id}/selesai:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Pesanan]
+      summary: Menyelesaikan pesanan
+      description: Hanya pemilik pesanan. Pesanan harus berstatus dikirim atau tiba.
+      responses:
+        '200':
+          description: Pesanan berhasil diselesaikan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Pesanan belum dapat diselesaikan, sudah selesai, atau dibatalkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /pesanan/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Admin]
+      summary: Alias mengubah status pesanan (Admin)
+      description: Memerlukan middleware admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [menunggu_pembayaran, menunggu_konfirmasi, dibayar, diproses, dikirim, tiba, selesai, dibatalkan]
+                  example: diproses
+      responses:
+        '200':
+          description: Status pesanan berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Transisi status tidak diizinkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /pesanan/{id}/kirim:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Admin]
+      summary: Mengirim pesanan (Admin)
+      description: Memerlukan middleware admin. Pesanan harus berstatus diproses; simulasi pengiriman dapat dijalankan melalui queue.
+      responses:
+        '200':
+          description: Pesanan berhasil dikirim.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Pesanan belum dapat dikirim atau transisi status tidak diizinkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /orders:
+    get:
+      tags: [Pesanan]
+      summary: Alias daftar pesanan pelanggan
+      responses:
+        '200':
+          description: Daftar pesanan berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+
+  /orders/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Admin]
+      summary: Alias mengubah status pesanan (Admin)
+      description: Memerlukan middleware admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [menunggu_pembayaran, menunggu_konfirmasi, dibayar, diproses, dikirim, tiba, selesai, dibatalkan]
+                  example: diproses
+      responses:
+        '200':
+          description: Status pesanan berhasil diperbarui.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Transisi status tidak diizinkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Pesanan]
+      summary: Alias detail pesanan pelanggan
+      responses:
+        '200':
+          description: Rincian pesanan berhasil diambil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /couriers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Admin]
+      summary: Menghapus kurir (Admin)
+      description: Memerlukan middleware admin. Penghapusan menggunakan soft delete.
+      responses:
+        '200':
+          description: Kurir/wilayah antar berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KurirDeleteResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+
+  /wilayah/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Admin]
+      summary: Menghapus kurir/wilayah antar (Admin)
+      description: Memerlukan middleware admin. Menggunakan KurirController.destroy dan soft delete.
+      responses:
+        '200':
+          description: Kurir/wilayah antar berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KurirDeleteResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /kurir/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Admin]
+      summary: Alias menghapus kurir (Admin)
+      description: Memerlukan middleware admin. Penghapusan menggunakan soft delete.
+      responses:
+        '200':
+          description: Kurir/wilayah antar berhasil dihapus.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KurirDeleteResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    sanctumBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: ID data pada resource terkait.
+      schema:
+        type: integer
+        minimum: 1
+        example: 1
+
+  schemas:
+    AuthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: sukses
+        code:
+          type: string
+          example: '201'
+        message:
+          type: string
+          example: Autentikasi berhasil.
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: Plain text Sanctum token. Salin ke tombol Authorize.
+            user:
+              type: object
+              additionalProperties: true
+
+    AuthMeResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: sukses
+        code:
+          type: string
+          example: '200'
+        message:
+          type: string
+          example: Data pelanggan berhasil diambil.
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              additionalProperties: true
+
+    AuthError:
+      type: object
+      properties:
+        status:
+          type: string
+          example: gagal
+        code:
+          type: string
+          example: '401'
+        message:
+          type: string
+          example: Email atau kata sandi tidak valid.
+
+    BasicResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: sukses
+        code:
+          type: string
+          example: '200'
+        message:
+          type: string
+        data:
+          nullable: true
+          description: Isi data mengikuti resource terkait.
+          example: null
+
+    KurirResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: sukses
+        code:
+          type: string
+          example: '200'
+        message:
+          type: string
+          example: Daftar kurir/wilayah antar berhasil diambil
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    KurirDeleteResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: sukses
+        code:
+          type: string
+          example: '200'
+        message:
+          type: string
+          example: Kurir/wilayah antar berhasil dihapus
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            dipakai_pada_pesanan:
+              type: boolean
+              example: true
+
+    EnvelopeResponse:
+      type: object
+      description: Bentuk envelope yang digunakan oleh sebagian besar Cart, Product, dan Checkout responses.
+      properties:
+        success:
+          type: boolean
+          example: true
+        status:
+          type: string
+          example: sukses
+        code:
+          type: string
+          example: '200'
+        message:
+          type: string
+        data:
+          nullable: true
+          description: Struktur data mengikuti endpoint.
+        meta:
+          nullable: true
+          description: Metadata pagination atau metadata lain jika tersedia.
+        errors:
+          nullable: true
+          description: Detail validasi jika terjadi kesalahan.
+
+    ProductWrite:
+      type: object
+      required: [nama, harga, stok, tersedia, satuan_jual, mudah_rusak]
+      properties:
+        nama:
+          type: string
+          maxLength: 255
+          example: Apel Fuji
+        harga:
+          type: integer
+          minimum: 0
+          example: 25000
+        kategori:
+          type: string
+          nullable: true
+          example: Buah
+        category_id:
+          type: integer
+          nullable: true
+          example: 1
+        stok:
+          type: integer
+          minimum: 0
+          example: 50
+        tersedia:
+          type: boolean
+          example: true
+        deskripsi:
+          type: string
+          nullable: true
+          example: Apel segar.
+        satuan_jual:
+          type: string
+          example: kg
+        mudah_rusak:
+          type: boolean
+          example: false
+        gambar:
+          type: string
+          format: binary
+          description: File gambar jpeg, png, jpg, gif, atau webp; maksimum 4096 KB.
+
+    ProductUpdate:
+      type: object
+      properties:
+        nama:
+          type: string
+          maxLength: 255
+        harga:
+          type: integer
+          minimum: 0
+        kategori:
+          type: string
+          nullable: true
+        category_id:
+          type: integer
+          nullable: true
+        stok:
+          type: integer
+          minimum: 0
+        tersedia:
+          type: boolean
+        deskripsi:
+          type: string
+          nullable: true
+        satuan_jual:
+          type: string
+        mudah_rusak:
+          type: boolean
+        gambar:
+          type: string
+          format: binary
+          description: File gambar jpeg, png, jpg, gif, atau webp; maksimum 4096 KB.
+
+  responses:
+    Unauthorized:
+      description: Token tidak ada, tidak valid, atau sudah tidak berlaku.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    Forbidden:
+      description: Pengguna tidak memiliki izin untuk mengakses resource ini.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    NotFound:
+      description: Data tidak ditemukan.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/EnvelopeResponse'
+    ValidationError:
+      description: Validasi request gagal.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
